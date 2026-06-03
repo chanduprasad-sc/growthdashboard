@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>smallcase B2B growth & support analytics dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- html2canvas for capturing dashboard screenshots -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body class="light-mode">
+    <!-- Apple-inspired Liquid Glass Background Mesh and Noise Overlay -->
+    <div class="bg-mesh">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+        <div class="blob blob-4"></div>
+    </div>
+    <div class="noise-overlay"></div>
+
+    <!-- Floating button to restore sidebar -->
+    <button id="sidebar-expand-btn" class="sidebar-expand-btn hidden" title="Show Sidebar">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+    </button>
+
+    <div class="dashboard-wrapper">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <button id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Hide Sidebar">◀</button>
+            <div class="brand">
+                <div class="brand-logo"></div>
+                <div class="brand-text">
+                    <span class="brand-title">smallcase</span>
+                    <span class="brand-subtitle">B2B growth</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-btn active" data-tab="tab-weekly-pulse">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+                    Weekly Pulse
+                </button>
+                <button class="nav-btn" data-tab="tab-main-dashboard">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 13h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm10 0h6c.55 0 1-.45 1-1v-8c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0-18v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1z"/></svg>
+                    Main Dashboard
+                </button>
+                <button class="nav-btn" data-tab="tab-visual-control">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2z"/></svg>
+                    Visual Control
+                </button>
+                <button class="nav-btn" data-tab="tab-neo">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/></svg>
+                    B2B Neo
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="theme-toggle-btn" class="theme-toggle">
+                    <span class="toggle-icon sun-icon">☀️</span>
+                    <span class="toggle-icon moon-icon">🌙</span>
+                    <span class="toggle-icon black-icon">🌑</span>
+                    <span class="toggle-text theme-text">Dark Mode</span>
+                </button>
+                <div class="sync-info">
+                    <span>Database Gen Timestamp</span>
+                    <strong id="data-gen-time">Loading...</strong>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace Frame -->
+        <main class="workspace">
+            <!-- Global Controls & Capture -->
+            <header class="workspace-header">
+                <div class="header-intro">
+                    <h1 class="header-title" id="page-title">Weekly Pulse</h1>
+                    <p class="header-subtitle">Comparative weekly reports & segment hotspot analytics</p>
+                </div>
+                
+                <!-- Screenshot Trigger & Filters -->
+                <div class="top-utility-bar">
+                    <button id="screenshot-btn" class="screenshot-btn" title="Download Weekly Pulse Dashboard Summary">
+                        <span class="btn-icon">📸</span> Take Dashboard Screenshot
+                    </button>
+                </div>
+            </header>
+
+            <!-- Filters Panel (Global) -->
+            <div class="filter-panel weekly-filters-container">
+                <!-- Row 1: Preset Timeline & Custom Range -->
+                <div class="filter-row" style="margin-bottom: 16px;">
+                    <!-- Date Presets -->
+                    <div class="filter-group">
+                        <label class="filter-label">Preset Timeline</label>
+                        <div class="preset-buttons">
+                            <button class="preset-btn" data-preset="today">Today</button>
+                            <button class="preset-btn" data-preset="yesterday">Yesterday</button>
+                            <button class="preset-btn" data-preset="7d">Last 7d</button>
+                            <button class="preset-btn active" data-preset="30d">Last 30d</button>
+                            <button class="preset-btn" data-preset="month">This Month</button>
+                            <button class="preset-btn" data-preset="year">This Year</button>
+                            <button class="preset-btn" id="current-week-preset-btn" data-preset="week">Current Week</button>
+                        </div>
+                    </div>
+
+                    <!-- Custom Range -->
+                    <div class="filter-group">
+                        <label class="filter-label">Custom Range</label>
+                        <div class="date-inputs">
+                            <input type="date" id="filter-date-from" class="date-picker">
+                            <span class="date-separator">to</span>
+                            <input type="date" id="filter-date-to" class="date-picker">
+                            <button id="apply-date-btn" class="apply-btn">Apply Range</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Channel, Select Dropdowns, Reset -->
+                <div class="filter-row-sub" style="border-top: 1px solid var(--border-color); padding-top: 16px;">
+                    <!-- Channel filter pills -->
+                    <div class="filter-group">
+                        <label class="filter-label">Quick Channel Filters</label>
+                        <div class="channel-pills">
+                            <button class="pill-btn active" data-channel="all">Combined</button>
+                            <button class="pill-btn" data-channel="Call Ticket">Call Tickets</button>
+                            <button class="pill-btn" data-channel="WhatsApp Chat">WhatsApp</button>
+                            <button class="pill-btn" data-channel="Care Email">Care Emails</button>
+                        </div>
+                    </div>
+
+                    <!-- Dropdowns and Reset button -->
+                    <div class="filter-row-group" style="margin-left: auto;">
+                        <div class="filter-group">
+                            <select id="filter-broker" class="dropdown-select">
+                                <option value="all">All Broker Families</option>
+                                <!-- Dynamic -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <select id="filter-poc" class="dropdown-select">
+                                <option value="all">All Assigned POCs</option>
+                                <!-- Dynamic -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <select id="filter-agent" class="dropdown-select">
+                                <option value="all">All Support Agents</option>
+                                <!-- Dynamic -->
+                            </select>
+                        </div>
+                        <button id="weekly-reset-btn" class="reset-btn flex-center" style="height: 38px; margin-top: auto; margin-left: 8px;">
+                            Reset Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB-DASHBOARD 1: WEEKLY PULSE (THE POWERHOUSE) -->
+            <section id="tab-weekly-pulse" class="tab-content active">
+                
+                <!-- Capture Target Container (For screenshot purposes) -->
+                <div id="weekly-pulse-dashboard-capture-area">
+                    
+                    <!-- Section 1: Key Metrics Widget -->
+                    <div class="dashboard-section-wrapper">
+                        <h2 class="section-heading">Key Support Metrics</h2>
+                        <div class="kpi-grid">
+                            <div class="kpi-card" id="card-interactions">
+                                <span class="kpi-title">Total Interactions</span>
+                                <div class="kpi-value" id="pulse-total-interactions">0</div>
+                                <div class="kpi-desc">Chats + Tickets + Emails</div>
+                            </div>
+                            <div class="kpi-card" id="card-tickets">
+                                <span class="kpi-title">Call Tickets</span>
+                                <div class="kpi-value" id="pulse-call-tickets">0</div>
+                                <div class="kpi-desc">DevRev Tickets created</div>
+                            </div>
+                            <div class="kpi-card" id="card-whatsapp">
+                                <span class="kpi-title">WhatsApp Chats</span>
+                                <div class="kpi-value" id="pulse-whatsapp-chats">0</div>
+                                <div class="kpi-desc">WhatsApp conversations</div>
+                            </div>
+                            <div class="kpi-card" id="card-answered">
+                                <span class="kpi-title">Answered Calls</span>
+                                <div class="kpi-value text-green" id="pulse-answered-calls">0</div>
+                                <div class="kpi-desc">Voice calls connected</div>
+                            </div>
+                            <div class="kpi-card" id="card-missed">
+                                <span class="kpi-title">Missed Calls</span>
+                                <div class="kpi-value text-red" id="pulse-missed-calls">0</div>
+                                <div class="kpi-desc">Voice calls missed/abandoned</div>
+                            </div>
+                            <div class="kpi-card" id="card-aoh">
+                                <span class="kpi-title">AOH Calls</span>
+                                <div class="kpi-value text-blue" id="pulse-aoh-calls">0</div>
+                                <div class="kpi-desc">After Office Hours calls</div>
+                            </div>
+                            <div class="kpi-card" id="card-aht">
+                                <span class="kpi-title">Avg Handling Time</span>
+                                <div class="kpi-value" id="pulse-aht">00:00</div>
+                                <div class="kpi-desc">Avg talk time per answered call</div>
+                            </div>
+                            <div class="kpi-card" id="card-aqt">
+                                <span class="kpi-title">Avg Queue Time</span>
+                                <div class="kpi-value" id="pulse-aqt">00:00</div>
+                                <div class="kpi-desc">Avg time to answer calls</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: POC Query Heatmap -->
+                    <div class="dashboard-section-wrapper">
+                        <div class="section-heading-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h2 class="section-heading" style="margin-bottom: 0; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.8px;">POC Query Heat Map <span style="font-weight: 500; font-size: 0.76rem; text-transform: none; color: var(--text-muted); margin-left: 8px;">Branch ownership and repeat clusters</span></h2>
+                        </div>
+                        <div class="visual-card heatmap-card" style="min-height: auto;">
+                            <div class="card-header-row" style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px;">
+                                <h3 class="card-title" style="font-size: 1.05rem;">POC Query Heat Map</h3>
+                                <span class="card-subtitle" style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 0;">3rd row of Key Metrics · click any POC for deepdive</span>
+                            </div>
+                            <div class="poc-blocks-container" id="pulse-poc-blocks-container">
+                                <!-- Dynamic POC Cards (Blocks) -->
+                            </div>
+                            <p class="poc-blocks-footer" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                                Snapshot-ready POC split: each tile shows total contacts, channel mix, highest branch, RM, issue/sub-issue and repeated RM-branch-issue-sub-issue clusters.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Charts - Row 1 (Comparison & POC Bars) -->
+                    <div class="chart-row-2">
+                        <div class="visual-card">
+                            <h3 class="card-title">Weekly Support Volume Comparison</h3>
+                            <p class="card-subtitle">Comparing present week metrics with previous week (Mon-Sun window)</p>
+                            <div class="chart-container">
+                                <canvas id="chart-weekly-comparison"></canvas>
+                            </div>
+                        </div>
+                        <div class="visual-card">
+                            <h3 class="card-title">POC-wise Support Contacts</h3>
+                            <p class="card-subtitle">Support volume load distributed among POCs</p>
+                            <div class="chart-container">
+                                <canvas id="chart-poc-contacts"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Charts - Row 2 (Trends & Calls Breakdown) -->
+                    <div class="chart-row-2">
+                        <div class="visual-card">
+                            <h3 class="card-title">Support Channels Trend</h3>
+                            <p class="card-subtitle">Daily volumes of tickets, chats, and emails</p>
+                            <div class="chart-container">
+                                <canvas id="chart-pulse-trend"></canvas>
+                            </div>
+                        </div>
+                        <div class="visual-card">
+                            <h3 class="card-title">Call Log Status Composition</h3>
+                            <p class="card-subtitle">Calls answered, missed, AOH, and abandoned distribution</p>
+                            <div class="chart-container">
+                                <canvas id="chart-call-status-pie"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 5: Meta Metrics & 7-Day Repeat Loops -->
+                    <div class="chart-row-2">
+                        <div class="visual-card meta-kpi-subcard">
+                            <h3 class="card-title">Active Support Cohorts</h3>
+                            <p class="card-subtitle">Volumes in current slice vs. previous comparative period</p>
+                            <div class="meta-metrics-grid">
+                                <div class="meta-metric-item">
+                                    <span class="meta-label">Active Relationship Managers</span>
+                                    <div class="meta-val-row">
+                                        <strong class="meta-value" id="meta-rms-val">0</strong>
+                                        <span class="meta-comparison" id="meta-rms-cmp">0 vs prev</span>
+                                    </div>
+                                </div>
+                                <div class="meta-metric-item">
+                                    <span class="meta-label">Active Partner Brokerages</span>
+                                    <div class="meta-val-row">
+                                        <strong class="meta-value" id="meta-brokers-val">0</strong>
+                                        <span class="meta-comparison" id="meta-brokers-cmp">0 vs prev</span>
+                                    </div>
+                                </div>
+                                <div class="meta-metric-item">
+                                    <span class="meta-label">Active Partner Branches</span>
+                                    <div class="meta-val-row">
+                                        <strong class="meta-value" id="meta-branches-val">0</strong>
+                                        <span class="meta-comparison" id="meta-branches-cmp">0 vs prev</span>
+                                    </div>
+                                </div>
+                                <div class="meta-metric-item">
+                                    <span class="meta-label">Systemic Repeat 7-Day Loops</span>
+                                    <div class="meta-val-row">
+                                        <strong class="meta-value text-red" id="meta-loops-val">0</strong>
+                                        <span class="meta-comparison text-red" id="meta-loops-cmp">0 vs prev</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 7-Day Repeat Loops list -->
+                        <div class="visual-card">
+                            <h3 class="card-title">Repeat Loop Analysis (Friction Hotspots)</h3>
+                            <p class="card-subtitle">RMs raising identical issues in short timeframes</p>
+                            <div class="repeat-loops-table-wrapper scrollbar-themed flex-grow">
+                                <table class="dashboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Relationship Manager</th>
+                                            <th>Broker</th>
+                                            <th>Branch</th>
+                                            <th>Issue</th>
+                                            <th class="text-right">Repeat Loop Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="pulse-loops-body">
+                                        <!-- Dynamic -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 6: Issue Hotspots & Entity Summaries -->
+                    <div class="chart-row-2">
+                        <!-- Hotspots widget -->
+                        <div class="visual-card">
+                            <h3 class="card-title">Critical Issue Hotspots (Volume Ranked)</h3>
+                            <p class="card-subtitle">Highest volume combinations sorted in descending order</p>
+                            <div class="hotspots-list scrollbar-themed" id="pulse-hotspots-list">
+                                <!-- Dynamic -->
+                            </div>
+                        </div>
+
+                        <!-- Top Entities widget -->
+                        <div class="visual-card">
+                            <h3 class="card-title">Top Entity Directory</h3>
+                            <p class="card-subtitle">Identified top support drivers in active segment</p>
+                            <div class="top-entities-directory" id="pulse-entities-dir">
+                                <div class="dir-item"><span class="dir-lbl">Top Point of Contact:</span> <strong class="dir-val" id="dir-top-poc">-</strong></div>
+                                <div class="dir-item"><span class="dir-lbl">Top Support Agent:</span> <strong class="dir-val" id="dir-top-agent">-</strong></div>
+                                <div class="dir-item"><span class="dir-lbl">Top Active Branch:</span> <strong class="dir-val" id="dir-top-branch">-</strong></div>
+                                <div class="dir-item"><span class="dir-lbl">Top Relationship Manager:</span> <strong class="dir-val" id="dir-top-rm">-</strong></div>
+                                <div class="dir-item"><span class="dir-lbl">Top Partner Broker:</span> <strong class="dir-val" id="dir-top-broker">-</strong></div>
+                                <div class="dir-item"><span class="dir-lbl">Top Support Channel:</span> <strong class="dir-val" id="dir-top-channel">-</strong></div>
+                                <div class="dir-item"><span class="dir-lbl">Top Issue Type:</span> <strong class="dir-val" id="dir-top-issue">-</strong></div>
+                                <div class="dir-item"><span class="dir-lbl">Top Sub-issue Type:</span> <strong class="dir-val" id="dir-top-subissue">-</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 7: Attribute Explorer Widget -->
+                    <div class="visual-card attribute-explorer-card">
+                        <h3 class="card-title">Cross-Attribute Explorer Matrix</h3>
+                        <p class="card-subtitle">Click on any category tab, choose an option, and dissect its sub-attributes dynamically</p>
+                        
+                        <!-- Top tabs of Attribute Explorer -->
+                        <div class="explorer-tabs" id="explorer-top-tabs">
+                            <button class="exp-tab-btn active" data-attr="broker_family">RM Broker Name</button>
+                            <button class="exp-tab-btn" data-attr="poc">POC</button>
+                            <button class="exp-tab-btn" data-attr="agent">Agent</button>
+                            <button class="exp-tab-btn" data-attr="branch">Branch Location</button>
+                            <button class="exp-tab-btn" data-attr="rm_name">RM Name</button>
+                            <button class="exp-tab-btn" data-attr="channel">Channel</button>
+                            <button class="exp-tab-btn" data-attr="issue">Issue Type</button>
+                            <button class="exp-tab-btn" data-attr="sub_issue">Sub-issue Type</button>
+                        </div>
+
+                        <div class="explorer-body">
+                            <!-- Left: Options list -->
+                            <div class="explorer-left-pane scrollbar-themed">
+                                <div class="explorer-pane-header" id="exp-options-header">Select Broker Options</div>
+                                <div class="explorer-list-group" id="explorer-options-list">
+                                    <!-- Dynamic Options list -->
+                                </div>
+                            </div>
+
+                            <!-- Right: Dynamic dissected sub-attributes distribution -->
+                            <div class="explorer-right-pane scrollbar-themed">
+                                <div class="explorer-pane-header" id="exp-details-header">Dissection Analysis</div>
+                                <div id="explorer-dissect-empty" class="explorer-dissect-empty">
+                                    <span>🔍 Click an option on the left to analyze its cross-attribute breakdown.</span>
+                                </div>
+                                <div id="explorer-dissect-content" class="explorer-dissect-content hidden">
+                                    <div class="dissect-header-row">
+                                        <h2 id="dissect-target-title">Jaipur Branch</h2>
+                                        <span class="badge" id="dissect-target-count">24 issues</span>
+                                    </div>
+                                    <div class="dissect-grid" id="explorer-dissect-grid">
+                                        <!-- Dynamic breakdown sections -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 8: Comment Intelligence Summarizer -->
+                    <div class="visual-card comments-summarizer-card">
+                        <div class="summarizer-header">
+                            <div>
+                                <h3 class="card-title">Comment Intelligence & Resolution Summarizer</h3>
+                                <p class="card-subtitle">Summarise unstructured comment logs inside selected period using NVIDIA AI Nano LLM</p>
+                            </div>
+                            <button id="ai-summarise-btn" class="ai-btn">
+                                <span class="ai-btn-icon">⚡</span> Summarise Comments (AI)
+                            </button>
+                        </div>
+                        
+                        <div class="summarizer-workspace">
+                            <!-- Raw comment scroll log preview -->
+                            <div class="summarizer-left-pane">
+                                <h4 class="lens-section-title">Underlying Comments Registry</h4>
+                                <div class="comments-preview-list scrollbar-themed" id="pulse-comments-preview-list">
+                                    <!-- Dynamic -->
+                                </div>
+                            </div>
+
+                            <!-- AI Output display block -->
+                            <div class="summarizer-right-pane">
+                                <h4 class="lens-section-title">AI Summary Analysis Output</h4>
+                                <div class="ai-summary-output scrollbar-themed" id="ai-summary-output-block">
+                                    <div class="ai-empty-state" id="ai-empty-state">
+                                        <div class="ai-empty-icon">🤖</div>
+                                        <p>Click the <strong>"Summarise Comments (AI)"</strong> button above to invoke the NVIDIA Nemotron LLM. It will cluster the comments and extract actionable friction recommendations.</p>
+                                    </div>
+                                    <div class="ai-loading-state hidden" id="ai-loading-state">
+                                        <div class="spinner"></div>
+                                        <p>Invoking NVIDIA Nemotron omni-30b LLM...</p>
+                                        <span class="small-info">Parsing text logs & generating JSON narrative...</span>
+                                    </div>
+                                    <div class="ai-content-state hidden" id="ai-content-state">
+                                        <div class="ai-narrative" id="ai-narrative-block">
+                                            <!-- HTML Narrative summary -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 9: Live B2B Interaction Feed Strip -->
+                    <div class="visual-card live-feed-card">
+                        <div class="live-feed-header">
+                            <span class="live-dot-pulse"></span>
+                            <span class="live-feed-title">Live RM Friction Feed</span>
+                            <span class="live-feed-desc">Recent support logs rolling stream</span>
+                        </div>
+                        <div class="live-feed-viewport">
+                            <div class="live-feed-track" id="pulse-live-feed-track">
+                                <!-- Dynamic horizontal comments cards -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div> <!-- Capture Target Container End -->
+            </section>
+
+            <!-- SUB-DASHBOARD 2: MAIN DASHBOARD (PLACEHOLDER) -->
+            <section id="tab-main-dashboard" class="tab-content">
+                <div class="placeholder-container">
+                    <div class="placeholder-icon">📊</div>
+                    <h2>Main Dashboard Analytics</h2>
+                    <p class="placeholder-text">This section will host the main business performance matrix, partner health metrics, and volume projections.</p>
+                    <div class="placeholder-status-badge">Waiting for design instructions</div>
+                </div>
+            </section>
+
+            <!-- SUB-DASHBOARD 3: VISUAL CONTROL -->
+            <section id="tab-visual-control" class="tab-content">
+                <!-- 10 KPI Card Grid -->
+                <div class="vc-kpi-grid">
+                    <div class="kpi-card vc-kpi-card accent-purple">
+                        <span class="vc-kpi-label">TOTAL INTERACTIONS</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-total">0</strong>
+                        <span class="vc-kpi-desc">Call tickets + WhatsApp + Emails</span>
+                    </div>
+                    <div class="kpi-card vc-kpi-card accent-blue">
+                        <span class="vc-kpi-label">CALL TICKETS</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-calls">0</strong>
+                        <span class="vc-kpi-desc">Answered, missed and AOH calls from DevRev title</span>
+                    </div>
+                    <div class="kpi-card vc-kpi-card accent-green">
+                        <span class="vc-kpi-label">WHATSAPP</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-whatsapp">0</strong>
+                        <span class="vc-kpi-desc">WhatsApp chats in filtered slice</span>
+                    </div>
+                    <div class="kpi-card vc-kpi-card accent-orange">
+                        <span class="vc-kpi-label">CARE EMAILS</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-emails">0</strong>
+                        <span class="vc-kpi-desc">Care email tickets in filtered slice</span>
+                    </div>
+                    <div class="kpi-card vc-kpi-card accent-purple">
+                        <span class="vc-kpi-label">ACTIVE RMS</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-rms">0</strong>
+                        <span class="vc-kpi-desc">RM names across all channels</span>
+                    </div>
+                    <div class="kpi-card vc-kpi-card accent-orange">
+                        <span class="vc-kpi-label">ACTIVE BROKERS</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-brokers">0</strong>
+                        <span class="vc-kpi-desc">Broker families in slice</span>
+                    </div>
+                    <div class="kpi-card vc-kpi-card accent-blue">
+                        <span class="vc-kpi-label">ACTIVE BRANCHES</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-branches">0</strong>
+                        <span class="vc-kpi-desc">Locations in view</span>
+                    </div>
+                    <div class="kpi-card vc-kpi-card accent-green">
+                        <span class="vc-kpi-label">ACTIVE POCS</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-pocs">0</strong>
+                        <span class="vc-kpi-desc">Branch ownership from POC-Branch</span>
+                    </div>
+                    <div class="kpi-card vc-kpi-card accent-red">
+                        <span class="vc-kpi-label">REPEAT LOOPS</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-repeats">0</strong>
+                        <span class="vc-kpi-desc">RM + branch + issue repeats</span>
+                    </div>
+                    <div class="kpi-card vc-kpi-card accent-blue">
+                        <span class="vc-kpi-label">AVG / DAY</span>
+                        <strong class="vc-kpi-value" id="vc-kpi-avgday">0</strong>
+                        <span class="vc-kpi-desc">Ticket + WA + email daily average</span>
+                    </div>
+                </div>
+
+                <!-- Row 1: Call Tickets Over Time (50%) & WhatsApp Over Time (50%) -->
+                <div class="vc-charts-row-2">
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Call Tickets Over Time</h3>
+                            <span class="card-subtitle-right">ANSWERED / MISSED / AOH TREND FROM DEVREV TITLES</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-call-tickets-over-time"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">WhatsApp Over Time</h3>
+                            <span class="card-subtitle-right">WHATSAPP CHAT VOLUME TREND</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-whatsapp-over-time"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Care Emails Over Time (50%) & Channel Mix (50%) -->
+                <div class="vc-charts-row-2">
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Care Emails Over Time</h3>
+                            <span class="card-subtitle-right">CARE EMAIL TICKET TREND</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-emails-over-time"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Channel Mix</h3>
+                            <span class="card-subtitle-right">CALL TICKETS VS WHATSAPP VS CARE EMAILS</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-channel-mix"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 3: Top RMs - Call Tickets (25%) | Top RMs - WhatsApp (25%) | Top RMs - Care Emails (25%) | Top Brokers (25%) -->
+                <div class="vc-charts-row-4">
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Top RMs - Call Tickets</h3>
+                            <span class="card-subtitle-right">RMS CONTACTING THROUGH CALLS</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-top-rms-calls"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Top RMs - WhatsApp</h3>
+                            <span class="card-subtitle-right">RMS CONTACTING THROUGH WHATSAPP</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-top-rms-whatsapp"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Top RMs - Care Emails</h3>
+                            <span class="card-subtitle-right">RMS/REPORTERS IN CARE EMAIL FLOW</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-top-rms-emails"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Top Brokers</h3>
+                            <span class="card-subtitle-right">BROKER FAMILIES ACROSS ALL CHANNELS</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-top-brokers"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 4: Top Issues - Call Tickets (25%) | Top Issues - WhatsApp (25%) | Top Issues - Care Emails (25%) | POC Hotspots (25%) -->
+                <div class="vc-charts-row-4">
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Top Issues - Call Tickets</h3>
+                            <span class="card-subtitle-right">CALL-TICKET ISSUE CONCENTRATION</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-top-issues-calls"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Top Issues - WhatsApp</h3>
+                            <span class="card-subtitle-right">WHATSAPP ISSUE CONCENTRATION</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-top-issues-whatsapp"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Top Issues - Care Emails</h3>
+                            <span class="card-subtitle-right">CARE EMAIL ISSUE CONCENTRATION</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-top-issues-emails"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">POC Hotspots</h3>
+                            <span class="card-subtitle-right">POC-WISE SUPPORT INTERACTIONS</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-poc-hotspots"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 5: Day of Week by Channel (50%) & Monthly Trend by Channel (50%) -->
+                <div class="vc-charts-row-2">
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Day of Week by Channel</h3>
+                            <span class="card-subtitle-right">CALL TICKETS, WHATSAPP AND CARE EMAILS SEPARATELY</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-day-of-week"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Monthly Trend by Channel</h3>
+                            <span class="card-subtitle-right">MONTH-WISE CHANNEL LOAD</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-monthly-trend"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 6: Repeat Loops (33%) | Broker -> Branch -> Issue Flow (33%) | Outlier Scatter (33%) -->
+                <div class="vc-charts-row-3">
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Repeat Loops</h3>
+                            <span class="card-subtitle-right">RECURRING RM + BRANCH + ISSUE CLUSTERS</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-repeat-loops"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Broker ➔ Branch ➔ Issue</h3>
+                            <span class="card-subtitle-right">FLOW OF SUPPORT LOAD ACROSS BROKER, LOCATION AND ISSUE</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-sankey-flow"></canvas>
+                        </div>
+                    </div>
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Outlier Scatter</h3>
+                            <span class="card-subtitle-right">UNUSUALLY ACTIVE RMS AND BRANCHES</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="vc-chart-outlier-scatter"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SUB-DASHBOARD 4: NEO (PLACEHOLDER) -->
+            <section id="tab-neo" class="tab-content">
+                <div class="placeholder-container">
+                    <div class="placeholder-icon">🚀</div>
+                    <h2>B2B Neo Dashboard</h2>
+                    <p class="placeholder-text">This section is reserved for the smallcase Neo segment analytics, predictive friction modelling, and AI quality assurance auditing.</p>
+                    <div class="placeholder-status-badge">Waiting for design instructions</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- POC DEEP-DIVE MODAL (PORTED) -->
+    <div class="modal-overlay" id="poc-modal">
+        <div class="modal-content glassmorphism scrollbar-themed">
+            <button class="modal-close-btn" id="poc-modal-close">&times;</button>
+            <div class="modal-header">
+                <div>
+                    <h1 class="modal-title" id="poc-modal-name">POC Details</h1>
+                    <p class="modal-subtitle">Point of Contact - Segment Deep-Dive Summary</p>
+                </div>
+                <div class="modal-badges">
+                    <span class="modal-badge-info" id="poc-modal-broker-count">0 Brokers</span>
+                    <span class="modal-badge-info" id="poc-modal-branch-count">0 Branches</span>
+                </div>
+            </div>
+
+            <!-- Modal Metrics -->
+            <div class="modal-kpi-grid">
+                <div class="modal-kpi-card">
+                    <span class="modal-kpi-lbl">Total Support Load</span>
+                    <strong class="modal-kpi-val" id="poc-modal-kpi-total">0</strong>
+                </div>
+                <div class="modal-kpi-card">
+                    <span class="modal-kpi-lbl">WhatsApp Mix</span>
+                    <strong class="modal-kpi-val" id="poc-modal-kpi-wa">0%</strong>
+                </div>
+                <div class="modal-kpi-card">
+                    <span class="modal-kpi-lbl">Call Tickets</span>
+                    <strong class="modal-kpi-val" id="poc-modal-kpi-call">0</strong>
+                </div>
+                <div class="modal-kpi-card">
+                    <span class="modal-kpi-lbl">Active RMs</span>
+                    <strong class="modal-kpi-val" id="poc-modal-kpi-rms">0</strong>
+                </div>
+            </div>
+
+            <div class="modal-layout-grid">
+                <!-- Left panel: Distribution tables -->
+                <div class="modal-panel">
+                    <h3 class="panel-heading">Branch Friction Heatmap</h3>
+                    <div class="panel-table-wrapper scrollbar-themed">
+                        <table class="dashboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Branch Location</th>
+                                    <th>Broker Family</th>
+                                    <th class="text-right">Issues Raised</th>
+                                </tr>
+                            </thead>
+                            <tbody id="poc-modal-branches-body">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="modal-panel">
+                    <h3 class="panel-heading">Top RM Contacts Raised</h3>
+                    <div class="panel-table-wrapper scrollbar-themed">
+                        <table class="dashboard-table">
+                            <thead>
+                                <tr>
+                                    <th>RM Name</th>
+                                    <th>Broker Family</th>
+                                    <th class="text-right">Issues</th>
+                                    <th class="text-right">Outlier Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="poc-modal-rms-body">
+                                <!-- Dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom panel: Raw Records Table -->
+            <div class="modal-panel raw-records-panel">
+                <h3 class="panel-heading">Support Interactions Registry (Raw Audit Trail)</h3>
+                <div class="panel-table-wrapper scrollbar-themed">
+                    <table class="dashboard-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Relationship Manager</th>
+                                <th>Branch</th>
+                                <th>Issue</th>
+                                <th>Sub-Issue</th>
+                                <th>Comments & Transcripts</th>
+                                <th>Link</th>
+                            </tr>
+                        </thead>
+                        <tbody id="poc-modal-records-body">
+                            <!-- Dynamic -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Entry -->
+    <script src="dashboard.js"></script>
+</body>
+</html>
