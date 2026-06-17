@@ -60,9 +60,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadDashboardData() {
     try {
-        const response = await fetch('dashboard_data.json');
-        if (!response.ok) throw new Error("Failed to load dashboard data");
-        rawData = await response.json();
+        console.log("No live data loaded. Initializing empty skeleton data structure.");
+        rawData = {
+            generated_at: "No live data loaded",
+            support_interactions: [],
+            calls: [],
+            agent_breaks: [],
+            outliers: [],
+            repeat_loops: [],
+            top_themes: [],
+            recent_comments: [],
+            poc_mappings: [],
+            agent_scorecards: []
+        };
         
         // Show generation timestamp
         document.getElementById('data-gen-time').innerText = rawData.generated_at || 'Recently';

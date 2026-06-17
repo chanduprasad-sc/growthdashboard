@@ -103,6 +103,19 @@ function hexToRgba(hex, alpha) {
 // Paste your deployed Google Apps Script Web App URL below (must end with /exec?action=getData)
 const GOOGLE_SCRIPT_API_URL = "https://script.google.com/a/macros/smallcase.com/s/AKfycbzXb1cgZwP2RdEM8xvf9xaNk_ZHkoBAcAdUgZ1cxLWJ-naMBi5ABMvtHJ6s4RUEHsOj/exec";
 
+function getCleanApiUrl(url) {
+    if (!url) return "";
+    url = url.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) return "";
+    try {
+        const u = new URL(url);
+        u.searchParams.set("action", "getData");
+        return u.toString();
+    } catch (e) {
+        return "";
+    }
+}
+
 // -------------------------------------------------------------
 // CLIENT-SIDE PREPROCESSING COMPILER FOR LIVE GOOGLE SHEET DATA
 // -------------------------------------------------------------
@@ -1048,36 +1061,83 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadDashboardData() {
+    const statusDot = document.getElementById('connection-status-dot');
+    const statusText = document.getElementById('connection-status-text');
+    const timeBadge = document.getElementById('data-gen-time');
+    const syncBtn = document.getElementById('sidebar-sync-btn');
+
+    function updateStatusUI(status, label, timeStr) {
+        if (statusDot) {
+            statusDot.className = 'status-dot ' + status;
+        }
+        if (statusText) {
+            statusText.innerText = label;
+        }
+        if (timeBadge) {
+            timeBadge.innerText = timeStr || 'No data';
+        }
+        if (syncBtn) {
+            syncBtn.style.display = (status === 'online') ? 'inline-flex' : 'none';
+        }
+    }
+
     try {
         let data = null;
         let isLive = false;
+        let connectionError = false;
 
-        // Check if script URL is configured and active
-        if (typeof GOOGLE_SCRIPT_API_URL === "string" &&
-            GOOGLE_SCRIPT_API_URL.trim() !== "" &&
-            !GOOGLE_SCRIPT_API_URL.includes("YOUR_DEPLOYED_SCRIPT_WEB_APP_URL")) {
+        const liveUrl = localStorage.getItem('live_google_sheet_url');
+        const liveEnabled = localStorage.getItem('live_sync_enabled') !== 'false';
+        
+        let targetUrl = "";
 
-            console.log("Attempting to fetch live data from Google Sheets Web App API...");
+        if (liveEnabled && liveUrl && liveUrl.trim() !== "") {
+            targetUrl = getCleanApiUrl(liveUrl);
+        } else if (typeof GOOGLE_SCRIPT_API_URL === "string" &&
+                   GOOGLE_SCRIPT_API_URL.trim() !== "" &&
+                   !GOOGLE_SCRIPT_API_URL.includes("YOUR_DEPLOYED_SCRIPT_WEB_APP_URL")) {
+            targetUrl = getCleanApiUrl(GOOGLE_SCRIPT_API_URL);
+        }
+
+        if (targetUrl) {
+            console.log("Attempting to fetch live data from Google Sheets API: " + targetUrl);
             try {
-                const response = await fetch(GOOGLE_SCRIPT_API_URL);
+                const response = await fetch(targetUrl);
                 if (response.ok) {
                     data = await response.json();
                     isLive = true;
                     console.log("Successfully fetched live dashboard data from Google Sheets API.");
                 } else {
                     console.warn(`Live fetch returned status ${response.status}. Falling back to local cache.`);
+                    connectionError = true;
                 }
             } catch (err) {
                 console.warn("Network or CORS issue fetching from Google Sheets API, falling back to local cache file. Details:", err);
+                connectionError = true;
             }
         }
 
-        // Fallback to local json file
+        // Fallback to empty skeleton data structure directly in code to avoid static files
         if (!data) {
-            console.log("Loading dashboard data from local dashboard_data.json...");
-            const response = await fetch('dashboard_data.json');
-            if (!response.ok) throw new Error("Failed to load local dashboard_data.json");
-            data = await response.json();
+            console.log("No live data loaded. Initializing empty skeleton data structure.");
+            data = {
+                generated_at: "No live data loaded",
+                support_interactions: [],
+                calls: [],
+                agent_breaks: [],
+                outliers: [],
+                repeat_loops: [],
+                top_themes: [],
+                recent_comments: [],
+                poc_mappings: [],
+                agent_scorecards: []
+            };
+        }
+
+        if (!data) {
+            updateStatusUI('error', 'No Data Found', 'Setup required');
+            alert("No data available. Please click 'Setup' in the footer to connect your live Google Sheet.");
+            return;
         }
 
         // Run compiler client-side if raw Google Sheet cache shape is detected
@@ -1089,8 +1149,35 @@ async function loadDashboardData() {
             rawData = data;
         }
 
-        // Show generation timestamp
-        document.getElementById('data-gen-time').innerText = rawData.generated_at || 'Recently';
+        // Update Connection Status UI
+        if (isLive) {
+            updateStatusUI('online', 'Live Connected', rawData.generated_at || 'Just Now');
+        } else if (connectionError) {
+            updateStatusUI('error', 'Sync Failed', 'Local Fallback');
+        } else {
+            updateStatusUI('offline', 'Local Fallback', rawData.generated_at || 'Local');
+        }
+
+        // Detect empty/skeleton data (prompt user to connect)
+        const totalInteractions = (rawData.support_interactions || []).length;
+        const totalCalls = (rawData.calls || []).length;
+        
+        if (totalInteractions === 0 && totalCalls === 0) {
+            console.warn("No records found in loaded data. Prompting user to link live Sheet.");
+            setTimeout(() => {
+                const modal = document.getElementById('live-config-modal');
+                if (modal) {
+                    modal.classList.add('open');
+                    const testResult = document.getElementById('live-test-result');
+                    if (testResult) {
+                        testResult.style.display = 'block';
+                        testResult.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+                        testResult.style.color = '#ef4444';
+                        testResult.innerText = "Welcome! Your dashboard is currently empty. Please paste your Google Sheets Apps Script Web App URL below to sync your live data.";
+                    }
+                }
+            }, 800);
+        }
 
         // Populate filter dropdown choices
         populateFilterDropdowns();
@@ -1102,7 +1189,8 @@ async function loadDashboardData() {
         buildViewModel();
     } catch (error) {
         console.error("Dashboard Load Error:", error);
-        alert("Error loading B2B data file. Please ensure preprocess.py has run successfully or your Google Sheet API is correctly configured.");
+        updateStatusUI('error', 'Load Error', 'Check console');
+        alert("Error loading B2B data file. Please ensure your Google Sheet API is correctly configured.");
     }
 }
 
@@ -1111,6 +1199,133 @@ async function loadDashboardData() {
 // -------------------------------------------------------------
 
 function setupEventListeners() {
+    // Google Sheets Live Settings Modal
+    const liveModal = document.getElementById('live-config-modal');
+    const openLiveBtn = document.getElementById('sidebar-config-btn');
+    const closeLiveBtn = document.getElementById('live-config-modal-close');
+    const liveForm = document.getElementById('live-config-form');
+    const liveUrlInput = document.getElementById('live-script-url');
+    const liveEnabledCheckbox = document.getElementById('live-sync-enabled');
+    const testLiveBtn = document.getElementById('live-config-test-btn');
+    const testResultDiv = document.getElementById('live-test-result');
+    const sidebarSyncBtn = document.getElementById('sidebar-sync-btn');
+
+    if (openLiveBtn && liveModal) {
+        openLiveBtn.addEventListener('click', () => {
+            const currentUrl = localStorage.getItem('live_google_sheet_url') || 
+                               (GOOGLE_SCRIPT_API_URL.includes("YOUR_DEPLOYED_SCRIPT_WEB_APP_URL") ? "" : GOOGLE_SCRIPT_API_URL);
+            const isEnabled = localStorage.getItem('live_sync_enabled') !== 'false';
+            
+            if (liveUrlInput) liveUrlInput.value = currentUrl;
+            if (liveEnabledCheckbox) liveEnabledCheckbox.checked = isEnabled;
+            if (testResultDiv) testResultDiv.style.display = 'none';
+            
+            liveModal.classList.add('open');
+        });
+    }
+
+    if (closeLiveBtn && liveModal) {
+        closeLiveBtn.addEventListener('click', () => {
+            liveModal.classList.remove('open');
+        });
+        liveModal.addEventListener('click', (e) => {
+            if (e.target === liveModal) {
+                liveModal.classList.remove('open');
+            }
+        });
+    }
+
+    if (sidebarSyncBtn) {
+        sidebarSyncBtn.addEventListener('click', () => {
+            sidebarSyncBtn.disabled = true;
+            const originalText = sidebarSyncBtn.innerHTML;
+            sidebarSyncBtn.innerHTML = "🔄 Syncing...";
+            
+            loadDashboardData().finally(() => {
+                sidebarSyncBtn.disabled = false;
+                sidebarSyncBtn.innerHTML = originalText;
+            });
+        });
+    }
+
+    if (testLiveBtn) {
+        testLiveBtn.addEventListener('click', async () => {
+            const url = (liveUrlInput ? liveUrlInput.value : "").trim();
+            if (!url) {
+                alert("Please enter a URL to test.");
+                return;
+            }
+            
+            testLiveBtn.disabled = true;
+            testLiveBtn.innerText = "⚡ Testing...";
+            if (testResultDiv) {
+                testResultDiv.style.display = 'block';
+                testResultDiv.style.backgroundColor = 'rgba(139, 92, 246, 0.1)';
+                testResultDiv.style.color = 'var(--text-secondary)';
+                testResultDiv.innerText = "Connecting to Google Sheet Web App API...";
+            }
+
+            try {
+                const targetUrl = getCleanApiUrl(url);
+                if (!targetUrl) throw new Error("Invalid URL. Must start with http:// or https://");
+
+                console.log("Testing connection to: " + targetUrl);
+                const response = await fetch(targetUrl);
+                if (!response.ok) throw new Error("HTTP connection failed (Status: " + response.status + ")");
+                
+                const data = await response.json();
+                if (data && data.error) {
+                    throw new Error("Apps Script API Error: " + data.error);
+                }
+                
+                if (data && data.calls && data.callTkts && data.whatsapp) {
+                    const callCount = data.calls.length;
+                    const ticketCount = data.callTkts.length;
+                    const waCount = data.whatsapp.length;
+                    const emailCount = (data.careEmails || []).length;
+                    
+                    testResultDiv.style.backgroundColor = 'rgba(34, 197, 94, 0.15)';
+                    testResultDiv.style.color = '#22c55e';
+                    testResultDiv.innerHTML = `<strong>✓ Connection Successful!</strong><br>Successfully fetched sheet data:<br>` +
+                        `• Calls: ${callCount} rows<br>` +
+                        `• Call Tickets: ${ticketCount} rows<br>` +
+                        `• WhatsApp Chats: ${waCount} rows<br>` +
+                        `• Care Emails: ${emailCount} rows<br>` +
+                        `• Last Built: ${data.builtAt || 'N/A'}`;
+                } else {
+                    throw new Error("Invalid response format. Missing 'calls', 'callTkts', or 'whatsapp' keys.");
+                }
+            } catch (err) {
+                console.error("Test connection failed:", err);
+                testResultDiv.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+                testResultDiv.style.color = '#ef4444';
+                testResultDiv.innerHTML = `<strong>✗ Connection Failed</strong><br>${err.message}<br><br>` +
+                    `<small>Ensure the Apps Script is deployed as a Web App with "Execute as: Me" and "Who has access: Anyone".</small>`;
+            } finally {
+                testLiveBtn.disabled = false;
+                testLiveBtn.innerText = "⚡ Test Connection";
+            }
+        });
+    }
+
+    if (liveForm) {
+        liveForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const url = (liveUrlInput ? liveUrlInput.value : "").trim();
+            const enabled = liveEnabledCheckbox ? liveEnabledCheckbox.checked : true;
+            
+            localStorage.setItem('live_google_sheet_url', url);
+            localStorage.setItem('live_sync_enabled', enabled ? 'true' : 'false');
+            
+            if (liveModal) {
+                liveModal.classList.remove('open');
+            }
+            
+            // Reload dashboard data
+            loadDashboardData();
+        });
+    }
+
     // Top Tab switching (Weekly Pulse, Main, Visual Control, Neo)
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', () => {

@@ -84,9 +84,20 @@
                     <span class="toggle-icon black-icon">🌑</span>
                     <span class="toggle-text theme-text">Dark Mode</span>
                 </button>
-                <div class="sync-info">
-                    <span>Database Gen Timestamp</span>
-                    <strong id="data-gen-time">Loading...</strong>
+                <div class="connection-status-panel">
+                    <div class="status-indicator-row">
+                        <span id="connection-status-dot" class="status-dot offline"></span>
+                        <span id="connection-status-text" class="status-text">Local Fallback</span>
+                    </div>
+                    <strong id="data-gen-time" class="data-time-badge">Loading...</strong>
+                    <div class="status-action-row">
+                        <button id="sidebar-sync-btn" class="sidebar-action-btn" title="Refresh Live Data">
+                            🔄 Sync
+                        </button>
+                        <button id="sidebar-config-btn" class="sidebar-action-btn" title="Configure Live Google Sheet">
+                            ⚙️ Setup
+                        </button>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -1424,6 +1435,66 @@
                             <!-- Dynamic Rows -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LIVE GOOGLE SHEET CONFIGURATION MODAL -->
+    <div class="modal-overlay" id="live-config-modal">
+        <div class="modal-content glassmorphism scrollbar-themed" style="max-width: 600px;">
+            <button class="modal-close-btn" id="live-config-modal-close">&times;</button>
+            <div class="modal-header">
+                <div>
+                    <h1 class="modal-title">🔗 Google Sheet Sync Settings</h1>
+                    <p class="modal-subtitle">Connect your live, auto-updating spreadsheet data</p>
+                </div>
+            </div>
+            
+            <div class="modal-panel" style="margin-top: 16px;">
+                <form id="live-config-form" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label for="live-script-url" style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">
+                            Apps Script Web App URL
+                        </label>
+                        <input type="url" id="live-script-url" placeholder="https://script.google.com/macros/s/.../exec" required
+                               style="padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
+                        <small style="color: var(--text-muted); font-size: 0.75rem; line-height: 1.4;">
+                            Paste the Web App URL copied from your Google Sheet Apps Script deployment.
+                        </small>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 6px 0;">
+                        <input type="checkbox" id="live-sync-enabled" checked
+                               style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--purple);">
+                        <label for="live-sync-enabled" style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); cursor: pointer; user-select: none;">
+                            Enable Live Google Sheet Data Sync
+                        </label>
+                    </div>
+
+                    <div id="live-test-result" style="display: none; padding: 12px; border-radius: 10px; font-size: 0.8rem; font-weight: 500;">
+                        <!-- Connection test status goes here -->
+                    </div>
+
+                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+                        <button type="button" id="live-config-test-btn" class="export-btn" style="border-color: var(--blue); color: var(--blue);">
+                            ⚡ Test Connection
+                        </button>
+                        <button type="submit" class="ai-generate-btn" style="padding: 8px 20px; font-size: 0.85rem; border-radius: 10px;">
+                            💾 Save & Refresh
+                        </button>
+                    </div>
+                </form>
+
+                <div class="guide-card" style="margin-top: 24px; padding: 16px; background: rgba(139, 92, 246, 0.05); border-left: 3px solid var(--purple); font-size: 0.78rem; line-height: 1.5; color: var(--text-secondary);">
+                    <h4 style="margin: 0 0 8px 0; color: var(--text-primary); font-weight: 700;">💡 How to get your Web App URL:</h4>
+                    <ol style="margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 6px;">
+                        <li>In your Google Sheet, open <strong>Extensions ➔ Apps Script</strong>.</li>
+                        <li>Paste the contents of <strong>Codenew.gs</strong> and click save.</li>
+                        <li>Click <strong>Deploy ➔ New Deployment</strong> (Select type: <strong>Web app</strong>).</li>
+                        <li>Under <em>Who has access</em>, select <strong>Anyone</strong> (this allows the dashboard to fetch it securely).</li>
+                        <li>Click Deploy, authorize permissions, and copy the generated <strong>Web App URL</strong>.</li>
+                    </ol>
                 </div>
             </div>
         </div>
