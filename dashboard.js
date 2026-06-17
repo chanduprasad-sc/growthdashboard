@@ -81,6 +81,9 @@ const THEME_COLORS = {
     green: '#059669',      // Forest Green
     red: '#e11d48',        // Rose Red
     yellow: '#d97706',     // Amber Yellow
+    orange: '#f97316',     // Vibrant Orange
+    cyan: '#06b6d4',       // Teal Cyan
+    pink: '#ec4899',       // Hot Pink
     gray: '#64748b',
     border: 'rgba(0, 0, 0, 0.07)', // light mode border
     textPrimary: '#0f172a', // light mode primary text
@@ -1384,11 +1387,30 @@ function switchTab(tabId) {
         'tab-weekly-pulse': 'Weekly Pulse',
         'tab-main-dashboard': 'Main Dashboard',
         'tab-visual-control': 'Visual Control',
-        'tab-neo': 'B2B Neo'
+        'tab-intelligence': 'Intelligence',
+        'tab-monthly-view': 'Monthly View',
+        'tab-agent-performance': 'Agent Performance',
+        'tab-tickets-chats': 'Tickets & Chats',
+        'tab-ai-summary': 'AI Summary',
+        'tab-guide': 'Guide'
     };
-    document.getElementById('page-title').innerText = titleMap[tabId];
+    const subtitleMap = {
+        'tab-weekly-pulse': 'Comparative weekly reports & segment hotspot analytics',
+        'tab-main-dashboard': 'Channel metrics overview with deep-dive analytics',
+        'tab-visual-control': 'Visual analytics control room',
+        'tab-intelligence': 'Cross-channel insights & anomaly detection',
+        'tab-monthly-view': 'Date-wise monthly metric aggregation',
+        'tab-agent-performance': 'Agent workload, quality & productivity metrics',
+        'tab-tickets-chats': 'Browsable registry of all support interactions',
+        'tab-ai-summary': 'AI-powered narrative summaries & focus areas',
+        'tab-guide': 'How to use this dashboard'
+    };
+    document.getElementById('page-title').innerText = titleMap[tabId] || tabId;
+    const subtitleEl = document.querySelector('.header-subtitle');
+    if (subtitleEl) subtitleEl.innerText = subtitleMap[tabId] || '';
 
-    if (tabId === 'tab-weekly-pulse' || tabId === 'tab-visual-control') {
+    // All tabs except Guide trigger data rendering
+    if (tabId !== 'tab-guide') {
         buildViewModel();
     }
 }
@@ -1512,7 +1534,8 @@ function getPreviousPeriodDates(fromStr, toStr) {
 
 function buildViewModel() {
     if (!rawData) return;
-    if (currentTab !== 'tab-weekly-pulse' && currentTab !== 'tab-visual-control') return;
+    // Guide tab has no dynamic data
+    if (currentTab === 'tab-guide') return;
 
     const fromTs = new Date(activeFilters.dateFrom + 'T00:00:00').getTime();
     const toTs = new Date(activeFilters.dateTo + 'T23:59:59').getTime();
@@ -1579,11 +1602,23 @@ function buildViewModel() {
         prevToTs
     };
 
-    // Render components
+    // Render components based on active tab
     if (currentTab === 'tab-weekly-pulse') {
         renderWeeklyPulseDashboard();
     } else if (currentTab === 'tab-visual-control') {
         renderVisualControlDashboard();
+    } else if (currentTab === 'tab-main-dashboard') {
+        renderMainDashboard();
+    } else if (currentTab === 'tab-intelligence') {
+        renderIntelligenceDashboard();
+    } else if (currentTab === 'tab-monthly-view') {
+        renderMonthlyView();
+    } else if (currentTab === 'tab-agent-performance') {
+        renderAgentPerformance();
+    } else if (currentTab === 'tab-tickets-chats') {
+        renderTicketsChatsView();
+    } else if (currentTab === 'tab-ai-summary') {
+        renderAISummaryTab();
     }
 }
 
@@ -4334,3 +4369,778 @@ function renderBreakdownPanel(scorecards, selectedAgent) {
     }
 }
 
+
+// ==========================================================================
+// GLOBAL formatSeconds HELPER (accessible to all new tab functions)
+// Converts seconds to human-readable Xm Ys or X.Yh format
+// ==========================================================================
+function formatSeconds(sec) {
+    if (sec === null || sec === undefined || isNaN(sec)) return '-';
+    sec = Math.round(Number(sec));
+    if (sec < 60) return `${sec}s`;
+    if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+    return `${(sec / 3600).toFixed(1)}h`;
+}
+
+// ==========================================================================
+// NEW TAB RENDERING FUNCTIONS (Dashboard Redesign)
+// ==========================================================================
+
+// Chart refs for new tabs
+let mdCharts = {};
+let intelCharts = {};
+let agentPerfCharts = {};
+
+function destroyChartGroup(group) {
+    Object.keys(group).forEach(key => {
+        if (group[key]) { group[key].destroy(); group[key] = null; }
+    });
+}
+
+function formatSecondsCompact(s) {
+    if (!s || isNaN(s)) return '-';
+    s = Math.round(s);
+    if (s < 60) return `${s}s`;
+    if (s < 3600) return `${Math.floor(s/60)}m ${s%60}s`;
+    return `${(s/3600).toFixed(1)}h`;
+}
+
+function exportTableAsCSV(tableId, filename) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const rows = table.querySelectorAll('tr');
+    let csv = [];
+    rows.forEach(row => {
+        const cols = row.querySelectorAll('th, td');
+        const rowData = Array.from(cols).map(c => '"' + c.innerText.replace(/"/g, '""') + '"');
+        csv.push(rowData.join(','));
+    });
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename || 'export.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// ----- MAIN DASHBOARD RENDERING -----
+
+let mdActiveSubTab = 'md-overview';
+
+function renderMainDashboard() {
+    const data = window.viewModel.interactions;
+    const calls = window.viewModel.calls;
+    const activeSubTab = mdActiveSubTab;
+
+    // Setup sub-tab event listeners (only once)
+    const subTabContainer = document.getElementById('main-dash-sub-tabs');
+    if (subTabContainer && !subTabContainer._listenersSet) {
+        subTabContainer._listenersSet = true;
+        subTabContainer.querySelectorAll('.sub-tab-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                subTabContainer.querySelectorAll('.sub-tab-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                document.querySelectorAll('#tab-main-dashboard .sub-tab-content').forEach(c => c.classList.remove('active'));
+                const targetId = pill.getAttribute('data-subtab');
+                document.getElementById(targetId).classList.add('active');
+                mdActiveSubTab = targetId;
+                renderMainDashboard();
+            });
+        });
+    }
+
+    if (activeSubTab === 'md-overview') renderMainOverview(data, calls);
+    else if (activeSubTab === 'md-calls') renderCallsDeepDive(data, calls);
+    else if (activeSubTab === 'md-whatsapp') renderWhatsAppDeepDive(data);
+    else if (activeSubTab === 'md-emails') renderEmailsDeepDive(data);
+}
+
+function renderMainOverview(data, calls) {
+    destroyChartGroup(mdCharts);
+    const callTickets = data.filter(d => d.type === 'Call Ticket');
+    const whatsapp = data.filter(d => d.type === 'WhatsApp Chat');
+    const emails = data.filter(d => d.type === 'Care Email');
+    const daySpan = Math.max(1, Math.round((window.viewModel.toTs - window.viewModel.fromTs) / 86400000));
+
+    function getAvgFRT(items) {
+        const frtItems = items.filter(i => i.sla_frt && !isNaN(i.sla_frt));
+        return frtItems.length ? Math.round(frtItems.reduce((s, i) => s + Number(i.sla_frt), 0) / frtItems.length) : 0;
+    }
+    function getSLACompliance(items, field) {
+        const relevant = items.filter(i => i[field]);
+        if (!relevant.length) return '-';
+        const met = relevant.filter(i => i[field] === 'met').length;
+        return Math.round((met / relevant.length) * 100) + '%';
+    }
+    function getTopIssue(items) {
+        const counts = {};
+        items.forEach(i => { if (i.issue && i.issue !== '-') counts[i.issue] = (counts[i.issue] || 0) + 1; });
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        return sorted.length ? sorted[0][0] : '-';
+    }
+    function getTopBroker(items) {
+        const counts = {};
+        items.forEach(i => { if (i.broker_family && i.broker_family !== 'NA') counts[i.broker_family] = (counts[i.broker_family] || 0) + 1; });
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        return sorted.length ? sorted[0][0] : '-';
+    }
+    function getOpenClosed(items) {
+        const open = items.filter(i => ['new','open','in progress','work in progress'].includes((i.stage||'').toLowerCase())).length;
+        return { open, closed: items.length - open };
+    }
+
+    const grid = document.getElementById('md-channel-summary-grid');
+    const channels = [
+        { name: 'Call Tickets', icon: '📞', cls: 'calls', items: callTickets, frt: getAvgFRT(callTickets), sla: getSLACompliance(callTickets, 'sla_frt_status'), topIssue: getTopIssue(callTickets), topBroker: getTopBroker(callTickets), oc: getOpenClosed(callTickets) },
+        { name: 'WhatsApp Chats', icon: '💬', cls: 'whatsapp', items: whatsapp, frt: getAvgFRT(whatsapp), sla: getSLACompliance(whatsapp, 'sla_frt_status'), topIssue: getTopIssue(whatsapp), topBroker: getTopBroker(whatsapp), oc: getOpenClosed(whatsapp) },
+        { name: 'Care Emails', icon: '📧', cls: 'emails', items: emails, frt: getAvgFRT(emails), sla: getSLACompliance(emails, 'sla_frt_status'), topIssue: getTopIssue(emails), topBroker: getTopBroker(emails), oc: getOpenClosed(emails) }
+    ];
+    grid.innerHTML = channels.map(ch => `
+        <div class="channel-summary-card">
+            <div class="channel-header">
+                <div class="channel-icon ${ch.cls}">${ch.icon}</div>
+                <div class="channel-name">${ch.name}</div>
+            </div>
+            <div class="channel-volume">${ch.items.length.toLocaleString()}</div>
+            <div class="channel-avg">${(ch.items.length / daySpan).toFixed(1)} avg/day • ${ch.oc.open} open, ${ch.oc.closed} closed</div>
+            <div class="channel-stats-grid">
+                <div class="channel-stat-item"><span class="stat-label">Avg FRT</span><span class="stat-value">${formatSecondsCompact(ch.frt)}</span></div>
+                <div class="channel-stat-item"><span class="stat-label">SLA Compliance</span><span class="stat-value">${ch.sla}</span></div>
+                <div class="channel-stat-item"><span class="stat-label">Top Issue</span><span class="stat-value">${ch.topIssue}</span></div>
+                <div class="channel-stat-item"><span class="stat-label">Top Broker</span><span class="stat-value">${ch.topBroker}</span></div>
+            </div>
+        </div>
+    `).join('');
+
+    // Combined Trend Chart
+    const dateMap = {};
+    data.forEach(d => {
+        const day = d.date ? d.date.substring(0, 10) : null;
+        if (!day) return;
+        if (!dateMap[day]) dateMap[day] = { calls: 0, wa: 0, emails: 0 };
+        if (d.type === 'Call Ticket') dateMap[day].calls++;
+        else if (d.type === 'WhatsApp Chat') dateMap[day].wa++;
+        else if (d.type === 'Care Email') dateMap[day].emails++;
+    });
+    const sortedDates = Object.keys(dateMap).sort();
+    const ctx1 = document.getElementById('md-combined-trend-chart');
+    if (ctx1) {
+        mdCharts.combinedTrend = new Chart(ctx1.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: sortedDates,
+                datasets: [
+                    { label: 'Call Tickets', data: sortedDates.map(d => dateMap[d].calls), borderColor: THEME_COLORS.blue, backgroundColor: THEME_COLORS.blue + '20', tension: 0.4, fill: true },
+                    { label: 'WhatsApp', data: sortedDates.map(d => dateMap[d].wa), borderColor: THEME_COLORS.green, backgroundColor: THEME_COLORS.green + '20', tension: 0.4, fill: true },
+                    { label: 'Care Emails', data: sortedDates.map(d => dateMap[d].emails), borderColor: THEME_COLORS.orange, backgroundColor: THEME_COLORS.orange + '20', tension: 0.4, fill: true }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true } } }
+        });
+    }
+
+    // Channel Mix Donut
+    const ctx2 = document.getElementById('md-channel-mix-chart');
+    if (ctx2) {
+        mdCharts.channelMix = new Chart(ctx2.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Call Tickets', 'WhatsApp', 'Care Emails'],
+                datasets: [{ data: [callTickets.length, whatsapp.length, emails.length], backgroundColor: [THEME_COLORS.blue, THEME_COLORS.green, THEME_COLORS.orange], borderWidth: 0 }]
+            },
+            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+        });
+    }
+
+    // Response Time Comparison Bar
+    const ctx3 = document.getElementById('md-response-time-chart');
+    if (ctx3) {
+        const avgRT = (items) => {
+            const rtItems = items.filter(i => i.sla_rt && !isNaN(i.sla_rt));
+            return rtItems.length ? Math.round(rtItems.reduce((s, i) => s + Number(i.sla_rt), 0) / rtItems.length) : 0;
+        };
+        mdCharts.responseTime = new Chart(ctx3.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['Call Tickets', 'WhatsApp', 'Care Emails'],
+                datasets: [
+                    { label: 'Avg FRT (sec)', data: [getAvgFRT(callTickets), getAvgFRT(whatsapp), getAvgFRT(emails)], backgroundColor: [THEME_COLORS.blue + '80', THEME_COLORS.green + '80', THEME_COLORS.orange + '80'], borderRadius: 6 },
+                    { label: 'Avg RT (sec)', data: [avgRT(callTickets), avgRT(whatsapp), avgRT(emails)], backgroundColor: [THEME_COLORS.blue, THEME_COLORS.green, THEME_COLORS.orange], borderRadius: 6 }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true } } }
+        });
+    }
+}
+
+function renderCallsDeepDive(data, calls) {
+    destroyChartGroup(mdCharts);
+    const callTickets = data.filter(d => d.type === 'Call Ticket');
+    const answered = callTickets.filter(t => (t.call_status||'').toLowerCase().includes('answered'));
+    const missed = callTickets.filter(t => (t.call_status||'').toLowerCase().includes('missed'));
+    const aoh = callTickets.filter(t => (t.call_status||'').toLowerCase().includes('aoh'));
+
+    // AHT/AQT from calls
+    const answeredCalls = calls.filter(c => (c.stage||'').toLowerCase() === 'answered' || (c.stage||'').toLowerCase() === 'connected');
+    const totalDuration = answeredCalls.reduce((s, c) => s + (Number(c.duration) || 0), 0);
+    const aht = answeredCalls.length ? Math.round(totalDuration / answeredCalls.length) : 0;
+    const totalQueue = calls.reduce((s, c) => s + (Number(c.queue_time) || 0), 0);
+    const aqt = calls.length ? Math.round(totalQueue / calls.length) : 0;
+
+    const kpiGrid = document.getElementById('md-calls-kpi-grid');
+    kpiGrid.innerHTML = [
+        { title: 'Total Call Tickets', value: callTickets.length, cls: '' },
+        { title: 'Answered', value: answered.length, cls: 'text-green' },
+        { title: 'Missed', value: missed.length, cls: 'text-red' },
+        { title: 'AOH', value: aoh.length, cls: 'text-orange' },
+        { title: 'AHT', value: formatSecondsCompact(aht), cls: '' },
+        { title: 'AQT', value: formatSecondsCompact(aqt), cls: '' }
+    ].map(k => `
+        <div class="kpi-card"><span class="kpi-title">${k.title}</span><div class="kpi-value ${k.cls}">${k.value}</div></div>
+    `).join('');
+
+    // Call Volume Trend
+    const dateMap = {};
+    callTickets.forEach(t => { const d = (t.date||'').substring(0,10); if(d) { if(!dateMap[d]) dateMap[d]={a:0,m:0,o:0}; if((t.call_status||'').toLowerCase().includes('answered')) dateMap[d].a++; else if((t.call_status||'').toLowerCase().includes('missed')) dateMap[d].m++; else dateMap[d].o++; } });
+    const dates = Object.keys(dateMap).sort();
+    const ctx1 = document.getElementById('md-call-volume-chart');
+    if (ctx1) {
+        mdCharts.callVolume = new Chart(ctx1.getContext('2d'), {
+            type: 'bar', data: { labels: dates, datasets: [
+                { label: 'Answered', data: dates.map(d => dateMap[d].a), backgroundColor: THEME_COLORS.green + '80', borderRadius: 4 },
+                { label: 'Missed', data: dates.map(d => dateMap[d].m), backgroundColor: THEME_COLORS.red + '80', borderRadius: 4 },
+                { label: 'AOH/Other', data: dates.map(d => dateMap[d].o), backgroundColor: THEME_COLORS.orange + '60', borderRadius: 4 }
+            ] }, options: { responsive: true, scales: { x: { stacked: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { stacked: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true } }, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+        });
+    }
+
+    // Call Status Donut
+    const ctx2 = document.getElementById('md-call-status-chart');
+    if (ctx2) {
+        mdCharts.callStatus = new Chart(ctx2.getContext('2d'), {
+            type: 'doughnut', data: { labels: ['Answered', 'Missed', 'AOH/Other'], datasets: [{ data: [answered.length, missed.length, aoh.length], backgroundColor: [THEME_COLORS.green, THEME_COLORS.red, THEME_COLORS.orange], borderWidth: 0 }] },
+            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+        });
+    }
+
+    // Agent Call Performance
+    const agentCounts = {};
+    callTickets.forEach(t => { const a = t.agent || 'Unknown'; agentCounts[a] = (agentCounts[a]||0)+1; });
+    const sortedAgents = Object.entries(agentCounts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const ctx3 = document.getElementById('md-agent-calls-chart');
+    if (ctx3) {
+        mdCharts.agentCalls = new Chart(ctx3.getContext('2d'), {
+            type: 'bar', data: { labels: sortedAgents.map(a=>a[0]), datasets: [{ label: 'Call Tickets Handled', data: sortedAgents.map(a=>a[1]), backgroundColor: THEME_COLORS.purple + '80', borderRadius: 6 }] },
+            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+        });
+    }
+
+    // Callback metrics
+    const callbackDiv = document.getElementById('md-callback-metrics');
+    if (callbackDiv && rawData) {
+        const inboundMissed = calls.filter(c => (c.call_type||'').toLowerCase() === 'inbound' && (c.stage||'').toLowerCase() !== 'answered' && (c.stage||'').toLowerCase() !== 'connected');
+        const callbacks = calls.filter(c => (c.call_type||'').toLowerCase() === 'progressive');
+        const cbAnswered = callbacks.filter(c => (c.stage||'').toLowerCase() === 'answered' || (c.stage||'').toLowerCase() === 'connected');
+        callbackDiv.innerHTML = `
+            <div class="agent-scorecard-grid" style="grid-template-columns: repeat(2, 1fr);">
+                <div class="agent-score-card"><div class="score-label">Missed Calls</div><div class="score-value">${inboundMissed.length}</div></div>
+                <div class="agent-score-card"><div class="score-label">Callbacks Triggered</div><div class="score-value">${callbacks.length}</div><div class="score-sub">${inboundMissed.length ? Math.round(callbacks.length/inboundMissed.length*100) : 0}% conversion</div></div>
+                <div class="agent-score-card"><div class="score-label">Callbacks Answered</div><div class="score-value">${cbAnswered.length}</div></div>
+                <div class="agent-score-card"><div class="score-label">Success Rate</div><div class="score-value">${callbacks.length ? Math.round(cbAnswered.length/callbacks.length*100) : 0}%</div></div>
+            </div>
+        `;
+    }
+}
+
+function renderWhatsAppDeepDive(data) {
+    destroyChartGroup(mdCharts);
+    const wa = data.filter(d => d.type === 'WhatsApp Chat');
+    const daySpan = Math.max(1, Math.round((window.viewModel.toTs - window.viewModel.fromTs) / 86400000));
+
+    const kpiGrid = document.getElementById('md-wa-kpi-grid');
+    const openCount = wa.filter(i => ['open','new','in progress'].includes((i.stage||'').toLowerCase())).length;
+    const closedCount = wa.filter(i => (i.stage||'').toLowerCase() === 'closed').length;
+    kpiGrid.innerHTML = [
+        { title: 'Total Chats', value: wa.length },
+        { title: 'Avg / Day', value: (wa.length / daySpan).toFixed(1) },
+        { title: 'Open', value: openCount },
+        { title: 'Closed', value: closedCount }
+    ].map(k => `<div class="kpi-card"><span class="kpi-title">${k.title}</span><div class="kpi-value">${k.value}</div></div>`).join('');
+
+    // Volume Trend
+    const dateMap = {};
+    wa.forEach(d => { const day = (d.date||'').substring(0,10); if(day) dateMap[day] = (dateMap[day]||0)+1; });
+    const dates = Object.keys(dateMap).sort();
+    const ctx1 = document.getElementById('md-wa-volume-chart');
+    if (ctx1) {
+        mdCharts.waVolume = new Chart(ctx1.getContext('2d'), {
+            type: 'line', data: { labels: dates, datasets: [{ label: 'WhatsApp Chats', data: dates.map(d => dateMap[d]), borderColor: THEME_COLORS.green, backgroundColor: THEME_COLORS.green + '20', tension: 0.4, fill: true }] },
+            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+        });
+    }
+
+    // Stage Distribution
+    const stageCounts = {};
+    wa.forEach(d => { const s = d.stage || 'Unknown'; stageCounts[s] = (stageCounts[s]||0)+1; });
+    const ctx2 = document.getElementById('md-wa-stage-chart');
+    if (ctx2) {
+        const labels = Object.keys(stageCounts); const values = Object.values(stageCounts);
+        mdCharts.waStage = new Chart(ctx2.getContext('2d'), {
+            type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: [THEME_COLORS.green, THEME_COLORS.purple, THEME_COLORS.orange, THEME_COLORS.blue, THEME_COLORS.red, THEME_COLORS.cyan], borderWidth: 0 }] },
+            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+        });
+    }
+
+    // Top Issues
+    const issueCounts = {};
+    wa.forEach(d => { if(d.issue && d.issue !== '-') issueCounts[d.issue] = (issueCounts[d.issue]||0)+1; });
+    const topIssues = Object.entries(issueCounts).sort((a,b) => b[1]-a[1]).slice(0,8);
+    const ctx3 = document.getElementById('md-wa-issues-chart');
+    if (ctx3) {
+        mdCharts.waIssues = new Chart(ctx3.getContext('2d'), {
+            type: 'bar', data: { labels: topIssues.map(i=>i[0]), datasets: [{ label: 'Count', data: topIssues.map(i=>i[1]), backgroundColor: THEME_COLORS.green + '70', borderRadius: 6 }] },
+            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+        });
+    }
+
+    // Top Brokers
+    const brokerCounts = {};
+    wa.forEach(d => { if(d.broker_family && d.broker_family !== 'NA') brokerCounts[d.broker_family] = (brokerCounts[d.broker_family]||0)+1; });
+    const topBrokers = Object.entries(brokerCounts).sort((a,b) => b[1]-a[1]).slice(0,8);
+    const ctx4 = document.getElementById('md-wa-brokers-chart');
+    if (ctx4) {
+        mdCharts.waBrokers = new Chart(ctx4.getContext('2d'), {
+            type: 'bar', data: { labels: topBrokers.map(i=>i[0]), datasets: [{ label: 'Chats', data: topBrokers.map(i=>i[1]), backgroundColor: THEME_COLORS.cyan + '70', borderRadius: 6 }] },
+            options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+        });
+    }
+}
+
+function renderEmailsDeepDive(data) {
+    destroyChartGroup(mdCharts);
+    const emails = data.filter(d => d.type === 'Care Email');
+    const daySpan = Math.max(1, Math.round((window.viewModel.toTs - window.viewModel.fromTs) / 86400000));
+
+    const kpiGrid = document.getElementById('md-email-kpi-grid');
+    const openCount = emails.filter(i => ['open','new','in progress'].includes((i.stage||'').toLowerCase())).length;
+    kpiGrid.innerHTML = [
+        { title: 'Total Emails', value: emails.length },
+        { title: 'Avg / Day', value: (emails.length / daySpan).toFixed(1) },
+        { title: 'Open', value: openCount },
+        { title: 'Closed', value: emails.length - openCount }
+    ].map(k => `<div class="kpi-card"><span class="kpi-title">${k.title}</span><div class="kpi-value">${k.value}</div></div>`).join('');
+
+    // Volume Trend
+    const dateMap = {};
+    emails.forEach(d => { const day = (d.date||'').substring(0,10); if(day) dateMap[day] = (dateMap[day]||0)+1; });
+    const dates = Object.keys(dateMap).sort();
+    const ctx1 = document.getElementById('md-email-volume-chart');
+    if (ctx1) {
+        mdCharts.emailVolume = new Chart(ctx1.getContext('2d'), {
+            type: 'line', data: { labels: dates, datasets: [{ label: 'Care Emails', data: dates.map(d => dateMap[d]), borderColor: THEME_COLORS.orange, backgroundColor: THEME_COLORS.orange + '20', tension: 0.4, fill: true }] },
+            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+        });
+    }
+
+    // Sentiment
+    const sentCounts = {};
+    emails.forEach(d => { const s = d.sentiment || 'Unknown'; sentCounts[s] = (sentCounts[s]||0)+1; });
+    const ctx2 = document.getElementById('md-email-sentiment-chart');
+    if (ctx2) {
+        mdCharts.emailSentiment = new Chart(ctx2.getContext('2d'), {
+            type: 'doughnut', data: { labels: Object.keys(sentCounts), datasets: [{ data: Object.values(sentCounts), backgroundColor: [THEME_COLORS.green, THEME_COLORS.blue, THEME_COLORS.red, THEME_COLORS.orange], borderWidth: 0 }] },
+            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+        });
+    }
+
+    // Top Senders
+    const senderCounts = {};
+    emails.forEach(d => { const s = d.rm_name || 'Unknown'; if (s !== '-') senderCounts[s] = (senderCounts[s]||0)+1; });
+    const topSenders = Object.entries(senderCounts).sort((a,b) => b[1]-a[1]).slice(0,8);
+    const ctx3 = document.getElementById('md-email-senders-chart');
+    if (ctx3) {
+        mdCharts.emailSenders = new Chart(ctx3.getContext('2d'), {
+            type: 'bar', data: { labels: topSenders.map(i=>i[0]), datasets: [{ label: 'Emails', data: topSenders.map(i=>i[1]), backgroundColor: THEME_COLORS.orange + '70', borderRadius: 6 }] },
+            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+        });
+    }
+
+    // Response Times
+    const ctx4 = document.getElementById('md-email-response-chart');
+    if (ctx4) {
+        const frtItems = emails.filter(i => i.sla_frt && !isNaN(i.sla_frt));
+        const rtItems = emails.filter(i => i.sla_rt && !isNaN(i.sla_rt));
+        const avgFrt = frtItems.length ? Math.round(frtItems.reduce((s,i)=>s+Number(i.sla_frt),0)/frtItems.length) : 0;
+        const avgRt = rtItems.length ? Math.round(rtItems.reduce((s,i)=>s+Number(i.sla_rt),0)/rtItems.length) : 0;
+        mdCharts.emailResponse = new Chart(ctx4.getContext('2d'), {
+            type: 'bar', data: { labels: ['Avg FRT', 'Avg RT'], datasets: [{ data: [avgFrt, avgRt], backgroundColor: [THEME_COLORS.orange + '80', THEME_COLORS.orange], borderRadius: 8 }] },
+            options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+        });
+    }
+}
+
+// ----- INTELLIGENCE DASHBOARD -----
+
+function renderIntelligenceDashboard() {
+    const data = window.viewModel.interactions;
+
+    // Repeat Loops
+    const loopsDiv = document.getElementById('intel-repeat-loops');
+    if (loopsDiv && rawData.repeat_loops) {
+        const filteredLoops = rawData.repeat_loops.filter(l => l.repeat_count >= 2).sort((a,b) => b.repeat_count - a.repeat_count).slice(0, 15);
+        loopsDiv.innerHTML = filteredLoops.length ? `<table class="dashboard-table" style="font-size:0.82rem;"><thead><tr><th>RM</th><th>Broker</th><th>Branch</th><th>Issue</th><th style="text-align:right">Repeats</th></tr></thead><tbody>${filteredLoops.map(l => `<tr><td>${l.rm_name}</td><td>${l.broker_family}</td><td>${l.branch}</td><td>${l.issue}</td><td style="text-align:right"><span class="freq-badge high">${l.repeat_count}</span></td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--text-muted);text-align:center;padding:20px;">No repeat loops detected in this period.</p>';
+    }
+
+    // Outlier Detection
+    const outliersDiv = document.getElementById('intel-outliers');
+    if (outliersDiv && rawData.outliers) {
+        const outliers = rawData.outliers.filter(o => o.is_outlier).sort((a,b) => b.contacts_per_day - a.contacts_per_day).slice(0, 15);
+        outliersDiv.innerHTML = outliers.length ? `<table class="dashboard-table" style="font-size:0.82rem;"><thead><tr><th>RM</th><th>Broker</th><th>Branch</th><th style="text-align:right">Contacts</th><th style="text-align:right">Per Day</th></tr></thead><tbody>${outliers.map(o => `<tr><td>${o.rm_name}</td><td>${o.broker_family}</td><td>${o.branch}</td><td style="text-align:right">${o.contacts}</td><td style="text-align:right"><span class="freq-badge high">${o.contacts_per_day.toFixed(1)}</span></td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--text-muted);text-align:center;padding:20px;">No outliers detected.</p>';
+    }
+
+    // Broker Health Scores
+    const healthDiv = document.getElementById('intel-broker-health');
+    if (healthDiv) {
+        const brokerMap = {};
+        data.forEach(d => {
+            const b = d.broker_family; if (!b || b === 'NA') return;
+            if (!brokerMap[b]) brokerMap[b] = { total: 0, repeats: 0, issues: new Set(), sentiment_neg: 0 };
+            brokerMap[b].total++;
+            if (d.issue) brokerMap[b].issues.add(d.issue);
+            if ((d.sentiment||'').toLowerCase() === 'negative') brokerMap[b].sentiment_neg++;
+        });
+        if (rawData.repeat_loops) {
+            rawData.repeat_loops.forEach(l => { if (brokerMap[l.broker_family]) brokerMap[l.broker_family].repeats += l.repeat_count; });
+        }
+        const brokerScores = Object.entries(brokerMap).map(([name, d]) => {
+            const repeatPenalty = Math.min(30, d.repeats * 3);
+            const diversityPenalty = Math.min(20, d.issues.size * 2);
+            const volumeScore = Math.min(25, Math.round(d.total / 5));
+            const score = Math.max(0, 100 - repeatPenalty - diversityPenalty - volumeScore);
+            const grade = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'moderate' : 'poor';
+            return { name, total: d.total, repeats: d.repeats, score, grade };
+        }).sort((a,b) => b.score - a.score);
+        healthDiv.innerHTML = brokerScores.length ? `<table class="dashboard-table" style="font-size:0.82rem;"><thead><tr><th>Broker</th><th style="text-align:right">Volume</th><th style="text-align:right">Repeats</th><th style="text-align:right">Health Score</th></tr></thead><tbody>${brokerScores.map(b => `<tr><td>${b.name}</td><td style="text-align:right">${b.total}</td><td style="text-align:right">${b.repeats}</td><td style="text-align:right"><span class="health-score-badge ${b.grade}">${b.score}/100</span></td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--text-muted);text-align:center;padding:20px;">No broker data available.</p>';
+    }
+
+    // Time-of-Day Heatmap
+    const heatmapDiv = document.getElementById('intel-time-heatmap');
+    if (heatmapDiv) {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const hourGrid = Array.from({length: 7}, () => Array(24).fill(0));
+        let maxVal = 0;
+        data.forEach(d => {
+            if (!d.date) return;
+            const dt = safeParseDate(d.date);
+            if (dt) { hourGrid[dt.getDay()][dt.getHours()]++; maxVal = Math.max(maxVal, hourGrid[dt.getDay()][dt.getHours()]); }
+        });
+        let html = '<div style="display:flex;gap:4px;flex-direction:column;">';
+        dayNames.forEach((dayName, dayIdx) => {
+            html += `<div style="display:flex;align-items:center;gap:4px;"><span style="width:32px;font-size:0.72rem;color:var(--text-muted);font-weight:600;">${dayName}</span><div style="display:flex;gap:2px;flex:1;">`;
+            for (let h = 0; h < 24; h++) {
+                const val = hourGrid[dayIdx][h];
+                const intensity = maxVal ? Math.round((val / maxVal) * 255) : 0;
+                const bg = val === 0 ? 'var(--bg-card)' : `rgba(139, 92, 246, ${(intensity/255).toFixed(2)})`;
+                html += `<div class="heatmap-cell" style="background:${bg};flex:1;height:24px;border-radius:3px;" title="${dayName} ${h}:00 - ${val} contacts"></div>`;
+            }
+            html += '</div></div>';
+        });
+        html += '<div style="display:flex;align-items:center;gap:4px;margin-top:4px;"><span style="width:32px;"></span><div style="display:flex;justify-content:space-between;flex:1;"><span style="font-size:0.65rem;color:var(--text-muted);">12am</span><span style="font-size:0.65rem;color:var(--text-muted);">6am</span><span style="font-size:0.65rem;color:var(--text-muted);">12pm</span><span style="font-size:0.65rem;color:var(--text-muted);">6pm</span><span style="font-size:0.65rem;color:var(--text-muted);">11pm</span></div></div>';
+        html += '</div>';
+        heatmapDiv.innerHTML = html;
+    }
+
+    // Sankey Flow
+    const sankeyCanvas = document.getElementById('intel-sankey-canvas');
+    if (sankeyCanvas && typeof renderSankeyFlowCanvas === 'function') {
+        renderSankeyFlowCanvas(data);
+    }
+}
+
+// ----- MONTHLY VIEW -----
+
+function renderMonthlyView() {
+    if (!rawData) return;
+    const allInteractions = rawData.support_interactions;
+    const allCalls = rawData.calls;
+
+    // Populate month/year selectors
+    const monthSelect = document.getElementById('monthly-month-select');
+    const yearSelect = document.getElementById('monthly-year-select');
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    // Find available years/months
+    const availableYears = new Set();
+    allInteractions.forEach(d => { if (d.date) availableYears.add(safeParseDate(d.date).getFullYear()); });
+    const yearsArr = [...availableYears].sort();
+
+    if (yearSelect && !yearSelect._populated) {
+        yearSelect._populated = true;
+        yearSelect.innerHTML = yearsArr.map(y => `<option value="${y}">${y}</option>`).join('');
+        yearSelect.value = yearsArr[yearsArr.length - 1];
+        yearSelect.addEventListener('change', () => renderMonthlyView());
+    }
+    if (monthSelect && !monthSelect._populated) {
+        monthSelect._populated = true;
+        monthSelect.innerHTML = monthNames.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+        monthSelect.value = new Date().getMonth();
+        monthSelect.addEventListener('change', () => renderMonthlyView());
+    }
+
+    const selectedYear = parseInt(yearSelect.value);
+    const selectedMonth = parseInt(monthSelect.value);
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+
+    // Build date-wise data
+    const rows = [];
+    const totals = { calls: 0, wa: 0, emails: 0, total: 0, answered: 0, missed: 0, aoh: 0, ahtSum: 0, ahtCount: 0, aqtSum: 0, aqtCount: 0, rms: new Set(), brokers: new Set(), open: 0, closed: 0 };
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${selectedYear}-${String(selectedMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const dayInteractions = allInteractions.filter(d => d.date && d.date.substring(0,10) === dateStr);
+        const dayCalls = allCalls.filter(c => c.date && c.date.substring(0,10) === dateStr);
+
+        const callTix = dayInteractions.filter(d => d.type === 'Call Ticket');
+        const wa = dayInteractions.filter(d => d.type === 'WhatsApp Chat');
+        const em = dayInteractions.filter(d => d.type === 'Care Email');
+        const answered = callTix.filter(t => (t.call_status||'').toLowerCase().includes('answered')).length;
+        const missed = callTix.filter(t => (t.call_status||'').toLowerCase().includes('missed')).length;
+        const aoh = callTix.filter(t => (t.call_status||'').toLowerCase().includes('aoh')).length;
+
+        const answeredCalls = dayCalls.filter(c => (c.stage||'').toLowerCase() === 'answered' || (c.stage||'').toLowerCase() === 'connected');
+        const aht = answeredCalls.length ? Math.round(answeredCalls.reduce((s,c) => s + (Number(c.duration)||0), 0) / answeredCalls.length) : 0;
+        const aqt = dayCalls.length ? Math.round(dayCalls.reduce((s,c) => s + (Number(c.queue_time)||0), 0) / dayCalls.length) : 0;
+
+        const uniqueRMs = new Set(); const uniqueBrokers = new Set();
+        dayInteractions.forEach(d => { if (d.rm_name && d.rm_name !== '-') uniqueRMs.add(d.rm_name); if (d.broker_family && d.broker_family !== 'NA') uniqueBrokers.add(d.broker_family); });
+
+        const openCount = dayInteractions.filter(d => ['new','open','in progress'].includes((d.stage||'').toLowerCase())).length;
+        const closedCount = dayInteractions.filter(d => (d.stage||'').toLowerCase() === 'closed').length;
+
+        const total = callTix.length + wa.length + em.length;
+        rows.push({ dateStr, calls: callTix.length, wa: wa.length, emails: em.length, total, answered, missed, aoh, aht, aqt, rms: uniqueRMs.size, brokers: uniqueBrokers.size, open: openCount, closed: closedCount });
+
+        totals.calls += callTix.length; totals.wa += wa.length; totals.emails += em.length; totals.total += total;
+        totals.answered += answered; totals.missed += missed; totals.aoh += aoh;
+        if (aht > 0) { totals.ahtSum += aht * answeredCalls.length; totals.ahtCount += answeredCalls.length; }
+        if (aqt > 0) { totals.aqtSum += aqt * dayCalls.length; totals.aqtCount += dayCalls.length; }
+        uniqueRMs.forEach(r => totals.rms.add(r)); uniqueBrokers.forEach(b => totals.brokers.add(b));
+        totals.open += openCount; totals.closed += closedCount;
+    }
+
+    const tbody = document.getElementById('monthly-table-body');
+    tbody.innerHTML = rows.map(r => `
+        <tr class="clickable-row" data-date="${r.dateStr}">
+            <td>${r.dateStr}</td><td>${r.calls}</td><td>${r.wa}</td><td>${r.emails}</td><td><strong>${r.total}</strong></td>
+            <td>${r.answered}</td><td>${r.missed}</td><td>${r.aoh}</td>
+            <td>${formatSecondsCompact(r.aht)}</td><td>${formatSecondsCompact(r.aqt)}</td>
+            <td>${r.rms}</td><td>${r.brokers}</td><td>${r.open}</td><td>${r.closed}</td>
+        </tr>
+    `).join('') + `
+        <tr class="aggregate-row">
+            <td>TOTAL / AVG</td><td>${totals.calls}</td><td>${totals.wa}</td><td>${totals.emails}</td><td><strong>${totals.total}</strong></td>
+            <td>${totals.answered}</td><td>${totals.missed}</td><td>${totals.aoh}</td>
+            <td>${formatSecondsCompact(totals.ahtCount ? Math.round(totals.ahtSum/totals.ahtCount) : 0)}</td>
+            <td>${formatSecondsCompact(totals.aqtCount ? Math.round(totals.aqtSum/totals.aqtCount) : 0)}</td>
+            <td>${totals.rms.size}</td><td>${totals.brokers.size}</td><td>${totals.open}</td><td>${totals.closed}</td>
+        </tr>
+    `;
+
+    // Click handler for date rows
+    tbody.querySelectorAll('.clickable-row').forEach(row => {
+        row.addEventListener('click', () => {
+            const date = row.getAttribute('data-date');
+            const dayData = rawData.support_interactions.filter(d => d.date && d.date.substring(0,10) === date);
+            openMetricDeepDiveModal('all', `Interactions on ${date}`);
+        });
+    });
+
+    // Export CSV
+    const exportBtn = document.getElementById('monthly-export-btn');
+    if (exportBtn && !exportBtn._bound) {
+        exportBtn._bound = true;
+        exportBtn.addEventListener('click', () => exportTableAsCSV('monthly-data-table', `monthly_${monthNames[selectedMonth]}_${selectedYear}.csv`));
+    }
+}
+
+// ----- AGENT PERFORMANCE -----
+
+function renderAgentPerformance() {
+    const data = window.viewModel.interactions;
+    const calls = window.viewModel.calls;
+    destroyChartGroup(agentPerfCharts);
+
+    // Populate agent selector
+    const agentSelect = document.getElementById('agent-perf-select');
+    const agents = new Set();
+    data.forEach(d => { if (d.agent && d.agent !== '-' && d.agent !== 'Unknown') agents.add(d.agent); });
+    const agentList = [...agents].sort();
+    if (agentSelect && !agentSelect._populated) {
+        agentSelect._populated = true;
+        agentSelect.innerHTML = '<option value="all">All Agents (Comparison View)</option>' + agentList.map(a => `<option value="${a}">${a}</option>`).join('');
+        agentSelect.addEventListener('change', () => { agentSelect._populated = false; renderAgentPerformance(); });
+    }
+    const selectedAgent = agentSelect ? agentSelect.value : 'all';
+
+    // Compute per-agent metrics
+    const agentMetrics = {};
+    agentList.forEach(agent => {
+        const agentData = data.filter(d => d.agent === agent);
+        const agentCalls = agentData.filter(d => d.type === 'Call Ticket');
+        const agentWA = agentData.filter(d => d.type === 'WhatsApp Chat');
+        const agentEmails = agentData.filter(d => d.type === 'Care Email');
+
+        // Talk time from calls
+        const agentCallRecords = calls.filter(c => c.agent === agent && ((c.stage||'').toLowerCase() === 'answered' || (c.stage||'').toLowerCase() === 'connected'));
+        const avgTalkTime = agentCallRecords.length ? Math.round(agentCallRecords.reduce((s,c) => s + (Number(c.talk_time)||0), 0) / agentCallRecords.length) : 0;
+
+        // QA Score
+        const qaItems = agentData.filter(d => d.qa_overall && !isNaN(d.qa_overall));
+        const avgQA = qaItems.length ? (qaItems.reduce((s,d) => s + Number(d.qa_overall), 0) / qaItems.length).toFixed(1) : '-';
+
+        // SLA
+        const frtItems = agentData.filter(d => d.sla_frt_status);
+        const frtMet = frtItems.length ? Math.round(frtItems.filter(d => d.sla_frt_status === 'met').length / frtItems.length * 100) : '-';
+        const rtItems = agentData.filter(d => d.sla_rt_status);
+        const rtMet = rtItems.length ? Math.round(rtItems.filter(d => d.sla_rt_status === 'met').length / rtItems.length * 100) : '-';
+
+        // Breaks from scorecards
+        const scorecard = (rawData.agent_scorecards || []).find(s => s.agent_name === agent);
+        const breakTime = scorecard ? scorecard.total_breaks_sec : 0;
+        const occupancy = scorecard ? (scorecard.occupancy_rate * 100).toFixed(1) : '-';
+
+        agentMetrics[agent] = { calls: agentCalls.length, wa: agentWA.length, emails: agentEmails.length, total: agentData.length, avgTalkTime, avgQA, frtMet, rtMet, breakTime, occupancy };
+    });
+
+    // KPI Scorecards (for selected agent or totals)
+    const kpisDiv = document.getElementById('agent-perf-kpis');
+    if (selectedAgent === 'all') {
+        const totalCalls = Object.values(agentMetrics).reduce((s,m) => s + m.calls, 0);
+        const totalWA = Object.values(agentMetrics).reduce((s,m) => s + m.wa, 0);
+        const totalEmails = Object.values(agentMetrics).reduce((s,m) => s + m.emails, 0);
+        kpisDiv.innerHTML = [
+            { label: 'Active Agents', value: agentList.length },
+            { label: 'Total Calls', value: totalCalls },
+            { label: 'Total WhatsApp', value: totalWA },
+            { label: 'Total Emails', value: totalEmails },
+            { label: 'Total Interactions', value: totalCalls + totalWA + totalEmails }
+        ].map(k => `<div class="agent-score-card"><div class="score-label">${k.label}</div><div class="score-value">${k.value}</div></div>`).join('');
+    } else {
+        const m = agentMetrics[selectedAgent] || {};
+        kpisDiv.innerHTML = [
+            { label: 'Call Tickets', value: m.calls || 0 },
+            { label: 'WhatsApp Chats', value: m.wa || 0 },
+            { label: 'Care Emails', value: m.emails || 0 },
+            { label: 'Total', value: m.total || 0 },
+            { label: 'Avg Talk Time', value: formatSecondsCompact(m.avgTalkTime) },
+            { label: 'QA Score', value: m.avgQA + '/45' },
+            { label: 'FRT Met', value: m.frtMet + '%' },
+            { label: 'RT Met', value: m.rtMet + '%' },
+            { label: 'Break Time', value: formatSecondsCompact(m.breakTime) },
+            { label: 'Occupancy', value: m.occupancy + '%' }
+        ].map(k => `<div class="agent-score-card"><div class="score-label">${k.label}</div><div class="score-value">${k.value}</div></div>`).join('');
+    }
+
+    // Comparison Table
+    const compBody = document.getElementById('agent-comparison-body');
+    compBody.innerHTML = agentList.map(agent => {
+        const m = agentMetrics[agent];
+        const isHighlight = agent === selectedAgent;
+        return `<tr class="${isHighlight ? 'highlight' : ''}">
+            <td>${agent}</td><td>${m.calls}</td><td>${m.wa}</td><td>${m.emails}</td><td><strong>${m.total}</strong></td>
+            <td>${formatSecondsCompact(m.avgTalkTime)}</td><td>${m.avgQA}/45</td>
+            <td>${m.frtMet}%</td><td>${m.rtMet}%</td>
+            <td>${formatSecondsCompact(m.breakTime)}</td><td>${m.occupancy}%</td>
+        </tr>`;
+    }).join('');
+
+    // Agent Activity Timeline
+    const chartAgent = selectedAgent !== 'all' ? selectedAgent : null;
+    const dateMap = {};
+    const filteredData = chartAgent ? data.filter(d => d.agent === chartAgent) : data;
+    filteredData.forEach(d => { const day = (d.date||'').substring(0,10); if(day) dateMap[day] = (dateMap[day]||0)+1; });
+    const dates = Object.keys(dateMap).sort();
+    const ctx = document.getElementById('agent-activity-chart');
+    if (ctx) {
+        agentPerfCharts.activity = new Chart(ctx.getContext('2d'), {
+            type: 'bar', data: { labels: dates, datasets: [{ label: chartAgent ? `${chartAgent} — Daily Volume` : 'All Agents — Daily Volume', data: dates.map(d => dateMap[d]), backgroundColor: THEME_COLORS.purple + '70', borderRadius: 4 }] },
+            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 20 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+        });
+    }
+}
+
+// ----- TICKETS & CHATS VIEW -----
+
+let ticketsState = { statusFilter: 'all', channelFilter: 'all', search: '', page: 1, perPage: 50, sortField: 'date', sortDir: -1 };
+
+function renderTicketsChatsView() {
+    if (!rawData) return;
+    // Use ALL interactions (not filtered by date for browsing), but respect global date filter
+    let allData = window.viewModel.interactions.slice();
+
+    // Setup event listeners once
+    const statusPills = document.getElementById('tickets-status-pills');
+    if (statusPills && !statusPills._bound) {
+        statusPills._bound = true;
+        statusPills.querySelectorAll('.status-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                statusPills.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                ticketsState.statusFilter = pill.getAttribute('data-status');
+                ticketsState.page = 1;
+                renderTicketsChatsView();
+            });
+        });
+    }
+    const channelPills = document.getElementById('tickets-channel-pills');
+    if (channelPills && !channelPills._bound) {
+        channelPills._bound = true;
+        channelPills.querySelectorAll('.status-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                channelPills.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                ticketsState.channelFilter = pill.getAttribute('data-tchannel');
+                ticketsState.page = 1;
+                renderTicketsChatsView();
+            });
+        });
+    }
+    const searchInput = document.getElementById('tickets-search');
+    if (searchInput && !searchInput._bound) {
+        searchInput._bound = true;
+        searchInput.addEventListener('input', () => { ticketsState.search = searchInput.value.toLowerCase(); ticketsState.page = 1; renderTicketsChatsView(); });
+    }
+    // Sort headers
+    const table = document.getElementById('tickets-data-table');
+    if (table && !table._bound) {
+        table._bound = true;
+        table.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const field = th.getAttribute('data-sort');
+                if (ticketsState.sortField === field) ticketsState.sortDir *= -1;
+                else { ticketsState.sortField = field; ticketsState.sortDir = 1; }
+                ticketsState.page = 1;
+                renderTicketsChatsView();
+            });
+        });
+    }
+    // Export
+    const exportBtn = document.getElementById('tickets-export-btn');
+    if (exportBtn && !exportBtn._bound) {
+        exportBtn._bound = true;
+        exportBtn.addEventListener('click', () => exportTableAsCSV('tickets-data-table', 'tickets_export.csv'));
+    }
+
+    // Apply filters
+    let filtered = allData;
+    if (ticketsState.statusFilter !== 'all') {
+        filtered = filtered.filter(d => {
+            const stage = (d.stage || '').toLowerCase().replace(/\s+/g, '_');
+            return stage === ticketsState.statusFilter || stage.includes(ticketsState.statusFilter);
+        });
+    }
+    if (ticketsState.channelFilter !== 'all') {
+        filtered = filtered.filter(d => d.type === ticketsState.channelFilter);
+    }
+    // NOTE: renderTicketsChatsView continues in next append block (search, sort, pagination, table render)
+}

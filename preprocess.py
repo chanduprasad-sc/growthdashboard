@@ -145,6 +145,14 @@ def parse_hms_to_seconds(val):
     except:
         return 0
 
+def clean_score(val):
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return None
+    try:
+        return float(val)
+    except:
+        return None
+
 # -------------------------------------------------------------
 # 2. PARSE POC-BRANCH MAPPING
 # -------------------------------------------------------------
@@ -377,17 +385,36 @@ for idx, row in tk_df.iterrows():
     elif "answered call" in title_lower:
         call_status = "answered"
         
-    # Parse resolution time (in minutes, convert to seconds)
-    resolution_time = None
-    for i in range(3):
+    # Parse SLA response and resolution times
+    sla_frt = None
+    sla_rt = None
+    sla_frt_status = None
+    sla_rt_status = None
+    for i in range(5):
         metric_col = f'Metric Name[{i}]'
         comp_col = f'Completed In[{i}]'
+        status_col = f'Metric Status[{i}]'
         if metric_col in row and comp_col in row:
-            if str(row.get(metric_col)).strip() == 'Resolution time':
+            m_name = str(row.get(metric_col) or "").strip().lower()
+            comp_val = row.get(comp_col)
+            m_status = str(row.get(status_col) or "").strip() if status_col in row else None
+            if m_status:
+                m_status = m_status.strip().upper()
+                
+            if m_name in ['first response time', 'first_response_time']:
                 try:
-                    val = float(row.get(comp_col))
+                    val = float(comp_val)
                     if not math.isnan(val):
-                        resolution_time = int(val * 60) # Convert minutes to seconds
+                        sla_frt = int(val * 60)
+                        sla_frt_status = m_status
+                except:
+                    pass
+            elif m_name in ['resolution time', 'resolution_time']:
+                try:
+                    val = float(comp_val)
+                    if not math.isnan(val):
+                        sla_rt = int(val * 60)
+                        sla_rt_status = m_status
                 except:
                     pass
 
@@ -422,7 +449,17 @@ for idx, row in tk_df.iterrows():
         "qa_score": qa_score,
         "recording_url": rec_url,
         "call_status": call_status,
-        "resolution_time": resolution_time
+        "resolution_time": sla_rt, # Keep for backwards compatibility
+        "qa_greeting": clean_score(row.get('Opening & Greetings (5)')),
+        "qa_grammar": clean_score(row.get('Grammar (5)')),
+        "qa_acknowledgement": clean_score(row.get('Acknowledgement and Assurance (15)')),
+        "qa_sla": clean_score(row.get('Maintaining SLA (15)')),
+        "qa_assistance": clean_score(row.get('Offer further assistance & Closing statement (5)')),
+        "qa_overall": clean_score(row.get('Overall Score (45)')),
+        "sla_frt": sla_frt,
+        "sla_rt": sla_rt,
+        "sla_frt_status": sla_frt_status,
+        "sla_rt_status": sla_rt_status
     })
 
 print(f"Processed {len(tickets)} Call Tickets.")
@@ -455,17 +492,27 @@ for idx, row in wa_df.iterrows():
     norm_branch = normalize_branch(branch_loc)
     poc = match_poc(broker_fam, norm_branch)
     
-    # Parse resolution time (in hours, convert to seconds)
-    resolution_time = None
+    # Parse SLA response and resolution times (in hours, convert to seconds)
+    sla_frt = None
+    sla_rt = None
     for i in range(3):
         metric_col = f'Metric Name[{i}]'
         comp_col = f'Completed In[{i}]'
         if metric_col in row and comp_col in row:
-            if str(row.get(metric_col)).strip() == 'Resolution time':
+            m_name = str(row.get(metric_col) or "").strip().lower()
+            comp_val = row.get(comp_col)
+            if m_name in ['first response time', 'first_response_time']:
                 try:
-                    val = float(row.get(comp_col))
+                    val = float(comp_val)
                     if not math.isnan(val):
-                        resolution_time = int(val * 3600) # Convert hours to seconds
+                        sla_frt = int(val * 3600)
+                except:
+                    pass
+            elif m_name in ['resolution time', 'resolution_time']:
+                try:
+                    val = float(comp_val)
+                    if not math.isnan(val):
+                        sla_rt = int(val * 3600)
                 except:
                     pass
 
@@ -499,7 +546,17 @@ for idx, row in wa_df.iterrows():
         "sla_status": "MET",
         "qa_score": "",
         "recording_url": "",
-        "resolution_time": resolution_time
+        "resolution_time": sla_rt, # Keep for backwards compatibility
+        "qa_greeting": None,
+        "qa_grammar": None,
+        "qa_acknowledgement": None,
+        "qa_sla": None,
+        "qa_assistance": None,
+        "qa_overall": None,
+        "sla_frt": sla_frt,
+        "sla_rt": sla_rt,
+        "sla_frt_status": None,
+        "sla_rt_status": None
     })
 
 print(f"Processed {len(chats)} WhatsApp Chats.")
@@ -540,6 +597,39 @@ for idx, row in filtered_df.iterrows():
     norm_branch = "Not shared"
     poc = match_poc(broker_fam, norm_branch)
     
+    # Parse SLA response and resolution times (in minutes, convert to seconds)
+    sla_frt = None
+    sla_rt = None
+    sla_frt_status = None
+    sla_rt_status = None
+    for i in range(3):
+        metric_col = f'Metric Name[{i}]'
+        comp_col = f'Completed In[{i}]'
+        status_col = f'Metric Status[{i}]'
+        if metric_col in row and comp_col in row:
+            m_name = str(row.get(metric_col) or "").strip().lower()
+            comp_val = row.get(comp_col)
+            m_status = str(row.get(status_col) or "").strip() if status_col in row else None
+            if m_status:
+                m_status = m_status.strip().upper()
+                
+            if m_name in ['first response time', 'first_response_time']:
+                try:
+                    val = float(comp_val)
+                    if not math.isnan(val):
+                        sla_frt = int(val * 60)
+                        sla_frt_status = m_status
+                except:
+                    pass
+            elif m_name in ['resolution time', 'resolution_time']:
+                try:
+                    val = float(comp_val)
+                    if not math.isnan(val):
+                        sla_rt = int(val * 60)
+                        sla_rt_status = m_status
+                except:
+                    pass
+
     emails.append({
         "id": work_id,
         "type": "Care Email",
@@ -558,10 +648,20 @@ for idx, row in filtered_df.iterrows():
         "stage": stage or "Closed",
         "comments": body,
         "severity": "Medium",
-        "sla_status": "MET",
-        "qa_score": "",
+        "sla_status": sla_status or "MET",
+        "qa_score": clean_str(row.get('Overall Score (45)')),
         "recording_url": "",
-        "sentiment": sentiment or "Neutral"
+        "sentiment": sentiment or "Neutral",
+        "qa_greeting": clean_score(row.get('Opening & Greetings (5)')),
+        "qa_grammar": clean_score(row.get('Grammar (5)')),
+        "qa_acknowledgement": clean_score(row.get('Acknowledgement and Assurance (15)')),
+        "qa_sla": clean_score(row.get('Maintaining SLA (15)')),
+        "qa_assistance": clean_score(row.get('Offer further assistance & Closing statement (5)')),
+        "qa_overall": clean_score(row.get('Overall Score (45)')),
+        "sla_frt": sla_frt,
+        "sla_rt": sla_rt,
+        "sla_frt_status": sla_frt_status,
+        "sla_rt_status": sla_rt_status
     })
 
 print(f"Processed {len(emails)} Care Emails.")
@@ -636,7 +736,8 @@ for idx, row in calls_df.iterrows():
         "talk_time": talk_time,
         "hold_time": hold_time,
         "queue_time": queue_time,
-        "time_to_answer": time_to_answer
+        "time_to_answer": time_to_answer,
+        "call_type": call_type
     })
 
 print(f"Processed {len(calls)} raw calls. Matched {matched_calls_count} calls to known RMs.")
@@ -682,6 +783,180 @@ print(f"Processed {len(agent_breaks)} Agent break logs.")
 
 # List of support interactions: Call Tickets + WhatsApp Chats + Care Emails
 support_interactions = tickets + chats + emails
+
+# -------------------------------------------------------------
+# 6.5. POST-PROCESSING: TIME-WINDOWED JOINS & METRICS COMPILATION
+# -------------------------------------------------------------
+print("Running post-processing time-windowed joins & metrics compilation...")
+
+# Group calls by cleaned phone number
+calls_by_phone = {}
+for call in calls:
+    phone = clean_phone(call["caller_no"])
+    if phone:
+        if phone not in calls_by_phone:
+            calls_by_phone[phone] = []
+        calls_by_phone[phone].append(call)
+
+# Sort calls for each phone by date
+for phone in calls_by_phone:
+    calls_by_phone[phone].sort(key=lambda x: x["date"])
+
+# Match Ozonetel Call to DevRev Ticket
+for tkt in tickets:
+    phone = clean_phone(tkt.get("rm_num") or tkt.get("rm_number") or "")
+    if not phone:
+        phone = clean_phone(tkt.get("rm_name"))
+        if not phone:
+            continue
+            
+    tkt_dt = None
+    if tkt["date"]:
+        try:
+            tkt_dt = datetime.strptime(tkt["date"], "%Y-%m-%d %H:%M:%S")
+        except:
+            pass
+            
+    if not tkt_dt:
+        continue
+        
+    candidate_calls = calls_by_phone.get(phone, [])
+    if not candidate_calls:
+        continue
+        
+    best_call = None
+    min_diff = 9999999
+    
+    for call in candidate_calls:
+        call_dt = None
+        if call["date"]:
+            try:
+                call_dt = datetime.strptime(call["date"], "%Y-%m-%d %H:%M:%S")
+            except:
+                pass
+        if not call_dt:
+            continue
+        diff = abs((tkt_dt - call_dt).total_seconds())
+        # Window of 20 seconds
+        if diff <= 20 and diff < min_diff:
+            min_diff = diff
+            best_call = call
+            
+    if best_call:
+        tkt["call_ucid"] = best_call["id"]
+        tkt["call_duration"] = best_call["duration"]
+        tkt["call_talk_time"] = best_call["talk_time"]
+        tkt["call_hold_time"] = best_call["hold_time"]
+        tkt["call_queue_time"] = best_call["queue_time"]
+        tkt["call_time_to_answer"] = best_call["time_to_answer"]
+        tkt["call_agent"] = best_call["agent"]
+        tkt["call_status"] = best_call["stage"]
+        # Link recording URL to ticket
+        tkt["recording_url"] = best_call["recording_url"]
+        
+        # Missed Call Callback Matching
+        is_missed = "missed" in tkt["title"].lower() or best_call["stage"].lower() in ["missed", "unanswered"]
+        if is_missed:
+            best_callback = None
+            initial_call_dt = None
+            try:
+                initial_call_dt = datetime.strptime(best_call["date"], "%Y-%m-%d %H:%M:%S")
+            except:
+                pass
+            if initial_call_dt:
+                for call in candidate_calls:
+                    ctype = str(call.get("call_type") or "").lower()
+                    if "progressive" in ctype or "callback" in ctype:
+                        call_dt = None
+                        try:
+                            call_dt = datetime.strptime(call["date"], "%Y-%m-%d %H:%M:%S")
+                        except:
+                            pass
+                        if call_dt:
+                            diff = (call_dt - initial_call_dt).total_seconds()
+                            if 0 < diff <= 900: # Callback within 15 minutes
+                                best_callback = call
+                                break
+                                
+            if best_callback:
+                tkt["recording_url"] = best_callback["recording_url"] # Fetch callback recording!
+                tkt["callback_ucid"] = best_callback["id"]
+                tkt["callback_duration"] = best_callback["duration"]
+                tkt["callback_talk_time"] = best_callback["talk_time"]
+                tkt["callback_agent"] = best_callback["agent"]
+                tkt["callback_status"] = best_callback["stage"]
+
+# Aggregate Agent breaks and Occupancy
+agent_summary_map = {}
+for b in agent_breaks:
+    agent = b["agent_name"]
+    if not agent or agent == "NA":
+        continue
+    date_str = b["date"].split(" ")[0] if b["date"] else ""
+    if not date_str:
+        continue
+        
+    if agent not in agent_summary_map:
+        agent_summary_map[agent] = {
+            "agent_name": agent,
+            "active_days": set(),
+            "total_breaks_sec": 0,
+            "break_types": {}
+        }
+    summary = agent_summary_map[agent]
+    summary["active_days"].add(date_str)
+    summary["total_breaks_sec"] += b["duration_sec"]
+    
+    btype = b["break_type"]
+    summary["break_types"][btype] = summary["break_types"].get(btype, 0) + b["duration_sec"]
+
+for call in calls:
+    agent = call["agent"]
+    if not agent or agent == "System" or agent == "NA":
+        continue
+    date_str = call["date"].split(" ")[0] if call["date"] else ""
+    if not date_str:
+        continue
+        
+    if agent not in agent_summary_map:
+        agent_summary_map[agent] = {
+            "agent_name": agent,
+            "active_days": set(),
+            "total_breaks_sec": 0,
+            "break_types": {}
+        }
+    agent_summary_map[agent]["active_days"].add(date_str)
+
+agent_talk_time = {}
+for call in calls:
+    agent = call["agent"]
+    if agent and agent != "System":
+        agent_talk_time[agent] = agent_talk_time.get(agent, 0) + call.get("talk_time", 0)
+
+agent_scorecards = []
+for agent, summary in agent_summary_map.items():
+    active_days_count = len(summary["active_days"])
+    shift_time_sec = active_days_count * 32400 # 9 hours
+    talk_time_sec = agent_talk_time.get(agent, 0)
+    break_time_sec = summary["total_breaks_sec"]
+    
+    denominator = shift_time_sec - break_time_sec
+    occupancy_pct = 0.0
+    if denominator > 0:
+        occupancy_pct = round((talk_time_sec / denominator) * 100, 2)
+        if occupancy_pct > 100.0:
+            occupancy_pct = 100.0
+            
+    agent_scorecards.append({
+        "agent_name": agent,
+        "active_days": active_days_count,
+        "logged_hours": round(shift_time_sec / 3600, 2),
+        "total_breaks_sec": break_time_sec,
+        "talk_time_sec": talk_time_sec,
+        "occupancy_rate": occupancy_pct,
+        "break_types": summary["break_types"]
+    })
+
 
 # 7.1. Outliers
 print("Computing RM Outlier Contact Frequencies...")
@@ -874,7 +1149,34 @@ for item in support_interactions:
         "recording_url": item["recording_url"],
         "sentiment": item.get("sentiment", ""),
         "call_status": item.get("call_status", "other"),
-        "resolution_time": item.get("resolution_time", None)
+        "resolution_time": item.get("resolution_time", None),
+        # QA Scores
+        "qa_greeting": item.get("qa_greeting", None),
+        "qa_grammar": item.get("qa_grammar", None),
+        "qa_acknowledgement": item.get("qa_acknowledgement", None),
+        "qa_sla": item.get("qa_sla", None),
+        "qa_assistance": item.get("qa_assistance", None),
+        "qa_overall": item.get("qa_overall", None),
+        # SLA Metrics
+        "sla_frt": item.get("sla_frt", None),
+        "sla_rt": item.get("sla_rt", None),
+        "sla_frt_status": item.get("sla_frt_status", None),
+        "sla_rt_status": item.get("sla_rt_status", None),
+        # Matched Call Metrics
+        "call_ucid": item.get("call_ucid", None),
+        "call_duration": item.get("call_duration", None),
+        "call_talk_time": item.get("call_talk_time", None),
+        "call_hold_time": item.get("call_hold_time", None),
+        "call_queue_time": item.get("call_queue_time", None),
+        "call_time_to_answer": item.get("call_time_to_answer", None),
+        "call_agent": item.get("call_agent", None),
+        "call_status_raw": item.get("call_status", None),
+        # Callback Metrics
+        "callback_ucid": item.get("callback_ucid", None),
+        "callback_duration": item.get("callback_duration", None),
+        "callback_talk_time": item.get("callback_talk_time", None),
+        "callback_agent": item.get("callback_agent", None),
+        "callback_status": item.get("callback_status", None)
     })
 
 compact_calls = []
@@ -898,7 +1200,8 @@ for call in calls:
         "talk_time": call.get("talk_time", 0),
         "hold_time": call.get("hold_time", 0),
         "queue_time": call.get("queue_time", 0),
-        "time_to_answer": call.get("time_to_answer", 0)
+        "time_to_answer": call.get("time_to_answer", 0),
+        "call_type": call.get("call_type", "")
     })
 
 # Structure the output file
@@ -911,7 +1214,8 @@ dashboard_data = {
     "repeat_loops": repeat_loops,
     "top_themes": top_themes,
     "recent_comments": recent_comments,
-    "poc_mappings": poc_mappings
+    "poc_mappings": poc_mappings,
+    "agent_scorecards": agent_scorecards
 }
 
 with open(output_json_path, 'w', encoding='utf-8') as f:
