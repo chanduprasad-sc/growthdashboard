@@ -2953,3 +2953,92 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border-color: var(--text-muted);
 }
 
+/* ========================================================================
+   NEW UPGRADES: Staffing Simulator, SLA Risk Queue, QA Coaching Breakdown
+   ======================================================================== */
+
+/* Simulator Ranges */
+.simulator-control-group input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--divider-color);
+    outline: none;
+    transition: background 0.3s;
+}
+.simulator-control-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--purple);
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+    transition: transform 0.15s, background-color 0.15s;
+}
+.simulator-control-group input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: var(--accent-primary);
+}
+
+/* Status Banner */
+.status-banner {
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-align: center;
+    border: 1px solid transparent;
+}
+.status-banner.excellent {
+    background: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
+    border-color: rgba(34, 197, 94, 0.2);
+}
+.status-banner.good {
+    background: rgba(2, 132, 199, 0.12);
+    color: #0284c7;
+    border-color: rgba(2, 132, 199, 0.2);
+}
+.status-banner.moderate {
+    background: rgba(249, 115, 22, 0.12);
+    color: #f97316;
+    border-color: rgba(249, 115, 22, 0.2);
+}
+.status-banner.poor {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.2);
+    animation: pulseBorder 2s infinite;
+}
+@keyframes pulseBorder {
+    0% { border-color: rgba(239, 68, 68, 0.2); }
+    50% { border-color: rgba(239, 68, 68, 0.6); }
+    100% { border-color: rgba(239, 68, 68, 0.2); }
+}
+
+/* QA Coaching Progress Bar */
+.coaching-bar-group {
+    margin-bottom: 14px;
+}
+.progress-bar-bg {
+    width: 100%;
+    background: var(--divider-color);
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* SLA Queue Ticker Hover state */
+#sla-risk-queue-card > div {
+    transition: transform 0.2s, background-color 0.2s;
+}
+#sla-risk-queue-card > div:hover {
+    transform: translateX(4px);
+    background-color: var(--bg-card-hover) !important;
+}
+
