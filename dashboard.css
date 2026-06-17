@@ -697,6 +697,7 @@ body.light-mode .dropdown-select {
     justify-content: space-between;
     position: relative;
     overflow: hidden;
+    cursor: pointer;
 }
 .kpi-card::after {
     content: "";
@@ -1910,3 +1911,155 @@ body.light-mode .skeleton-shimmer {
         grid-template-columns: 1fr;
     }
 }
+
+/* ==========================================================================
+   DEVREV HYPERLINK & CODE BLOCK STYLING
+   ========================================================================== */
+.devrev-id-link {
+    color: var(--accent-blue, #0284c7);
+    text-decoration: none;
+    transition: var(--transition-smooth);
+    display: inline-block;
+}
+
+.devrev-id-link:hover {
+    filter: brightness(1.2);
+}
+
+.devrev-id-link:hover code {
+    border-color: var(--accent-blue);
+    background: rgba(var(--accent-blue-rgb), 0.15);
+    text-decoration: underline;
+}
+
+.devrev-id-link code {
+    font-family: monospace;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--accent-blue);
+    background: rgba(var(--accent-blue-rgb), 0.08);
+    border: 1px solid rgba(var(--accent-blue-rgb), 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: var(--transition-smooth);
+    cursor: pointer;
+}
+
+/* Base code tag styling for non-hyperlinked elements */
+code {
+    font-family: monospace;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+body.light-mode code {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+/* ==========================================================================
+   UPGRADED DASHBOARD SECTION STYLING (SLA, QA, BREAKS, CALLBACKS)
+   ========================================================================== */
+
+/* QA Scorecard Badges */
+.qa-badge-card {
+    transition: var(--transition-smooth);
+}
+.qa-badge-card:hover {
+    background: rgba(255, 255, 255, 0.04) !important;
+    transform: translateY(-2px);
+    border-color: rgba(var(--accent-green-rgb), 0.3) !important;
+}
+body.light-mode .qa-badge-card:hover {
+    background: rgba(0, 0, 0, 0.015) !important;
+    border-color: rgba(var(--accent-green-rgb), 0.4) !important;
+}
+
+/* Callback Stats Cards */
+.callback-stats-grid .kpi-card {
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: var(--transition-smooth);
+}
+.callback-stats-grid .kpi-card:hover {
+    background: rgba(255, 255, 255, 0.03) !important;
+    transform: translateY(-1px);
+    border-color: rgba(var(--accent-primary-rgb), 0.3) !important;
+}
+body.light-mode .callback-stats-grid .kpi-card:hover {
+    background: rgba(0, 0, 0, 0.01) !important;
+    border-color: rgba(var(--accent-primary-rgb), 0.4) !important;
+}
+
+/* Interactive Clickable Table Rows */
+.dashboard-table tbody tr.clickable-row {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.dashboard-table tbody tr.clickable-row:hover {
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+body.light-mode .dashboard-table tbody tr.clickable-row:hover {
+    background: rgba(0, 0, 0, 0.02) !important;
+}
+.dashboard-table tbody tr.clickable-row.selected-row {
+    background: rgba(var(--accent-primary-rgb), 0.15) !important;
+    border-left: 3px solid var(--accent-primary) !important;
+}
+body.light-mode .dashboard-table tbody tr.clickable-row.selected-row {
+    background: rgba(var(--accent-primary-rgb), 0.1) !important;
+}
+
+/* Dynamic Progress Bars for Breaks */
+.break-bar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.break-bar-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+.break-bar-outer {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    overflow: hidden;
+}
+body.light-mode .break-bar-outer {
+    background: rgba(0, 0, 0, 0.06);
+}
+.break-bar-inner {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-blue));
+    border-radius: 3px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Panel and Layout Adjustments */
+.agent-breaks-layout {
+    align-items: flex-start;
+}
+.agent-breaks-breakdown-wrapper {
+    transition: var(--transition-smooth);
+}
+.agent-breaks-breakdown-wrapper h4 {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+}
+body.light-mode .agent-breaks-breakdown-wrapper {
+    background: rgba(0, 0, 0, 0.01) !important;
+}
+
+

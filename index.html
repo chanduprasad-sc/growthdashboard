@@ -128,11 +128,19 @@
                     <div class="filter-group">
                         <label class="filter-label">Quick Channel Filters</label>
                         <div class="channel-pills">
-                            <button class="pill-btn active" data-channel="all">Combined</button>
+                            <button class="pill-btn active" data-channel="all" id="pill-combined">Combined</button>
                             <button class="pill-btn" data-channel="Call Ticket">Call Tickets</button>
                             <button class="pill-btn" data-channel="WhatsApp Chat">WhatsApp</button>
-                            <button class="pill-btn" data-channel="Care Email">Care Emails</button>
+                            <button class="pill-btn hidden" data-channel="Care Email" id="pill-care-emails" style="display: none;">Care Emails</button>
                         </div>
+                    </div>
+
+                    <!-- Include Care Emails Optional Toggle -->
+                    <div class="filter-group" style="display: flex; align-items: center; margin-top: auto; padding-bottom: 4px; margin-left: 12px;">
+                        <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">
+                            <input type="checkbox" id="filter-include-emails" style="width: 16px; height: 16px; cursor: pointer; border-radius: 4px; accent-color: var(--purple);">
+                            Include Care Emails
+                        </label>
                     </div>
 
                     <!-- Dropdowns and Reset button -->
@@ -175,7 +183,7 @@
                             <div class="kpi-card" id="card-interactions">
                                 <span class="kpi-title">Total Interactions</span>
                                 <div class="kpi-value" id="pulse-total-interactions">0</div>
-                                <div class="kpi-desc">Chats + Tickets + Emails</div>
+                                <div class="kpi-desc" id="pulse-total-desc">WhatsApp Chats + Call Tickets</div>
                             </div>
                             <div class="kpi-card" id="card-tickets">
                                 <span class="kpi-title">Call Tickets</span>
@@ -706,6 +714,156 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Upgraded Sections: SLA, QA, Auto Callbacks and Agent breaks -->
+                <h2 class="section-heading" style="margin-top: 40px; margin-bottom: 20px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.8px;">
+                    SLA, QA & Agent Productivity Control Room
+                </h2>
+
+                <div class="vc-charts-row-2">
+                    <!-- SLA & QA Control Room Panel -->
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">SLA & QA Control Room</h3>
+                            <span class="card-subtitle-right">SLA COMPLIANCE & QUALITY AUDITS</span>
+                        </div>
+                        
+                        <!-- SLA Compliance Sub-Panel -->
+                        <div class="sla-sub-panel" style="margin-top: 15px;">
+                            <h4 style="font-size: 0.85rem; color: var(--accent-primary); margin-bottom: 10px; font-weight: 600;">SLA Compliance per Channel</h4>
+                            <div class="panel-table-wrapper">
+                                <table class="dashboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Channel</th>
+                                            <th class="text-right">Avg FRT</th>
+                                            <th class="text-right">FRT Met %</th>
+                                            <th class="text-right">Avg RT</th>
+                                            <th class="text-right">RT Met %</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vc-sla-table-body">
+                                        <!-- Dynamic rows for Call Tickets, WhatsApp, Care Emails -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Voice & Tone QA Averages Sub-Panel -->
+                        <div class="qa-sub-panel" style="margin-top: 25px;">
+                            <h4 style="font-size: 0.85rem; color: var(--accent-green); margin-bottom: 10px; font-weight: 600;">Voice & Tone QA Averages</h4>
+                            <div class="qa-badge-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Greetings</span>
+                                    <strong id="vc-qa-greetings" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/5</span>
+                                </div>
+                                <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Grammar</span>
+                                    <strong id="vc-qa-grammar" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/5</span>
+                                </div>
+                                <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Acknowledgment</span>
+                                    <strong id="vc-qa-acknowledgement" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/15</span>
+                                </div>
+                                <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Maintaining SLA</span>
+                                    <strong id="vc-qa-sla" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/15</span>
+                                </div>
+                                <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Assistance</span>
+                                    <strong id="vc-qa-assistance" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/5</span>
+                                </div>
+                                <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Overall QA</span>
+                                    <strong id="vc-qa-overall" style="font-size: 1.1rem; color: var(--accent-green);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/45</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Auto Callbacks Success Tracker & QA Leaderboard -->
+                    <div class="visual-card" style="display: flex; flex-direction: column; gap: 20px;">
+                        <div>
+                            <div class="card-header-row">
+                                <h3 class="card-title">Auto Callbacks Success Tracker</h3>
+                                <span class="card-subtitle-right">MISSED CALL AUTO-CALLBACK PROGRESS</span>
+                            </div>
+                            <div class="callback-stats-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 15px;">
+                                <div class="kpi-card" style="padding: 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border);">
+                                    <span class="kpi-title" style="font-size: 0.7rem;">Inbound Missed Calls</span>
+                                    <div class="kpi-value" id="vc-callback-missed" style="font-size: 1.4rem;">0</div>
+                                </div>
+                                <div class="kpi-card" style="padding: 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border);">
+                                    <span class="kpi-title" style="font-size: 0.7rem;">Callbacks Triggered</span>
+                                    <div class="kpi-value text-blue" id="vc-callback-triggered" style="font-size: 1.4rem;">0</div>
+                                    <span class="kpi-desc" id="vc-callback-triggered-pct" style="font-size: 0.65rem;">0% of missed</span>
+                                </div>
+                                <div class="kpi-card" style="padding: 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border);">
+                                    <span class="kpi-title" style="font-size: 0.7rem;">Callbacks Answered</span>
+                                    <div class="kpi-value text-green" id="vc-callback-answered" style="font-size: 1.4rem;">0</div>
+                                </div>
+                                <div class="kpi-card" style="padding: 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border);">
+                                    <span class="kpi-title" style="font-size: 0.7rem;">Success Rate</span>
+                                    <div class="kpi-value text-purple" id="vc-callback-success-rate" style="font-size: 1.4rem;">0%</div>
+                                    <span class="kpi-desc" style="font-size: 0.65rem;">Answered / Triggered</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="flex-grow: 1; display: flex; flex-direction: column;">
+                            <h4 style="font-size: 0.85rem; color: var(--accent-primary); margin-bottom: 8px; font-weight: 600;">Agent QA Leaderboard</h4>
+                            <div class="panel-table-wrapper scrollbar-themed" style="max-height: 150px; overflow-y: auto; flex-grow: 1;">
+                                <table class="dashboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Agent Name</th>
+                                            <th class="text-right">Audited Tickets</th>
+                                            <th class="text-right">Avg QA Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vc-qa-leaderboard-body">
+                                        <!-- Dynamic Agent rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent Breaks & Occupancy Analytics Panel -->
+                <div class="vc-charts-row-2" style="grid-template-columns: 100%; margin-top: 20px;">
+                    <div class="visual-card">
+                        <div class="card-header-row">
+                            <h3 class="card-title">Agent Breaks & Occupancy Analytics</h3>
+                            <span class="card-subtitle-right">MONITOR SHIFTS, OCCUPANCY, AND BREAK PATTERNS</span>
+                        </div>
+                        <div class="agent-breaks-layout" style="display: flex; gap: 20px; margin-top: 15px; flex-wrap: wrap;">
+                            <div class="agent-scorecard-table-wrapper scrollbar-themed" style="flex: 1.3; min-width: 350px; max-height: 350px; overflow-y: auto;">
+                                <table class="dashboard-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Agent Name</th>
+                                            <th class="text-right">Active Days</th>
+                                            <th class="text-right">Logged Hours</th>
+                                            <th class="text-right">Total Breaks</th>
+                                            <th class="text-right">Talk Time</th>
+                                            <th class="text-right">Occupancy Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vc-breaks-table-body">
+                                        <!-- Dynamic Scorecards -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="agent-breaks-breakdown-wrapper" style="flex: 0.7; min-width: 250px; background: rgba(255,255,255,0.015); border: 1px solid var(--border); border-radius: 8px; padding: 15px; display: flex; flex-direction: column;">
+                                <h4 id="vc-breaks-breakdown-title" style="font-size: 0.85rem; font-weight: 600; color: var(--accent-primary); margin-bottom: 15px;">Break Type Distribution (All Agents)</h4>
+                                <div id="vc-breaks-breakdown-list" style="display: flex; flex-direction: column; gap: 12px; flex-grow: 1;">
+                                    <!-- Dynamic Break Types List with visual progress bars -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- SUB-DASHBOARD 4: NEO (PLACEHOLDER) -->
@@ -815,6 +973,35 @@
                         </thead>
                         <tbody id="poc-modal-records-body">
                             <!-- Dynamic -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- METRICS DEEP-DIVE MODAL -->
+    <div class="modal-overlay" id="metrics-modal">
+        <div class="modal-content glassmorphism scrollbar-themed" style="max-width: 1200px;">
+            <button class="modal-close-btn" id="metrics-modal-close">&times;</button>
+            <div class="modal-header">
+                <div>
+                    <h1 class="modal-title" id="metrics-modal-title">Metric Details</h1>
+                    <p class="modal-subtitle" id="metrics-modal-subtitle">Deep-Dive Entries used for Calculation</p>
+                </div>
+                <div class="modal-badges">
+                    <span class="modal-badge-info" id="metrics-modal-count">0 Entries</span>
+                </div>
+            </div>
+            
+            <div class="modal-panel raw-records-panel" style="margin-top: 0;">
+                <div class="panel-table-wrapper scrollbar-themed" style="max-height: 60vh; overflow-y: auto;">
+                    <table class="dashboard-table">
+                        <thead id="metrics-modal-table-head">
+                            <!-- Dynamic Head -->
+                        </thead>
+                        <tbody id="metrics-modal-table-body">
+                            <!-- Dynamic Rows -->
                         </tbody>
                     </table>
                 </div>

@@ -13,7 +13,8 @@ let activeFilters = {
     broker: 'all',
     poc: 'all',
     agent: 'all',
-    searchQuery: ''
+    searchQuery: '',
+    includeCareEmails: false
 };
 
 // Explorer Widget State
@@ -60,6 +61,17 @@ function safeParseDate(dStr) {
     if (!dStr) return null;
     if (dStr.includes('T')) return new Date(dStr);
     return new Date(dStr.replace(' ', 'T'));
+}
+
+function getDevRevLinkHTML(id, type) {
+    if (!id || id === '-') return '-';
+    const cleanId = String(id).trim();
+    if (type === 'WhatsApp Chat' || cleanId.startsWith('CONV-')) {
+        return `<a href="https://app.devrev.ai/smallcasebp/inbox/${cleanId}" target="_blank" class="devrev-id-link"><code>${cleanId}</code></a>`;
+    } else if (type === 'Call Ticket' || type === 'Care Email' || cleanId.startsWith('TKT-') || cleanId.startsWith('REV-')) {
+        return `<a href="https://app.devrev.ai/smallcasebp/works/${cleanId}" target="_blank" class="devrev-id-link"><code>${cleanId}</code></a>`;
+    }
+    return `<code>${cleanId}</code>`;
 }
 
 // Colors Matching CSS variables (Light Mode default)
@@ -218,6 +230,12 @@ function cleanDate(val) {
 function compileRawCache(cache) {
     console.log("Compiling raw cache...");
 
+    function cleanScore(val) {
+        if (val === undefined || val === null || val === "") return null;
+        let p = parseFloat(val);
+        return isNaN(p) ? null : p;
+    }
+
     // 1. Parse POC-Branch mapping
     let poc_mappings = [];
     if (cache.pocBranches && Array.isArray(cache.pocBranches)) {
@@ -330,18 +348,30 @@ function compileRawCache(cache) {
                 call_status = "answered";
             }
 
-            let resolution_time = null;
-            for (let i = 0; i < 3; i++) {
+            // Parse SLA response and resolution times (in minutes, convert to seconds)
+            let sla_frt = null;
+            let sla_rt = null;
+            let sla_frt_status = null;
+            let sla_rt_status = null;
+            for (let i = 0; i < 5; i++) {
                 let metric_col = `Metric Name[${i}]`;
                 let comp_col = `Completed In[${i}]`;
+                let status_col = `Metric Status[${i}]`;
                 if (row[metric_col] !== undefined && row[comp_col] !== undefined) {
-                    if (String(row[metric_col]).trim() === 'Resolution time') {
-                        try {
-                            let val = parseFloat(row[comp_col]);
-                            if (!isNaN(val)) {
-                                resolution_time = Math.round(val * 60); // minutes to seconds
-                            }
-                        } catch (e) { }
+                    let m_name = String(row[metric_col]).trim().toLowerCase();
+                    let comp_val = parseFloat(row[comp_col]);
+                    let m_status = row[status_col] ? String(row[status_col]).trim().toUpperCase() : null;
+                    
+                    if (m_name === 'first response time' || m_name === 'first_response_time') {
+                        if (!isNaN(comp_val)) {
+                            sla_frt = Math.round(comp_val * 60);
+                            sla_frt_status = m_status;
+                        }
+                    } else if (m_name === 'resolution time' || m_name === 'resolution_time') {
+                        if (!isNaN(comp_val)) {
+                            sla_rt = Math.round(comp_val * 60);
+                            sla_rt_status = m_status;
+                        }
                     }
                 }
             }
@@ -377,7 +407,17 @@ function compileRawCache(cache) {
                 "qa_score": qa_score,
                 "recording_url": rec_url,
                 "call_status": call_status,
-                "resolution_time": resolution_time
+                "resolution_time": sla_rt, // Keep for backwards compatibility
+                "qa_greeting": cleanScore(row["Opening & Greetings (5)"]),
+                "qa_grammar": cleanScore(row["Grammar (5)"]),
+                "qa_acknowledgement": cleanScore(row["Acknowledgement and Assurance (15)"]),
+                "qa_sla": cleanScore(row["Maintaining SLA (15)"]),
+                "qa_assistance": cleanScore(row["Offer further assistance & Closing statement (5)"]),
+                "qa_overall": cleanScore(row["Overall Score (45)"]),
+                "sla_frt": sla_frt,
+                "sla_rt": sla_rt,
+                "sla_frt_status": sla_frt_status,
+                "sla_rt_status": sla_rt_status
             });
         });
     }
@@ -481,6 +521,34 @@ function compileRawCache(cache) {
             let norm_branch = "Not shared";
             let poc = matchPoc(broker_fam, norm_branch);
 
+            // Parse SLA response and resolution times (in minutes, convert to seconds)
+            let sla_frt = null;
+            let sla_rt = null;
+            let sla_frt_status = null;
+            let sla_rt_status = null;
+            for (let i = 0; i < 3; i++) {
+                let metric_col = `Metric Name[${i}]`;
+                let comp_col = `Completed In[${i}]`;
+                let status_col = `Metric Status[${i}]`;
+                if (row[metric_col] !== undefined && row[comp_col] !== undefined) {
+                    let m_name = String(row[metric_col]).trim().toLowerCase();
+                    let comp_val = parseFloat(row[comp_col]);
+                    let m_status = row[status_col] ? String(row[status_col]).trim().toUpperCase() : null;
+                    
+                    if (m_name === 'first response time' || m_name === 'first_response_time') {
+                        if (!isNaN(comp_val)) {
+                            sla_frt = Math.round(comp_val * 60);
+                            sla_frt_status = m_status;
+                        }
+                    } else if (m_name === 'resolution time' || m_name === 'resolution_time') {
+                        if (!isNaN(comp_val)) {
+                            sla_rt = Math.round(comp_val * 60);
+                            sla_rt_status = m_status;
+                        }
+                    }
+                }
+            }
+
             emails.push({
                 "id": work_id,
                 "type": "Care Email",
@@ -499,9 +567,19 @@ function compileRawCache(cache) {
                 "comments": body.length > 300 ? body.slice(0, 300) : body,
                 "severity": "Medium",
                 "sla_status": "MET",
-                "qa_score": "",
+                "qa_score": cleanStr(row["Overall Score (45)"]),
                 "recording_url": "",
-                "sentiment": sentiment || "Neutral"
+                "sentiment": sentiment || "Neutral",
+                "qa_greeting": cleanScore(row["Opening & Greetings (5)"]),
+                "qa_grammar": cleanScore(row["Grammar (5)"]),
+                "qa_acknowledgement": cleanScore(row["Acknowledgement and Assurance (15)"]),
+                "qa_sla": cleanScore(row["Maintaining SLA (15)"]),
+                "qa_assistance": cleanScore(row["Offer further assistance & Closing statement (5)"]),
+                "qa_overall": cleanScore(row["Overall Score (45)"]),
+                "sla_frt": sla_frt,
+                "sla_rt": sla_rt,
+                "sla_frt_status": sla_frt_status,
+                "sla_rt_status": sla_rt_status
             });
         });
     }
@@ -552,6 +630,7 @@ function compileRawCache(cache) {
             let hold_time = parseHmsToSeconds(row["Hold Time"] || 0);
             let queue_time = parseHmsToSeconds(row["Queue Time"] || 0);
             let time_to_answer = parseHmsToSeconds(row["Time to Answer"] || 0);
+            let call_type = cleanStr(row["Call Type"] || row["call_type"]);
 
             calls.push({
                 "id": call_id || ucid,
@@ -573,7 +652,8 @@ function compileRawCache(cache) {
                 "talk_time": talk_time,
                 "hold_time": hold_time,
                 "queue_time": queue_time,
-                "time_to_answer": time_to_answer
+                "time_to_answer": time_to_answer,
+                "call_type": call_type
             });
         });
     }
@@ -610,6 +690,170 @@ function compileRawCache(cache) {
     }
 
     let support_interactions = [...tickets, ...chats, ...emails];
+
+    // 6.5. POST-PROCESSING: TIME-WINDOWED JOINS & METRICS COMPILATION
+    console.log("Running post-processing time-windowed joins & metrics compilation...");
+
+    // Group calls by cleaned phone number
+    let calls_by_phone = {};
+    calls.forEach(call => {
+        let phone = cleanPhone(call.caller_no);
+        if (phone) {
+            if (!calls_by_phone[phone]) {
+                calls_by_phone[phone] = [];
+            }
+            calls_by_phone[phone].push(call);
+        }
+    });
+
+    Object.keys(calls_by_phone).forEach(phone => {
+        calls_by_phone[phone].sort((a, b) => new Date(a.date.replace(" ", "T")) - new Date(b.date.replace(" ", "T")));
+    });
+
+    // Match Ozonetel Call to DevRev Ticket
+    tickets.forEach(tkt => {
+        let phone = cleanPhone(tkt.rm_num || tkt.rm_number || "");
+        if (!phone) {
+            phone = cleanPhone(tkt.rm_name);
+        }
+        if (!phone) return;
+        
+        let tkt_dt = tkt.date ? new Date(tkt.date.replace(" ", "T")) : null;
+        if (!tkt_dt || isNaN(tkt_dt.getTime())) return;
+        
+        let candidate_calls = calls_by_phone[phone] || [];
+        if (candidate_calls.length === 0) return;
+        
+        let best_call = null;
+        let min_diff = 9999999;
+        
+        candidate_calls.forEach(call => {
+            let call_dt = call.date ? new Date(call.date.replace(" ", "T")) : null;
+            if (!call_dt || isNaN(call_dt.getTime())) return;
+            let diff = Math.abs((tkt_dt - call_dt) / 1000); // difference in seconds
+            if (diff <= 20 && diff < min_diff) {
+                min_diff = diff;
+                best_call = call;
+            }
+        });
+        
+        if (best_call) {
+            tkt.call_ucid = best_call.id;
+            tkt.call_duration = best_call.duration;
+            tkt.call_talk_time = best_call.talk_time;
+            tkt.call_hold_time = best_call.hold_time;
+            tkt.call_queue_time = best_call.queue_time;
+            tkt.call_time_to_answer = best_call.time_to_answer;
+            tkt.call_agent = best_call.agent;
+            tkt.call_status = best_call.stage;
+            tkt.recording_url = best_call.recording_url;
+            
+            // Missed Call callback matching
+            let is_missed = tkt.title.toLowerCase().includes("missed call") || best_call.stage.toLowerCase() === "missed" || best_call.stage.toLowerCase() === "unanswered";
+            if (is_missed) {
+                let best_callback = null;
+                let initial_call_dt = new Date(best_call.date.replace(" ", "T"));
+                
+                for (let call of candidate_calls) {
+                    let ctype = String(call.call_type || "").toLowerCase();
+                    if (ctype.includes("progressive") || ctype.includes("callback")) {
+                        let call_dt = new Date(call.date.replace(" ", "T"));
+                        let diff = (call_dt - initial_call_dt) / 1000; // in seconds
+                        if (diff > 0 && diff <= 900) {
+                            best_callback = call;
+                            break;
+                        }
+                    }
+                }
+                
+                if (best_callback) {
+                    tkt.recording_url = best_callback.recording_url;
+                    tkt.callback_ucid = best_callback.id;
+                    tkt.callback_duration = best_callback.duration;
+                    tkt.callback_talk_time = best_callback.talk_time;
+                    tkt.callback_agent = best_callback.agent;
+                    tkt.callback_status = best_callback.stage;
+                }
+            }
+        }
+    });
+
+    // Aggregate Agent breaks and Occupancy
+    let agent_summary_map = {};
+    agent_breaks.forEach(b => {
+        let agent = b.agent_name;
+        if (!agent || agent === "NA") return;
+        let date_str = b.date ? b.date.split(" ")[0] : "";
+        if (!date_str) return;
+        
+        if (!agent_summary_map[agent]) {
+            agent_summary_map[agent] = {
+                agent_name: agent,
+                active_days: new Set(),
+                total_breaks_sec: 0,
+                break_types: {}
+            };
+        }
+        let summary = agent_summary_map[agent];
+        summary.active_days.add(date_str);
+        summary.total_breaks_sec += b.duration_sec;
+        
+        let btype = b.break_type;
+        summary.break_types[btype] = (summary.break_types[btype] || 0) + b.duration_sec;
+    });
+
+    calls.forEach(call => {
+        let agent = call.agent;
+        if (!agent || agent === "System" || agent === "NA") return;
+        let date_str = call.date ? call.date.split(" ")[0] : "";
+        if (!date_str) return;
+        
+        if (!agent_summary_map[agent]) {
+            agent_summary_map[agent] = {
+                agent_name: agent,
+                active_days: new Set(),
+                total_breaks_sec: 0,
+                break_types: {}
+            };
+        }
+        agent_summary_map[agent].active_days.add(date_str);
+    });
+
+    let agent_talk_time = {};
+    calls.forEach(call => {
+        let agent = call.agent;
+        if (agent && agent !== "System") {
+            agent_talk_time[agent] = (agent_talk_time[agent] || 0) + (call.talk_time || 0);
+        }
+    });
+
+    let agent_scorecards = [];
+    Object.keys(agent_summary_map).forEach(agent => {
+        let summary = agent_summary_map[agent];
+        let active_days_count = summary.active_days.size;
+        let shift_time_sec = active_days_count * 32400; // 9 hours
+        let talk_time_sec = agent_talk_time[agent] || 0;
+        let break_time_sec = summary.total_breaks_sec;
+        
+        let denominator = shift_time_sec - break_time_sec;
+        let occupancy_pct = 0.0;
+        if (denominator > 0) {
+            occupancy_pct = Math.round((talk_time_sec / denominator) * 10000) / 100;
+            if (occupancy_pct > 100.0) {
+                occupancy_pct = 100.0;
+            }
+        }
+        
+        agent_scorecards.push({
+            agent_name: agent,
+            active_days: active_days_count,
+            logged_hours: Math.round((shift_time_sec / 3600) * 100) / 100,
+            total_breaks_sec: break_time_sec,
+            talk_time_sec: talk_time_sec,
+            occupancy_rate: occupancy_pct,
+            break_types: summary.break_types
+        });
+    });
 
     // 7. RM Outlier scoring
     let rm_stats = {};
@@ -787,7 +1031,8 @@ function compileRawCache(cache) {
         "repeat_loops": repeat_loops,
         "top_themes": top_themes,
         "recent_comments": recent_comments,
-        "poc_mappings": poc_mappings
+        "poc_mappings": poc_mappings,
+        "agent_scorecards": agent_scorecards
     };
 }
 
@@ -910,6 +1155,31 @@ function setupEventListeners() {
         });
     });
 
+    // Include Care Emails checkbox toggle listener
+    const includeEmailsCheckbox = document.getElementById('filter-include-emails');
+    if (includeEmailsCheckbox) {
+        includeEmailsCheckbox.addEventListener('change', (e) => {
+            activeFilters.includeCareEmails = e.target.checked;
+            const careEmailsPill = document.getElementById('pill-care-emails');
+            if (careEmailsPill) {
+                if (activeFilters.includeCareEmails) {
+                    careEmailsPill.classList.remove('hidden');
+                    careEmailsPill.style.display = 'inline-block';
+                } else {
+                    careEmailsPill.classList.add('hidden');
+                    careEmailsPill.style.display = 'none';
+                    if (activeFilters.channel === 'Care Email') {
+                        activeFilters.channel = 'all';
+                        document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+                        const combinedPill = document.getElementById('pill-combined');
+                        if (combinedPill) combinedPill.classList.add('active');
+                    }
+                }
+            }
+            buildViewModel();
+        });
+    }
+
     // Reset Filters button
     document.getElementById('weekly-reset-btn').addEventListener('click', () => {
         activeFilters = {
@@ -920,8 +1190,18 @@ function setupEventListeners() {
             broker: 'all',
             poc: 'all',
             agent: 'all',
-            searchQuery: ''
+            searchQuery: '',
+            includeCareEmails: false
         };
+
+        if (includeEmailsCheckbox) {
+            includeEmailsCheckbox.checked = false;
+        }
+        const careEmailsPill = document.getElementById('pill-care-emails');
+        if (careEmailsPill) {
+            careEmailsPill.classList.add('hidden');
+            careEmailsPill.style.display = 'none';
+        }
 
         document.querySelectorAll('.preset-btn').forEach(b => {
             b.classList.remove('active');
@@ -1046,6 +1326,40 @@ function setupEventListeners() {
     document.getElementById('poc-modal').addEventListener('click', (e) => {
         if (e.target === document.getElementById('poc-modal')) {
             document.getElementById('poc-modal').classList.remove('open');
+        }
+    });
+
+    // Metrics Modal Close listeners
+    const metricsModal = document.getElementById('metrics-modal');
+    if (metricsModal) {
+        document.getElementById('metrics-modal-close').addEventListener('click', () => {
+            metricsModal.classList.remove('open');
+        });
+        metricsModal.addEventListener('click', (e) => {
+            if (e.target === metricsModal) {
+                metricsModal.classList.remove('open');
+            }
+        });
+    }
+
+    // Register click handlers for all 8 KPI cards in Weekly Pulse
+    const kpiCards = [
+        { id: 'card-interactions', type: 'interactions', title: 'Total Interactions' },
+        { id: 'card-tickets', type: 'tickets', title: 'Call Tickets' },
+        { id: 'card-whatsapp', type: 'whatsapp', title: 'WhatsApp Chats' },
+        { id: 'card-answered', type: 'answered', title: 'Answered Calls' },
+        { id: 'card-missed', type: 'missed', title: 'Missed Calls' },
+        { id: 'card-aoh', type: 'aoh', title: 'AOH Calls' },
+        { id: 'card-aht', type: 'aht', title: 'Average Handling Time (AHT)' },
+        { id: 'card-aqt', type: 'aqt', title: 'Average Queue Time (AQT)' }
+    ];
+
+    kpiCards.forEach(card => {
+        const el = document.getElementById(card.id);
+        if (el) {
+            el.addEventListener('click', () => {
+                openMetricDeepDiveModal(card.type, card.title);
+            });
         }
     });
 }
@@ -1209,8 +1523,8 @@ function buildViewModel() {
         const itemTs = safeParseDate(item.date).getTime();
         if (itemTs < fromTs || itemTs > toTs) return false;
 
-        // Don't include Care Emails in Weekly Pulse
-        if (currentTab === 'tab-weekly-pulse' && item.type === 'Care Email') return false;
+        // Optionally include Care Emails
+        if (item.type === 'Care Email' && !activeFilters.includeCareEmails) return false;
 
         if (activeFilters.channel !== 'all' && item.type !== activeFilters.channel) return false;
         if (activeFilters.broker !== 'all' && item.broker_family !== activeFilters.broker) return false;
@@ -1244,8 +1558,8 @@ function buildViewModel() {
         const itemTs = safeParseDate(item.date).getTime();
         if (itemTs < prevFromTs || itemTs > prevToTs) return false;
 
-        // Don't include Care Emails in Weekly Pulse
-        if (currentTab === 'tab-weekly-pulse' && item.type === 'Care Email') return false;
+        // Optionally include Care Emails
+        if (item.type === 'Care Email' && !activeFilters.includeCareEmails) return false;
 
         if (activeFilters.channel !== 'all' && item.type !== activeFilters.channel) return false;
         if (activeFilters.broker !== 'all' && item.broker_family !== activeFilters.broker) return false;
@@ -1369,9 +1683,9 @@ function renderKeyMetricsGrid(interactions, calls) {
         const st = String(call.stage || "").toLowerCase();
         if (st === 'answered' || st === 'connected') {
             callAns++;
-            totalCallDuration += (call.talk_time || call.duration || 0);
-            totalCallQueue += (call.queue_time || call.time_to_answer || 0);
+            totalCallDuration += (call.duration || 0);
         }
+        totalCallQueue += (call.queue_time || 0);
     });
 
     // WhatsApp Chat average resolution time (from Metric Resolution time)
@@ -1391,16 +1705,15 @@ function renderKeyMetricsGrid(interactions, calls) {
         finalAQT = 0;
     } else if (activeFilters.channel === 'Call Ticket' || activeFilters.channel === 'Voice Call') {
         finalAHT = callAns > 0 ? totalCallDuration / callAns : 0;
-        finalAQT = callAns > 0 ? totalCallQueue / callAns : 0;
+        finalAQT = calls.length > 0 ? totalCallQueue / calls.length : 0;
     } else {
         // Combined
         if (callAns > 0) {
             finalAHT = totalCallDuration / callAns;
-            finalAQT = totalCallQueue / callAns;
         } else {
             finalAHT = chatCount > 0 ? totalChatResolution / chatCount : 0;
-            finalAQT = 0;
         }
+        finalAQT = calls.length > 0 ? totalCallQueue / calls.length : 0;
     }
 
     const formatDuration = (sec) => {
@@ -1417,6 +1730,13 @@ function renderKeyMetricsGrid(interactions, calls) {
     document.getElementById('pulse-total-interactions').innerText = (tkt + wa + mail).toLocaleString();
     document.getElementById('pulse-call-tickets').innerText = tkt.toLocaleString();
     document.getElementById('pulse-whatsapp-chats').innerText = wa.toLocaleString();
+
+    const totalDescEl = document.getElementById('pulse-total-desc');
+    if (totalDescEl) {
+        totalDescEl.innerText = activeFilters.includeCareEmails
+            ? 'WhatsApp Chats + Call Tickets + Care Emails'
+            : 'WhatsApp Chats + Call Tickets';
+    }
 
     document.getElementById('pulse-answered-calls').innerText = ans.toLocaleString();
     document.getElementById('pulse-missed-calls').innerText = missed.toLocaleString();
@@ -2608,7 +2928,7 @@ function openPocDeepDiveModal(pocName) {
             recordsBody.innerHTML += `
                 <tr>
                     <td>${item.date || '-'}</td>
-                    <td><code>${item.id || '-'}</code></td>
+                    <td>${getDevRevLinkHTML(item.id, item.type)}</td>
                     <td><span class="badge">${item.type}</span></td>
                     <td><strong>${item.rm_name || '-'}</strong></td>
                     <td><span class="badge badge-poc">${item.branch || '-'}</span></td>
@@ -2619,6 +2939,179 @@ function openPocDeepDiveModal(pocName) {
                 </tr>
             `;
         });
+    }
+
+    // Open Modal
+    modal.classList.add('open');
+}
+
+function openMetricDeepDiveModal(type, title) {
+    const modal = document.getElementById('metrics-modal');
+    if (!modal) return;
+
+    // Set Title and Subtitle
+    document.getElementById('metrics-modal-title').innerText = title;
+    
+    // We will build the table head and body dynamically
+    const tableHead = document.getElementById('metrics-modal-table-head');
+    const tableBody = document.getElementById('metrics-modal-table-body');
+    const countEl = document.getElementById('metrics-modal-count');
+    
+    if (!tableHead || !tableBody || !countEl) return;
+
+    tableHead.innerHTML = '';
+    tableBody.innerHTML = '';
+
+    // Filter helpers
+    const interactions = window.viewModel ? window.viewModel.interactions : [];
+    const calls = window.viewModel ? window.viewModel.calls : [];
+
+    const formatSeconds = (sec) => {
+        if (sec === null || sec === undefined || isNaN(sec)) return '-';
+        const mins = Math.floor(sec / 60);
+        const secs = Math.round(sec % 60);
+        return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
+
+    let entries = [];
+    let isCallBased = false;
+
+    // Determine the data subset based on type
+    if (type === 'interactions') {
+        entries = interactions;
+    } else if (type === 'tickets') {
+        entries = interactions.filter(item => item.type === 'Call Ticket');
+    } else if (type === 'whatsapp') {
+        entries = interactions.filter(item => item.type === 'WhatsApp Chat');
+    } else if (type === 'answered') {
+        entries = interactions.filter(item => {
+            if (item.type !== 'Call Ticket') return false;
+            let cs = String(item.call_status || "").toLowerCase();
+            if (cs === 'other' || !cs) {
+                const titleLower = (item.title || "").toLowerCase();
+                if (titleLower.includes('missed call')) cs = 'missed';
+                else if (titleLower.includes('aoh call')) cs = 'aoh';
+                else if (titleLower.includes('answered call')) cs = 'answered';
+            }
+            return cs === 'answered';
+        });
+    } else if (type === 'missed') {
+        entries = interactions.filter(item => {
+            if (item.type !== 'Call Ticket') return false;
+            let cs = String(item.call_status || "").toLowerCase();
+            if (cs === 'other' || !cs) {
+                const titleLower = (item.title || "").toLowerCase();
+                if (titleLower.includes('missed call')) cs = 'missed';
+                else if (titleLower.includes('aoh call')) cs = 'aoh';
+                else if (titleLower.includes('answered call')) cs = 'answered';
+            }
+            return cs === 'missed';
+        });
+    } else if (type === 'aoh') {
+        entries = interactions.filter(item => {
+            if (item.type !== 'Call Ticket') return false;
+            let cs = String(item.call_status || "").toLowerCase();
+            if (cs === 'other' || !cs) {
+                const titleLower = (item.title || "").toLowerCase();
+                if (titleLower.includes('missed call')) cs = 'missed';
+                else if (titleLower.includes('aoh call')) cs = 'aoh';
+                else if (titleLower.includes('answered call')) cs = 'answered';
+            }
+            return cs === 'aoh';
+        });
+    } else if (type === 'aht') {
+        // Average Handling Time is calculated from answered Ozonetel calls
+        entries = calls.filter(call => {
+            const st = String(call.stage || "").toLowerCase();
+            return st === 'answered' || st === 'connected';
+        });
+        isCallBased = true;
+    } else if (type === 'aqt') {
+        // Average Queue Time is calculated over all Ozonetel calls (irrespective of stage)
+        entries = calls;
+        isCallBased = true;
+    }
+
+    countEl.innerText = `${entries.length} Entries`;
+
+    // Populate headers & rows based on whether it is Ozonetel Call or support interaction
+    if (!isCallBased) {
+        // Setup Interactions headers
+        tableHead.innerHTML = `
+            <tr>
+                <th>Date</th>
+                <th>ID</th>
+                <th>Channel Type</th>
+                <th>Relationship Manager</th>
+                <th>Broker Family</th>
+                <th>Branch Location</th>
+                <th>Assigned POC</th>
+                <th>Issue / Comments</th>
+            </tr>
+        `;
+
+        if (entries.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="8" class="text-muted text-center" style="text-align: center; padding: 20px;">No support interaction records found.</td></tr>';
+        } else {
+            // Sort by Date descending
+            const sorted = [...entries].sort((a, b) => safeParseDate(b.date).getTime() - safeParseDate(a.date).getTime());
+            sorted.forEach(item => {
+                tableBody.innerHTML += `
+                    <tr>
+                        <td>${item.date || '-'}</td>
+                        <td>${getDevRevLinkHTML(item.id, item.type)}</td>
+                        <td><span class="badge" style="background-color: ${item.type === 'WhatsApp Chat' ? '#10b981' : item.type === 'Care Email' ? '#f59e0b' : '#0ea5e9'}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.72rem;">${item.type}</span></td>
+                        <td><strong>${item.rm_name || '-'}</strong></td>
+                        <td>${item.broker_family || '-'}</td>
+                        <td><span class="badge badge-poc">${item.branch || '-'}</span></td>
+                        <td><strong>${item.poc || 'Unassigned'}</strong></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.comments || item.title || ''}">${item.comments || item.title || '-'}</td>
+                    </tr>
+                `;
+            });
+        }
+    } else {
+        // Setup Call log headers
+        tableHead.innerHTML = `
+            <tr>
+                <th>Date</th>
+                <th>Call ID</th>
+                <th>Status</th>
+                <th>Caller No</th>
+                <th>RM Name</th>
+                <th>Broker Family</th>
+                <th>Support Agent</th>
+                <th class="text-right">Duration</th>
+                <th class="text-right">Queue Time</th>
+                <th class="text-right">Time to Answer</th>
+                <th>Recording</th>
+            </tr>
+        `;
+
+        if (entries.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="11" class="text-muted text-center" style="text-align: center; padding: 20px;">No raw voice call records found.</td></tr>';
+        } else {
+            // Sort by Date descending
+            const sorted = [...entries].sort((a, b) => safeParseDate(b.date).getTime() - safeParseDate(a.date).getTime());
+            sorted.forEach(call => {
+                const badgeClass = String(call.stage || "").toLowerCase() === 'answered' || String(call.stage || "").toLowerCase() === 'connected' ? 'text-green' : 'text-red';
+                tableBody.innerHTML += `
+                    <tr>
+                        <td>${call.date || '-'}</td>
+                        <td><code>${call.id || '-'}</code></td>
+                        <td><span class="${badgeClass}">● ${call.stage || 'Unanswered'}</span></td>
+                        <td>${call.caller_no || '-'}</td>
+                        <td><strong>${call.rm_name || '-'}</strong></td>
+                        <td>${call.broker_family || '-'}</td>
+                        <td>${call.agent || 'System'}</td>
+                        <td class="text-right"><strong>${formatSeconds(call.duration)}</strong></td>
+                        <td class="text-right">${formatSeconds(call.queue_time)}</td>
+                        <td class="text-right">${formatSeconds(call.time_to_answer)}</td>
+                        <td>${call.recording_url ? `<a href="${call.recording_url}" target="_blank" class="text-blue" style="text-decoration: none;">🔗 Listen</a>` : '-'}</td>
+                    </tr>
+                `;
+            });
+        }
     }
 
     // Open Modal
@@ -3224,6 +3717,11 @@ function renderVisualControlDashboard() {
 
     // Render flow canvas
     renderSankeyFlowCanvas(data);
+
+    // Render upgraded panels
+    renderSLAAndQAMatrix(data);
+    renderAutoCallbacksTracker(data);
+    renderAgentBreaksTab(data, calls);
 }
 
 function renderSankeyFlowCanvas(data) {
@@ -3410,5 +3908,429 @@ function renderSankeyFlowCanvas(data) {
     ctx.fillText('BROKER', x0 + nodeW / 2, 12);
     ctx.fillText('BRANCH', x1 + nodeW / 2, 12);
     ctx.fillText('ISSUE CATEGORY', x2 + nodeW / 2, 12);
+}
+
+// ==========================================================================
+// 6.5. UPGRADED METRICS RENDERING: SLA, QA, AUTO-CALLBACKS, AGENT BREAKS
+// ==========================================================================
+
+function renderSLAAndQAMatrix(data) {
+    // 1. Calculate SLA metrics per channel
+    const channels = ['Call Ticket', 'WhatsApp Chat', 'Care Email'];
+    const slaStats = {};
+    channels.forEach(ch => {
+        slaStats[ch] = {
+            frtSum: 0, frtCount: 0, frtMet: 0,
+            rtSum: 0, rtCount: 0, rtMet: 0
+        };
+    });
+
+    data.forEach(item => {
+        const ch = item.type;
+        if (!slaStats[ch]) return;
+
+        // FRT
+        if (item.sla_frt !== null && item.sla_frt !== undefined) {
+            slaStats[ch].frtSum += item.sla_frt;
+            slaStats[ch].frtCount++;
+            if (item.sla_frt_status === 'MET') {
+                slaStats[ch].frtMet++;
+            }
+        }
+        // RT
+        const rtVal = (ch === 'WhatsApp Chat') ? item.resolution_time : item.sla_rt;
+        if (rtVal !== null && rtVal !== undefined) {
+            slaStats[ch].rtSum += rtVal;
+            slaStats[ch].rtCount++;
+            if (ch === 'WhatsApp Chat') {
+                if (item.sla_status === 'MET') slaStats[ch].rtMet++;
+            } else {
+                if (item.sla_rt_status === 'MET') slaStats[ch].rtMet++;
+            }
+        }
+    });
+
+    const formatSeconds = (sec) => {
+        if (sec === null || sec === undefined || isNaN(sec) || sec === 0) return '-';
+        if (sec < 60) return `${Math.round(sec)}s`;
+        const mins = Math.floor(sec / 60);
+        if (mins < 60) {
+            const secs = Math.round(sec % 60);
+            return `${mins}m ${secs}s`;
+        }
+        const hrs = Math.floor(mins / 60);
+        const remMins = Math.round(mins % 60);
+        return `${hrs}h ${remMins}m`;
+    };
+
+    const formatPct = (met, total) => {
+        if (!total) return '-';
+        return `${Math.round((met / total) * 100)}%`;
+    };
+
+    const slaTbody = document.getElementById('vc-sla-table-body');
+    if (slaTbody) {
+        slaTbody.innerHTML = `
+            <tr>
+                <td><strong>Call Tickets</strong></td>
+                <td class="text-right"><strong>${formatSeconds(slaStats['Call Ticket'].frtCount ? slaStats['Call Ticket'].frtSum / slaStats['Call Ticket'].frtCount : null)}</strong></td>
+                <td class="text-right">${formatPct(slaStats['Call Ticket'].frtMet, slaStats['Call Ticket'].frtCount)}</td>
+                <td class="text-right"><strong>${formatSeconds(slaStats['Call Ticket'].rtCount ? slaStats['Call Ticket'].rtSum / slaStats['Call Ticket'].rtCount : null)}</strong></td>
+                <td class="text-right">${formatPct(slaStats['Call Ticket'].rtMet, slaStats['Call Ticket'].rtCount)}</td>
+            </tr>
+            <tr>
+                <td><strong>WhatsApp Chats</strong></td>
+                <td class="text-right">-</td>
+                <td class="text-right">-</td>
+                <td class="text-right"><strong>${formatSeconds(slaStats['WhatsApp Chat'].rtCount ? slaStats['WhatsApp Chat'].rtSum / slaStats['WhatsApp Chat'].rtCount : null)}</strong></td>
+                <td class="text-right">${formatPct(slaStats['WhatsApp Chat'].rtMet, slaStats['WhatsApp Chat'].rtCount)}</td>
+            </tr>
+            <tr>
+                <td><strong>Care Emails</strong></td>
+                <td class="text-right"><strong>${formatSeconds(slaStats['Care Email'].frtCount ? slaStats['Care Email'].frtSum / slaStats['Care Email'].frtCount : null)}</strong></td>
+                <td class="text-right">${formatPct(slaStats['Care Email'].frtMet, slaStats['Care Email'].frtCount)}</td>
+                <td class="text-right"><strong>${formatSeconds(slaStats['Care Email'].rtCount ? slaStats['Care Email'].rtSum / slaStats['Care Email'].rtCount : null)}</strong></td>
+                <td class="text-right">${formatPct(slaStats['Care Email'].rtMet, slaStats['Care Email'].rtCount)}</td>
+            </tr>
+        `;
+    }
+
+    // 2. Compute Voice & Tone QA Averages
+    let greetingSum = 0, greetingCount = 0;
+    let grammarSum = 0, grammarCount = 0;
+    let ackSum = 0, ackCount = 0;
+    let slaQASum = 0, slaQACount = 0;
+    let assistanceSum = 0, assistanceCount = 0;
+    let overallSum = 0, overallCount = 0;
+
+    // Agent QA leaderboard group
+    const agentQA = {};
+
+    data.forEach(item => {
+        if (item.qa_overall !== null && item.qa_overall !== undefined) {
+            overallSum += item.qa_overall;
+            overallCount++;
+
+            if (item.qa_greeting !== null && item.qa_greeting !== undefined) {
+                greetingSum += item.qa_greeting;
+                greetingCount++;
+            }
+            if (item.qa_grammar !== null && item.qa_grammar !== undefined) {
+                grammarSum += item.qa_grammar;
+                grammarCount++;
+            }
+            if (item.qa_acknowledgement !== null && item.qa_acknowledgement !== undefined) {
+                ackSum += item.qa_acknowledgement;
+                ackCount++;
+            }
+            if (item.qa_sla !== null && item.qa_sla !== undefined) {
+                slaQASum += item.qa_sla;
+                slaQACount++;
+            }
+            if (item.qa_assistance !== null && item.qa_assistance !== undefined) {
+                assistanceSum += item.qa_assistance;
+                assistanceCount++;
+            }
+
+            // Leaderboard
+            const agent = item.agent;
+            if (agent && agent !== 'System' && agent !== 'Unassigned') {
+                if (!agentQA[agent]) {
+                    agentQA[agent] = { sum: 0, count: 0 };
+                }
+                agentQA[agent].sum += item.qa_overall;
+                agentQA[agent].count++;
+            }
+        }
+    });
+
+    const setQAVal = (id, avg, max) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerText = avg !== null ? (Math.round(avg * 10) / 10) : '-';
+        }
+    };
+
+    setQAVal('vc-qa-greetings', greetingCount ? greetingSum / greetingCount : null, 5);
+    setQAVal('vc-qa-grammar', grammarCount ? grammarSum / grammarCount : null, 5);
+    setQAVal('vc-qa-acknowledgement', ackCount ? ackSum / ackCount : null, 15);
+    setQAVal('vc-qa-sla', slaQACount ? slaQASum / slaQACount : null, 15);
+    setQAVal('vc-qa-assistance', assistanceCount ? assistanceSum / assistanceCount : null, 5);
+    setQAVal('vc-qa-overall', overallCount ? overallSum / overallCount : null, 45);
+
+    // Render Agent QA Leaderboard
+    const qaLeaderboardBody = document.getElementById('vc-qa-leaderboard-body');
+    if (qaLeaderboardBody) {
+        const sortedAgents = Object.entries(agentQA)
+            .map(([agent, stats]) => ({
+                name: agent,
+                count: stats.count,
+                avg: stats.sum / stats.count
+            }))
+            .sort((a, b) => b.avg - a.avg);
+
+        if (sortedAgents.length === 0) {
+            qaLeaderboardBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted" style="padding: 10px;">No QA audits compiled for this period</td></tr>';
+        } else {
+            qaLeaderboardBody.innerHTML = sortedAgents.map(a => `
+                <tr>
+                    <td><strong>${a.name}</strong></td>
+                    <td class="text-right">${a.count}</td>
+                    <td class="text-right text-green"><strong>${Math.round(a.avg * 10) / 10} / 45</strong></td>
+                </tr>
+            `).join('');
+        }
+    }
+}
+
+function renderAutoCallbacksTracker(data) {
+    // Filter inbound missed call tickets
+    let missedCount = 0;
+    let triggeredCount = 0;
+    let answeredCount = 0;
+
+    data.forEach(item => {
+        if (item.type === 'Call Ticket' && item.call_status === 'missed') {
+            missedCount++;
+            if (item.callback_ucid) {
+                triggeredCount++;
+                const status = String(item.callback_status || "").toLowerCase();
+                if (status === 'answered' || status === 'connected') {
+                    answeredCount++;
+                }
+            }
+        }
+    });
+
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = val.toLocaleString();
+    };
+
+    setVal('vc-callback-missed', missedCount);
+    setVal('vc-callback-triggered', triggeredCount);
+    setVal('vc-callback-answered', answeredCount);
+
+    const triggeredPctEl = document.getElementById('vc-callback-triggered-pct');
+    if (triggeredPctEl) {
+        triggeredPctEl.innerText = missedCount ? `${Math.round((triggeredCount / missedCount) * 100)}% of missed` : '0% of missed';
+    }
+
+    const successRateEl = document.getElementById('vc-callback-success-rate');
+    if (successRateEl) {
+        successRateEl.innerText = triggeredCount ? `${Math.round((answeredCount / triggeredCount) * 100)}%` : '0%';
+    }
+}
+
+let selectedAgentForBreaks = null;
+
+function renderAgentBreaksTab(data, calls) {
+    const fromTs = window.viewModel.fromTs;
+    const toTs = window.viewModel.toTs;
+
+    // Filter breaks dynamically by timeline
+    let filteredBreaks = [];
+    if (rawData.agent_breaks && Array.isArray(rawData.agent_breaks)) {
+        filteredBreaks = rawData.agent_breaks.filter(b => {
+            if (!b.date) return false;
+            let bTs = safeParseDate(b.date).getTime();
+            return bTs >= fromTs && bTs <= toTs;
+        });
+    }
+
+    // Initialize agent statistics
+    let agentSummary = {};
+    
+    // Group active days and talk time from filtered calls
+    calls.forEach(c => {
+        let agent = c.agent;
+        if (!agent || agent === 'System' || agent === 'NA') return;
+        
+        // Respect active filters for agent
+        if (activeFilters.agent !== 'all' && agent !== activeFilters.agent) return;
+
+        if (!agentSummary[agent]) {
+            agentSummary[agent] = {
+                agent_name: agent,
+                active_days: new Set(),
+                total_breaks_sec: 0,
+                talk_time_sec: 0,
+                break_types: {}
+            };
+        }
+        let dateStr = c.date ? c.date.split(" ")[0] : "";
+        if (dateStr) agentSummary[agent].active_days.add(dateStr);
+        agentSummary[agent].talk_time_sec += (c.talk_time || 0);
+    });
+
+    // Group active days and breaks duration from filtered breaks
+    filteredBreaks.forEach(b => {
+        let agent = b.agent_name;
+        if (!agent || agent === 'NA') return;
+
+        // Respect active filters for agent
+        if (activeFilters.agent !== 'all' && agent !== activeFilters.agent) return;
+
+        // Skip agent if there's any filter on calls and agent has no calls in filtered calls
+        let hasCallsFilter = activeFilters.broker !== 'all' || activeFilters.poc !== 'all' || activeFilters.channel !== 'all';
+        if (hasCallsFilter && !agentSummary[agent]) {
+            return;
+        }
+
+        if (!agentSummary[agent]) {
+            agentSummary[agent] = {
+                agent_name: agent,
+                active_days: new Set(),
+                total_breaks_sec: 0,
+                talk_time_sec: 0,
+                break_types: {}
+            };
+        }
+
+        let dateStr = b.date ? b.date.split(" ")[0] : "";
+        if (dateStr) agentSummary[agent].active_days.add(dateStr);
+        agentSummary[agent].total_breaks_sec += b.duration_sec;
+
+        let btype = b.break_type || "Other";
+        agentSummary[agent].break_types[btype] = (agentSummary[agent].break_types[btype] || 0) + b.duration_sec;
+    });
+
+    // Compile dynamic scorecards
+    let scorecards = [];
+    Object.keys(agentSummary).forEach(agent => {
+        let s = agentSummary[agent];
+        let activeDays = s.active_days.size;
+        if (activeDays === 0) return;
+
+        let shiftTimeSec = activeDays * 32400; // 9 hours/day
+        let breakTimeSec = s.total_breaks_sec;
+        let talkTimeSec = s.talk_time_sec;
+
+        let denominator = shiftTimeSec - breakTimeSec;
+        let occupancy = 0.0;
+        if (denominator > 0) {
+            occupancy = Math.round((talkTimeSec / denominator) * 10000) / 100;
+            if (occupancy > 100.0) occupancy = 100.0;
+        }
+
+        scorecards.push({
+            agent_name: agent,
+            active_days: activeDays,
+            logged_hours: Math.round((shiftTimeSec / 3600) * 100) / 100,
+            total_breaks_sec: breakTimeSec,
+            talk_time_sec: talkTimeSec,
+            occupancy_rate: occupancy,
+            break_types: s.break_types
+        });
+    });
+
+    // Sort by occupancy rate descending
+    scorecards.sort((a, b) => b.occupancy_rate - a.occupancy_rate);
+
+    const formatSeconds = (sec) => {
+        if (sec === null || sec === undefined || isNaN(sec)) return '0s';
+        const mins = Math.floor(sec / 60);
+        if (mins < 60) {
+            return `${mins}m`;
+        }
+        const hrs = Math.floor(mins / 60);
+        const remMins = Math.round(mins % 60);
+        return `${hrs}h ${remMins}m`;
+    };
+
+    const tbody = document.getElementById('vc-breaks-table-body');
+    if (tbody) {
+        if (scorecards.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding: 20px;">No agent break records found</td></tr>';
+        } else {
+            tbody.innerHTML = scorecards.map(s => {
+                const isSelected = selectedAgentForBreaks === s.agent_name;
+                return `
+                    <tr class="clickable-row ${isSelected ? 'selected-row' : ''}" data-agent="${s.agent_name}">
+                        <td><strong>${s.agent_name}</strong></td>
+                        <td class="text-right">${s.active_days} days</td>
+                        <td class="text-right">${s.logged_hours} hrs</td>
+                        <td class="text-right text-orange">${formatSeconds(s.total_breaks_sec)}</td>
+                        <td class="text-right text-blue">${formatSeconds(s.talk_time_sec)}</td>
+                        <td class="text-right text-green"><strong>${s.occupancy_rate}%</strong></td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Bind click listeners
+            const rows = tbody.querySelectorAll('.clickable-row');
+            rows.forEach(row => {
+                row.addEventListener('click', () => {
+                    const agentName = row.getAttribute('data-agent');
+                    if (selectedAgentForBreaks === agentName) {
+                        selectedAgentForBreaks = null; // deselect
+                    } else {
+                        selectedAgentForBreaks = agentName;
+                    }
+                    renderAgentBreaksTab(data, calls); // re-render list and breakdown
+                });
+            });
+        }
+    }
+
+    // Render Break Type breakdown on the right
+    renderBreakdownPanel(scorecards, selectedAgentForBreaks);
+}
+
+function renderBreakdownPanel(scorecards, selectedAgent) {
+    const titleEl = document.getElementById('vc-breaks-breakdown-title');
+    const listEl = document.getElementById('vc-breaks-breakdown-list');
+    if (!listEl) return;
+
+    let breakTotals = {};
+    let grandTotal = 0;
+
+    if (selectedAgent) {
+        if (titleEl) titleEl.innerText = `Break Type Distribution (Agent: ${selectedAgent})`;
+        const scorecard = scorecards.find(s => s.agent_name === selectedAgent);
+        if (scorecard) {
+            breakTotals = scorecard.break_types;
+            grandTotal = scorecard.total_breaks_sec;
+        }
+    } else {
+        if (titleEl) titleEl.innerText = `Break Type Distribution (All Agents)`;
+        scorecards.forEach(s => {
+            Object.entries(s.break_types).forEach(([btype, duration]) => {
+                breakTotals[btype] = (breakTotals[btype] || 0) + duration;
+                grandTotal += duration;
+            });
+        });
+    }
+
+    const formatSeconds = (sec) => {
+        if (sec === null || sec === undefined || isNaN(sec)) return '0s';
+        const mins = Math.floor(sec / 60);
+        if (mins < 60) {
+            return `${mins}m`;
+        }
+        const hrs = Math.floor(mins / 60);
+        const remMins = Math.round(mins % 60);
+        return `${hrs}h ${remMins}m`;
+    };
+
+    if (grandTotal === 0) {
+        listEl.innerHTML = '<div class="text-center text-muted" style="padding: 20px; font-size: 0.8rem;">No breaks registered for active selection</div>';
+    } else {
+        const sortedBreakTypes = Object.entries(breakTotals).sort((a, b) => b[1] - a[1]);
+        listEl.innerHTML = sortedBreakTypes.map(([btype, duration]) => {
+            const pct = Math.round((duration / grandTotal) * 100);
+            return `
+                <div class="break-bar-container">
+                    <div class="break-bar-label-row">
+                        <span>${btype}</span>
+                        <strong>${formatSeconds(duration)} (${pct}%)</strong>
+                    </div>
+                    <div class="break-bar-outer">
+                        <div class="break-bar-inner" style="width: ${pct}%"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
 }
 
