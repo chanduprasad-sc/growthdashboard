@@ -1671,9 +1671,24 @@ return true;
 // DRIVE CACHE
 // ================================================================
 function getCacheFile() {
-var files = DriveApp.getFilesByName(CACHE_FILE_NAME);
-if (files.hasNext()) return files.next();
-return DriveApp.createFile(CACHE_FILE_NAME, "{}", MimeType.PLAIN_TEXT);
+  var props = PropertiesService.getScriptProperties();
+  var fileId = props.getProperty('CACHE_FILE_ID');
+  if (fileId) {
+    try {
+      return DriveApp.getFileById(fileId);
+    } catch(e) {
+      Logger.log("Cached file ID not found or invalid: " + e.message);
+    }
+  }
+  var files = DriveApp.getFilesByName(CACHE_FILE_NAME);
+  if (files.hasNext()) {
+    var file = files.next();
+    props.setProperty('CACHE_FILE_ID', file.getId());
+    return file;
+  }
+  var file = DriveApp.createFile(CACHE_FILE_NAME, "{}", MimeType.PLAIN_TEXT);
+  props.setProperty('CACHE_FILE_ID', file.getId());
+  return file;
 }
 
 function buildDashboardCache() {

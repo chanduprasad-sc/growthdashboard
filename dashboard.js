@@ -68,9 +68,9 @@ function getDevRevLinkHTML(id, type) {
     if (!id || id === '-') return '-';
     const cleanId = String(id).trim();
     if (type === 'WhatsApp Chat' || cleanId.startsWith('CONV-')) {
-        return `<a href="https://app.devrev.ai/smallcasebp/inbox/${cleanId}" target="_blank" class="devrev-id-link"><code>${cleanId}</code></a>`;
+        return `<a href="https://app.devrev.ai/smallcasebp/inbox/${cleanId}" target="_blank" onclick="event.stopPropagation();" class="devrev-id-link"><code>${cleanId}</code></a>`;
     } else if (type === 'Call Ticket' || type === 'Care Email' || cleanId.startsWith('TKT-') || cleanId.startsWith('REV-')) {
-        return `<a href="https://app.devrev.ai/smallcasebp/works/${cleanId}" target="_blank" class="devrev-id-link"><code>${cleanId}</code></a>`;
+        return `<a href="https://app.devrev.ai/smallcasebp/works/${cleanId}" target="_blank" onclick="event.stopPropagation();" class="devrev-id-link"><code>${cleanId}</code></a>`;
     }
     return `<code>${cleanId}</code>`;
 }
@@ -206,6 +206,15 @@ function parseHmsToSeconds(val) {
     if (typeof val === 'number') return Math.floor(val);
     let s = String(val).trim();
     if (!s) return 0;
+    if (s.includes(' ')) {
+        s = s.split(' ').pop().trim();
+    }
+    if (s.includes('T')) {
+        let parts = s.split('T');
+        s = parts[1] || '';
+    }
+    // Remove millisecond and timezone parts if any, e.g. "00:02:00.000Z" -> "00:02:00"
+    s = s.split('.')[0].replace('Z', '').trim();
     if (s.includes(':')) {
         let parts = s.split(':');
         try {
@@ -489,18 +498,29 @@ function compileRawCache(cache) {
             let norm_branch = normalizeBranch(branch_loc);
             let poc = matchPoc(broker_fam, norm_branch);
 
-            let resolution_time = null;
-            for (let i = 0; i < 3; i++) {
+            let sla_frt = null;
+            let sla_rt = null;
+            let sla_frt_status = null;
+            let sla_rt_status = null;
+            for (let i = 0; i < 5; i++) {
                 let metric_col = `Metric Name[${i}]`;
                 let comp_col = `Completed In[${i}]`;
+                let status_col = `Metric Status[${i}]`;
                 if (row[metric_col] !== undefined && row[comp_col] !== undefined) {
-                    if (String(row[metric_col]).trim() === 'Resolution time') {
-                        try {
-                            let val = parseFloat(row[comp_col]);
-                            if (!isNaN(val)) {
-                                resolution_time = Math.round(val * 3600); // hours to seconds
-                            }
-                        } catch (e) { }
+                    let m_name = String(row[metric_col]).trim().toLowerCase();
+                    let comp_val = parseFloat(row[comp_col]);
+                    let m_status = row[status_col] ? String(row[status_col]).trim().toUpperCase() : null;
+                    
+                    if (m_name === 'first response time' || m_name === 'first_response_time') {
+                        if (!isNaN(comp_val)) {
+                            sla_frt = Math.round(comp_val * 60); // minutes to seconds
+                            sla_frt_status = m_status;
+                        }
+                    } else if (m_name === 'resolution time' || m_name === 'resolution_time') {
+                        if (!isNaN(comp_val)) {
+                            sla_rt = Math.round(comp_val * 60); // minutes to seconds
+                            sla_rt_status = m_status;
+                        }
                     }
                 }
             }
@@ -533,12 +553,16 @@ function compileRawCache(cache) {
                 "stage": stage || "Closed",
                 "comments": comments.length > 300 ? comments.slice(0, 300) : comments,
                 "severity": "Medium",
-                "sla_status": "MET",
+                "sla_status": sla_frt_status || sla_rt_status || "MET",
                 "qa_score": "",
                 "recording_url": "",
-                "resolution_time": resolution_time,
+                "resolution_time": sla_rt,
                 "sentiment": analysis.label,
-                "csat": analysis.csat
+                "csat": analysis.csat,
+                "sla_frt": sla_frt,
+                "sla_rt": sla_rt,
+                "sla_frt_status": sla_frt_status || "MET",
+                "sla_rt_status": sla_rt_status || "MET"
             });
         });
     }
@@ -683,6 +707,9 @@ function compileRawCache(cache) {
             let queue_time = parseHmsToSeconds(row["Queue Time"] || 0);
             let time_to_answer = parseHmsToSeconds(row["Time to Answer"] || 0);
             let call_type = cleanStr(row["Call Type"] || row["call_type"]);
+            let dial_status = cleanStr(row["Dial Status"] || row["dial_status"]);
+            let agent_dial_status = cleanStr(row["Agent Dial Status"] || row["agent_dial_status"]);
+            let raw_call_event = cleanStr(row["Call Event"] || row["call_event"]);
 
             calls.push({
                 "id": call_id || ucid,
@@ -695,17 +722,20 @@ function compileRawCache(cache) {
                 "poc": poc,
                 "channel": "Voice Call",
                 "issue": "Voice Call",
-                "sub_issue": disposition || call_event || "General",
+                "sub_issue": disposition || raw_call_event || "General",
                 "agent": agent || "System",
                 "stage": status || "Answered",
-                "comments": `Voice call log: ${disposition} / ${call_event}`,
+                "comments": `Voice call log: ${disposition} / ${raw_call_event}`,
                 "duration": duration,
                 "recording_url": rec_url,
                 "talk_time": talk_time,
                 "hold_time": hold_time,
                 "queue_time": queue_time,
                 "time_to_answer": time_to_answer,
-                "call_type": call_type
+                "call_type": call_type,
+                "dial_status": dial_status,
+                "agent_dial_status": agent_dial_status,
+                "call_event": raw_call_event
             });
         });
     }
@@ -1092,6 +1122,34 @@ function compileRawCache(cache) {
 // 1. DATA INITIALIZATION & ENTRY
 // -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. Instantly load from localStorage if available to speed up load time
+    const cachedDataStr = localStorage.getItem('b2b_dashboard_raw_payload');
+    if (cachedDataStr) {
+        try {
+            console.log("Found cached dashboard data in localStorage. Instantly loading...");
+            const cachedData = JSON.parse(cachedDataStr);
+            if (cachedData && cachedData.calls && cachedData.callTkts && cachedData.whatsapp) {
+                rawData = compileRawCache(cachedData);
+            } else {
+                rawData = cachedData;
+            }
+            if (rawData) {
+                populateFilterDropdowns();
+                setDefaultDateRange();
+                buildViewModel();
+                const statusDot = document.getElementById('connection-status-dot');
+                const statusText = document.getElementById('connection-status-text');
+                const timeBadge = document.getElementById('data-gen-time');
+                if (statusDot) statusDot.className = 'status-dot online';
+                if (statusText) statusText.innerText = 'Cached Loaded';
+                if (timeBadge) timeBadge.innerText = rawData.generated_at || 'Local';
+            }
+        } catch (e) {
+            console.error("Error loading cached dashboard data", e);
+        }
+    }
+
+    // 2. Perform background sync/fetch and setup event listeners
     loadDashboardData();
     setupEventListeners();
 });
@@ -1143,6 +1201,8 @@ async function loadDashboardData() {
                     data = await response.json();
                     isLive = true;
                     console.log("Successfully fetched live dashboard data from Google Sheets API.");
+                    // Save to localStorage cache
+                    localStorage.setItem('b2b_dashboard_raw_payload', JSON.stringify(data));
                 } else {
                     console.warn(`Live fetch returned status ${response.status}. Falling back to local cache.`);
                     connectionError = true;
@@ -1150,6 +1210,19 @@ async function loadDashboardData() {
             } catch (err) {
                 console.warn("Network or CORS issue fetching from Google Sheets API, falling back to local cache file. Details:", err);
                 connectionError = true;
+            }
+        }
+
+        // If live fetch failed, try loading from localStorage cache
+        if (!data) {
+            const cachedDataStr = localStorage.getItem('b2b_dashboard_raw_payload');
+            if (cachedDataStr) {
+                try {
+                    data = JSON.parse(cachedDataStr);
+                    console.log("Loaded fallback from localStorage cache.");
+                } catch (e) {
+                    console.error("Error parsing cached data", e);
+                }
             }
         }
 
@@ -1189,9 +1262,9 @@ async function loadDashboardData() {
         if (isLive) {
             updateStatusUI('online', 'Live Connected', rawData.generated_at || 'Just Now');
         } else if (connectionError) {
-            updateStatusUI('error', 'Sync Failed', 'Local Fallback');
+            updateStatusUI('error', 'Sync Failed', 'Local Cache');
         } else {
-            updateStatusUI('offline', 'Local Fallback', rawData.generated_at || 'Local');
+            updateStatusUI('offline', 'Local Cache', rawData.generated_at || 'Local');
         }
 
         // Detect empty/skeleton data (prompt user to connect)
@@ -1218,8 +1291,16 @@ async function loadDashboardData() {
         // Populate filter dropdown choices
         populateFilterDropdowns();
 
-        // Establish default date range (Last 30 days)
-        setDefaultDateRange();
+        // Establish default date range (Last 30 days) if not already set
+        if (!activeFilters.dateFrom || !activeFilters.dateTo) {
+            setDefaultDateRange();
+        } else {
+            // Keep UI in sync with active filter variables
+            const elFrom = document.getElementById('filter-date-from');
+            const elTo = document.getElementById('filter-date-to');
+            if (elFrom) elFrom.value = activeFilters.dateFrom;
+            if (elTo) elTo.value = activeFilters.dateTo;
+        }
 
         // Run reactive view model compiler
         buildViewModel();
@@ -1721,31 +1802,54 @@ function populateFilterDropdowns() {
     });
 
     const brokerSelect = document.getElementById('filter-broker');
-    brokerSelect.innerHTML = '<option value="all">All Broker Families</option>';
-    Array.from(brokers).sort().forEach(b => {
-        brokerSelect.innerHTML += `<option value="${b}">${b}</option>`;
-    });
+    const currentBroker = brokerSelect ? brokerSelect.value : 'all';
+    if (brokerSelect) {
+        brokerSelect.innerHTML = '<option value="all">All Broker Families</option>';
+        Array.from(brokers).sort().forEach(b => {
+            brokerSelect.innerHTML += `<option value="${b}">${b}</option>`;
+        });
+        brokerSelect.value = currentBroker;
+    }
 
     const pocSelect = document.getElementById('filter-poc');
-    pocSelect.innerHTML = '<option value="all">All Assigned POCs</option>';
-    Array.from(pocs).sort().forEach(p => {
-        pocSelect.innerHTML += `<option value="${p}">${p}</option>`;
-    });
+    const currentPoc = pocSelect ? pocSelect.value : 'all';
+    if (pocSelect) {
+        pocSelect.innerHTML = '<option value="all">All Assigned POCs</option>';
+        Array.from(pocs).sort().forEach(p => {
+            pocSelect.innerHTML += `<option value="${p}">${p}</option>`;
+        });
+        pocSelect.value = currentPoc;
+    }
 
     const agentSelect = document.getElementById('filter-agent');
-    agentSelect.innerHTML = '<option value="all">All Support Agents</option>';
-    Array.from(agents).sort().forEach(a => {
-        agentSelect.innerHTML += `<option value="${a}">${a}</option>`;
-    });
+    const currentAgent = agentSelect ? agentSelect.value : 'all';
+    if (agentSelect) {
+        agentSelect.innerHTML = '<option value="all">All Support Agents</option>';
+        Array.from(agents).sort().forEach(a => {
+            agentSelect.innerHTML += `<option value="${a}">${a}</option>`;
+        });
+        agentSelect.value = currentAgent;
+    }
 }
 
 function setDefaultDateRange() {
-    setDateRangeFromPreset('week');
+    const defaultPreset = '30d';
+    setDateRangeFromPreset(defaultPreset);
+    activeFilters.datePreset = defaultPreset;
+
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        if (btn.getAttribute('data-preset') === defaultPreset) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
 }
 
 function setDateRangeFromPreset(preset) {
-    // Current local time inside context is June 3, 2026 (Wednesday)
-    const baseDate = new Date("2026-06-03T12:00:00");
+    // Always use the actual current date so presets stay relative to today
+    const now = new Date();
+    const baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // midnight local
     let fromDate = new Date(baseDate.getTime());
     let toDate = new Date(baseDate.getTime());
 
@@ -1760,9 +1864,8 @@ function setDateRangeFromPreset(preset) {
         fromDate.setDate(baseDate.getDate() + distanceToMonday);
         toDate.setDate(fromDate.getDate() + 6);
     } else if (preset === 'today') {
-        // June 3, 2026
-        fromDate = baseDate;
-        toDate = baseDate;
+        fromDate = new Date(baseDate.getTime());
+        toDate = new Date(baseDate.getTime());
     } else if (preset === 'yesterday') {
         fromDate.setDate(baseDate.getDate() - 1);
         toDate.setDate(baseDate.getDate() - 1);
@@ -1798,10 +1901,26 @@ function setDateRangeFromPreset(preset) {
 function getPreviousPeriodDates(fromStr, toStr) {
     const from = new Date(fromStr + 'T00:00:00');
     const to = new Date(toStr + 'T23:59:59');
-    const diff = to.getTime() - from.getTime(); // duration of current period
 
-    const prevTo = new Date(from.getTime() - 1000); // 1 sec before current from
-    const prevFrom = new Date(prevTo.getTime() - diff);
+    // Check if it's a full calendar month selection
+    const isFullMonth = (from.getDate() === 1) && (to.getDate() === new Date(to.getFullYear(), to.getMonth() + 1, 0).getDate());
+
+    let prevFrom, prevTo;
+    if (isFullMonth) {
+        const monthsDiff = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()) + 1;
+        prevFrom = new Date(from.getFullYear(), from.getMonth() - monthsDiff, 1);
+        prevTo = new Date(to.getFullYear(), to.getMonth() - monthsDiff, new Date(to.getFullYear(), to.getMonth() - monthsDiff + 1, 0).getDate());
+    } else {
+        const diffMs = to.getTime() - from.getTime();
+        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+        
+        // Align day-of-week by shifting back by multiples of 7 days
+        const weeks = Math.ceil(diffDays / 7);
+        const shiftDays = weeks * 7;
+
+        prevFrom = new Date(from.getTime() - shiftDays * 24 * 60 * 60 * 1000);
+        prevTo = new Date(to.getTime() - shiftDays * 24 * 60 * 60 * 1000);
+    }
 
     const pad = (n) => (n < 10 ? '0' : '') + n;
     const format = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -1828,6 +1947,7 @@ function buildViewModel() {
     const filteredInteractions = rawData.support_interactions.filter(item => {
         if (!item.date) return false;
         const itemTs = safeParseDate(item.date).getTime();
+        if (isNaN(itemTs)) return false;
         if (itemTs < fromTs || itemTs > toTs) return false;
 
         // Optionally include Care Emails
@@ -1846,6 +1966,7 @@ function buildViewModel() {
     const filteredCalls = rawData.calls.filter(call => {
         if (!call.date) return false;
         const callTs = safeParseDate(call.date).getTime();
+        if (isNaN(callTs)) return false;
         if (callTs < fromTs || callTs > toTs) return false;
 
         if (activeFilters.channel !== 'all' && activeFilters.channel !== 'Call Ticket' && activeFilters.channel !== 'Voice Call') return false;
@@ -1865,6 +1986,7 @@ function buildViewModel() {
     const prevInteractions = rawData.support_interactions.filter(item => {
         if (!item.date) return false;
         const itemTs = safeParseDate(item.date).getTime();
+        if (isNaN(itemTs)) return false;
         if (itemTs < prevFromTs || itemTs > prevToTs) return false;
 
         // Optionally include Care Emails
@@ -1923,6 +2045,7 @@ function renderWeeklyPulseDashboard() {
     renderPOCContactsChart(data);
     renderPulseTrendChart(data);
     renderCallStatusPieChart(calls);
+    renderChannelDonutChart(data);
 
     // 4. Render active cohorts comparison meta block & table
     renderActiveCohortsGrid();
@@ -1973,10 +2096,11 @@ const getPocColor = (pocName) => {
 };
 
 // 4.1. Key Metrics Card Compiler
+// 4.1. Key Metrics Card Compiler (Core Operations Snapshot)
 function renderKeyMetricsGrid(interactions, calls) {
     let tkt = 0, wa = 0, mail = 0;
     let ans = 0, missed = 0, aoh = 0;
-
+    
     interactions.forEach(item => {
         if (item.type === 'Call Ticket') {
             tkt++;
@@ -1994,19 +2118,24 @@ function renderKeyMetricsGrid(interactions, calls) {
         else if (item.type === 'WhatsApp Chat') wa++;
         else if (item.type === 'Care Email') mail++;
     });
-
+    
     // Average Handling Time (AHT) and Average Queue Time (AQT) from Ozonetel Calls sheet (calls)
+    // Only count inbound answered calls for AHT/AQT (progressive/outbound excluded)
     let callAns = 0;
     let totalCallDuration = 0;
     let totalCallQueue = 0;
-
+    
     calls.forEach(call => {
-        const st = String(call.stage || "").toLowerCase();
-        if (st === 'answered' || st === 'connected') {
-            callAns++;
-            totalCallDuration += (call.duration || 0);
+        const ct = String(call.call_type || '').toLowerCase();
+        const st = String(call.stage || '').toLowerCase();
+        // Only inbound answered calls contribute to AHT/AQT
+        if (!ct || ct === 'inbound') { // inbound or unclassified
+            if (st === 'answered' || st === 'connected') {
+                callAns++;
+                totalCallDuration += (call.talk_time || call.duration || 0);
+                totalCallQueue += (call.queue_time || call.time_to_answer || 0);
+            }
         }
-        totalCallQueue += (call.queue_time || 0);
     });
 
     // WhatsApp Chat average resolution time (from Metric Resolution time)
@@ -2026,46 +2155,184 @@ function renderKeyMetricsGrid(interactions, calls) {
         finalAQT = 0;
     } else if (activeFilters.channel === 'Call Ticket' || activeFilters.channel === 'Voice Call') {
         finalAHT = callAns > 0 ? totalCallDuration / callAns : 0;
-        finalAQT = calls.length > 0 ? totalCallQueue / calls.length : 0;
+        finalAQT = callAns > 0 ? totalCallQueue / callAns : 0;
     } else {
         // Combined
         if (callAns > 0) {
             finalAHT = totalCallDuration / callAns;
+            finalAQT = totalCallQueue / callAns;
         } else {
             finalAHT = chatCount > 0 ? totalChatResolution / chatCount : 0;
+            finalAQT = 0;
         }
-        finalAQT = calls.length > 0 ? totalCallQueue / calls.length : 0;
     }
 
     const formatDuration = (sec) => {
-        if (!sec || isNaN(sec)) return "-";
-        if (sec > 3600) {
-            const hrs = (sec / 3600).toFixed(1);
-            return `${hrs} hrs`;
-        }
-        const m = Math.floor(sec / 60);
-        const s = Math.round(sec % 60);
-        return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        return formatSeconds(sec);
     };
 
     document.getElementById('pulse-total-interactions').innerText = (tkt + wa + mail).toLocaleString();
     document.getElementById('pulse-call-tickets').innerText = tkt.toLocaleString();
     document.getElementById('pulse-whatsapp-chats').innerText = wa.toLocaleString();
-
-    const totalDescEl = document.getElementById('pulse-total-desc');
-    if (totalDescEl) {
-        totalDescEl.innerText = activeFilters.includeCareEmails
-            ? 'WhatsApp Chats + Call Tickets + Care Emails'
-            : 'WhatsApp Chats + Call Tickets';
-    }
-
+    
     document.getElementById('pulse-answered-calls').innerText = ans.toLocaleString();
     document.getElementById('pulse-missed-calls').innerText = missed.toLocaleString();
     document.getElementById('pulse-aoh-calls').innerText = aoh.toLocaleString();
-
+    
     document.getElementById('pulse-aht').innerText = formatDuration(finalAHT);
     document.getElementById('pulse-aqt').innerText = formatDuration(finalAQT);
+
+    // --- KPI Sub-Info Population ---
+    const prevInteractionsData = window.viewModel.prevInteractions || [];
+    let prevTkt = 0, prevWa = 0, prevMail = 0, prevAns = 0, prevMissed = 0, prevAoh = 0;
+    prevInteractionsData.forEach(item => {
+        if (item.type === 'Call Ticket') {
+            prevTkt++;
+            let cs = String(item.call_status || '').toLowerCase();
+            if (cs === 'other' || !cs) {
+                const t = (item.title || '').toLowerCase();
+                if (t.includes('missed call')) cs = 'missed';
+                else if (t.includes('aoh call')) cs = 'aoh';
+                else if (t.includes('answered call')) cs = 'answered';
+            }
+            if (cs === 'answered') prevAns++;
+            else if (cs === 'missed') prevMissed++;
+            else if (cs === 'aoh') prevAoh++;
+        } else if (item.type === 'WhatsApp Chat') prevWa++;
+        else if (item.type === 'Care Email') prevMail++;
+    });
+    const prevTotalInteractions = prevTkt + prevWa + prevMail;
+    const total = tkt + wa + mail;
+
+    const mkDelta = (curr, prevV) => {
+        if (prevV === 0 && curr === 0) return `<span class="kpi-delta neutral">\u2014 No change</span>`;
+        const diff = curr - prevV;
+        const pct = prevV > 0 ? Math.abs(Math.round((diff / prevV) * 100)) : 100;
+        if (diff > 0) return `<span class="kpi-delta up">\u25b2 +${diff} (${pct}%) vs prev</span>`;
+        if (diff < 0) return `<span class="kpi-delta down">\u25bc ${diff} (${pct}%) vs prev</span>`;
+        return `<span class="kpi-delta neutral">\u2192 No change vs prev</span>`;
+    };
+
+    const setSubInfo = (id, html) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+    };
+
+    // Total Interactions — channel badges + delta
+    const tktPct = total > 0 ? Math.round(tkt / total * 100) : 0;
+    const waPct = total > 0 ? Math.round(wa / total * 100) : 0;
+    const mailPct = total > 0 ? Math.round(mail / total * 100) : 0;
+    setSubInfo('pulse-total-sub', `
+        ${mkDelta(total, prevTotalInteractions)}
+        <div class="kpi-mini-badges">
+            <span class="kpi-mini-badge">\ud83d\udcde ${tkt} (${tktPct}%)</span>
+            <span class="kpi-mini-badge">\ud83d\udcac ${wa} (${waPct}%)</span>
+            ${mail > 0 ? `<span class="kpi-mini-badge">\ud83d\udce7 ${mail} (${mailPct}%)</span>` : ''}
+        </div>
+    `);
+
+    // Call Tickets
+    const ansRate = tkt > 0 ? Math.round(ans / tkt * 100) : 0;
+    setSubInfo('pulse-tickets-sub', `
+        ${mkDelta(tkt, prevTkt)}
+        <div class="kpi-sub-metric">Ans rate: <strong>${ansRate}%</strong> &nbsp;|&nbsp; Missed: <strong>${missed}</strong> &nbsp;|&nbsp; AOH: <strong>${aoh}</strong></div>
+    `);
+
+    // WhatsApp Chats
+    let waFrtSum = 0, waFrtCount = 0;
+    interactions.forEach(item => {
+        if (item.type === 'WhatsApp Chat' && item.sla_frt && !isNaN(Number(item.sla_frt))) {
+            waFrtSum += Number(item.sla_frt); waFrtCount++;
+        }
+    });
+    const waAvgFrt = waFrtCount > 0 ? formatSeconds(Math.round(waFrtSum / waFrtCount)) : '\u2014';
+    setSubInfo('pulse-whatsapp-sub', `
+        ${mkDelta(wa, prevWa)}
+        <div class="kpi-sub-metric">Avg FRT: <strong>${waAvgFrt}</strong></div>
+    `);
+
+    // Answered Calls
+    setSubInfo('pulse-answered-sub', `
+        ${mkDelta(ans, prevAns)}
+        <div class="kpi-sub-metric">Avg AHT: <strong>${formatDuration(finalAHT)}</strong></div>
+    `);
+
+    // Missed Calls
+    const totalInboundCalls = ans + missed + aoh;
+    const abandonRate = totalInboundCalls > 0 ? Math.round(missed / totalInboundCalls * 100) : 0;
+    setSubInfo('pulse-missed-sub', `
+        ${mkDelta(missed, prevMissed)}
+        <div class="kpi-sub-metric">Abandon rate: <strong>${abandonRate}%</strong> of inbound</div>
+    `);
+
+    // AOH Calls
+    const aohPct = totalInboundCalls > 0 ? Math.round(aoh / totalInboundCalls * 100) : 0;
+    setSubInfo('pulse-aoh-sub', `
+        ${mkDelta(aoh, prevAoh)}
+        <div class="kpi-sub-metric"><strong>${aohPct}%</strong> of inbound call volume</div>
+    `);
+
+    // AHT — vs prev period
+    const prevToTs = window.viewModel.prevToTs || 0;
+    const prevFromTs = window.viewModel.prevFromTs || 0;
+    let prevCallAns = 0, prevTotalDur = 0;
+    if (rawData && rawData.calls) {
+        rawData.calls.forEach(c => {
+            if (!c.date) return;
+            const ts = safeParseDate(c.date).getTime();
+            if (ts < prevFromTs || ts > prevToTs) return;
+            const ct = String(c.call_type || '').toLowerCase();
+            const st = String(c.stage || '').toLowerCase();
+            if (!ct || ct === 'inbound') {
+                if (st === 'answered' || st === 'connected') {
+                    prevCallAns++;
+                    prevTotalDur += (c.talk_time || c.duration || 0);
+                }
+            }
+        });
+    }
+    const prevAHT = prevCallAns > 0 ? Math.round(prevTotalDur / prevCallAns) : 0;
+    const ahtDiff = Math.round(finalAHT) - prevAHT;
+    const ahtDeltaHtml = prevAHT === 0
+        ? `<span class="kpi-delta neutral">\u2014 No prev data</span>`
+        : ahtDiff > 0 ? `<span class="kpi-delta down">\u25b2 +${formatSeconds(ahtDiff)} vs prev</span>`
+        : ahtDiff < 0 ? `<span class="kpi-delta up">\u25bc ${formatSeconds(Math.abs(ahtDiff))} vs prev</span>`
+        : `<span class="kpi-delta neutral">\u2192 Same as prev</span>`;
+    setSubInfo('pulse-aht-sub', `
+        ${ahtDeltaHtml}
+        <div class="kpi-sub-metric">Prev period: <strong>${formatSeconds(prevAHT)}</strong></div>
+    `);
+
+    // AQT — vs prev period
+    let prevTotalQueue = 0, prevQueueAns = 0;
+    if (rawData && rawData.calls) {
+        rawData.calls.forEach(c => {
+            if (!c.date) return;
+            const ts = safeParseDate(c.date).getTime();
+            if (ts < prevFromTs || ts > prevToTs) return;
+            const ct = String(c.call_type || '').toLowerCase();
+            const st = String(c.stage || '').toLowerCase();
+            if (!ct || ct === 'inbound') {
+                if (st === 'answered' || st === 'connected') {
+                    prevQueueAns++;
+                    prevTotalQueue += (c.queue_time || c.time_to_answer || 0);
+                }
+            }
+        });
+    }
+    const prevAQT = prevQueueAns > 0 ? Math.round(prevTotalQueue / prevQueueAns) : 0;
+    const aqtDiff = Math.round(finalAQT) - prevAQT;
+    const aqtDeltaHtml = prevAQT === 0
+        ? `<span class="kpi-delta neutral">\u2014 No prev data</span>`
+        : aqtDiff > 0 ? `<span class="kpi-delta down">\u25b2 +${formatSeconds(aqtDiff)} vs prev</span>`
+        : aqtDiff < 0 ? `<span class="kpi-delta up">\u25bc ${formatSeconds(Math.abs(aqtDiff))} vs prev</span>`
+        : `<span class="kpi-delta neutral">\u2192 Same as prev</span>`;
+    setSubInfo('pulse-aqt-sub', `
+        ${aqtDeltaHtml}
+        <div class="kpi-sub-metric">Prev period: <strong>${formatSeconds(prevAQT)}</strong></div>
+    `);
 }
+
 
 // 4.2. POC Query Heatmap Matrix (Blocks Layout)
 function renderPOCQueryHeatmap(data) {
@@ -2552,7 +2819,59 @@ function renderCallStatusPieChart(calls) {
     });
 }
 
+// 4.6b. Channel Distribution Donut Chart
+let channelDonutChartInst = null;
+function renderChannelDonutChart(data) {
+    const canvas = document.getElementById('chart-channel-donut');
+    if (!canvas) return;
+
+    const counts = { 'Call Ticket': 0, 'WhatsApp Chat': 0, 'Care Email': 0 };
+    data.forEach(item => {
+        if (counts[item.type] !== undefined) counts[item.type]++;
+        else counts['Care Email']++;
+    });
+
+    const labels = ['Call Tickets', 'WhatsApp Chats', 'Care Emails'];
+    const values = [counts['Call Ticket'], counts['WhatsApp Chat'], counts['Care Email']];
+    const total = values.reduce((a, b) => a + b, 0);
+
+    if (channelDonutChartInst) channelDonutChartInst.destroy();
+    const ctx = canvas.getContext('2d');
+    channelDonutChartInst = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: ['rgba(14,165,233,0.85)', 'rgba(34,197,94,0.85)', 'rgba(249,115,22,0.85)'],
+                borderColor: [THEME_COLORS.cardBg, THEME_COLORS.cardBg, THEME_COLORS.cardBg],
+                borderWidth: 3,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 700 },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const pct = total > 0 ? Math.round(ctx.raw / total * 100) : 0;
+                            return ` ${ctx.label}: ${ctx.raw.toLocaleString()} (${pct}%)`;
+                        }
+                    }
+                },
+                legend: {
+                    position: 'bottom',
+                    labels: { color: THEME_COLORS.textSecondary, font: { family: 'SF Pro Display', size: 10 }, padding: 12 }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+}
+
 // 4.7. Active Cohorts Comparison Grid
+
 function renderActiveCohortsGrid() {
     const data = window.viewModel.interactions;
     const prev = window.viewModel.prevInteractions;
@@ -2628,9 +2947,218 @@ function renderActiveCohortsGrid() {
     formatCmp(curr.brokers, prevCounts.brokers, 'meta-brokers-cmp');
     formatCmp(curr.branches, prevCounts.branches, 'meta-branches-cmp');
     formatCmp(currLoops, prevLoops, 'meta-loops-cmp');
+
+    // Attach click handlers for deep dive modals
+    const rmItem = document.getElementById('cohort-rm-item');
+    const brokerItem = document.getElementById('cohort-broker-item');
+    const branchItem = document.getElementById('cohort-branch-item');
+    if (rmItem) { rmItem.onclick = () => openCohortDrilldownModal('rm'); }
+    if (brokerItem) { brokerItem.onclick = () => openCohortDrilldownModal('broker'); }
+    if (branchItem) { branchItem.onclick = () => openCohortDrilldownModal('branch'); }
 }
 
+// -------------------------------------------------------------------------
+// COHORT DRILLDOWN MODAL
+// -------------------------------------------------------------------------
+let cohortModalCurrentType = null;
+let cohortModalAllRows = [];
+let cohortModalSortKey = null;
+let cohortModalSortDir = 1;
+
+function openCohortDrilldownModal(type) {
+    cohortModalCurrentType = type;
+    cohortModalSortKey = null;
+    cohortModalSortDir = 1;
+
+    const data = window.viewModel.interactions || [];
+    const overlay = document.getElementById('cohort-modal-overlay');
+    const titleEl = document.getElementById('cohort-modal-title');
+    const headEl = document.getElementById('cohort-table-head');
+    const searchEl = document.getElementById('cohort-modal-search');
+    if (!overlay) return;
+    if (searchEl) searchEl.value = '';
+
+    if (type === 'rm') {
+        titleEl.innerText = '🧑‍💼 Active Relationship Managers';
+        // Build RM rows
+        const rmMap = {};
+        data.forEach(item => {
+            if (!item.rm_name || item.rm_name === 'NA') return;
+            const key = item.rm_name;
+            if (!rmMap[key]) {
+                rmMap[key] = {
+                    rm: item.rm_name, broker: item.broker_family || '—', branch: item.branch || '—',
+                    channels: new Set(), contacts: 0, lastDate: null, issues: {}
+                };
+            }
+            rmMap[key].contacts++;
+            rmMap[key].channels.add(item.channel || item.type || '—');
+            const d = item.date ? safeParseDate(item.date) : null;
+            if (d && (!rmMap[key].lastDate || d > rmMap[key].lastDate)) rmMap[key].lastDate = d;
+            if (item.issue) rmMap[key].issues[item.issue] = (rmMap[key].issues[item.issue] || 0) + 1;
+        });
+        cohortModalAllRows = Object.values(rmMap).map(r => ({
+            rm: r.rm, broker: r.broker, branch: r.branch,
+            channels: [...r.channels].join(', '),
+            contacts: r.contacts,
+            lastContact: r.lastDate ? r.lastDate.toLocaleDateString('en-IN') : '—',
+            topIssue: Object.entries(r.issues).sort((a,b) => b[1]-a[1])[0]?.[0] || '—'
+        })).sort((a, b) => b.contacts - a.contacts);
+
+        headEl.innerHTML = `<tr>
+            <th data-col="rm">RM Name<span class="sort-arr"></span></th>
+            <th data-col="broker">Broker Name<span class="sort-arr"></span></th>
+            <th data-col="branch">Branch<span class="sort-arr"></span></th>
+            <th data-col="channels">Channels</th>
+            <th data-col="contacts"># Contacts<span class="sort-arr"></span></th>
+            <th data-col="lastContact">Last Contact<span class="sort-arr"></span></th>
+            <th data-col="topIssue">Top Issue</th>
+        </tr>`;
+
+    } else if (type === 'broker') {
+        titleEl.innerText = '🏢 Active Partner Brokerages';
+        const brkMap = {};
+        data.forEach(item => {
+            if (!item.broker_family || item.broker_family === 'NA') return;
+            const key = item.broker_family;
+            if (!brkMap[key]) brkMap[key] = { broker: key, rms: new Set(), branches: new Set(), contacts: 0, issues: {} };
+            brkMap[key].contacts++;
+            if (item.rm_name && item.rm_name !== 'NA') brkMap[key].rms.add(item.rm_name);
+            if (item.branch && item.branch !== 'Not shared') brkMap[key].branches.add(item.branch);
+            if (item.issue) brkMap[key].issues[item.issue] = (brkMap[key].issues[item.issue] || 0) + 1;
+        });
+        cohortModalAllRows = Object.values(brkMap).map(r => ({
+            broker: r.broker, rms: r.rms.size, branches: r.branches.size,
+            contacts: r.contacts,
+            topRM: [...r.rms][0] || '—',
+            topBranch: [...r.branches][0] || '—',
+            topIssue: Object.entries(r.issues).sort((a,b) => b[1]-a[1])[0]?.[0] || '—'
+        })).sort((a, b) => b.contacts - a.contacts);
+
+        headEl.innerHTML = `<tr>
+            <th data-col="broker">Broker Name<span class="sort-arr"></span></th>
+            <th data-col="rms"># RMs<span class="sort-arr"></span></th>
+            <th data-col="branches"># Branches<span class="sort-arr"></span></th>
+            <th data-col="contacts"># Contacts<span class="sort-arr"></span></th>
+            <th data-col="topRM">Top RM</th>
+            <th data-col="topBranch">Top Branch</th>
+            <th data-col="topIssue">Top Issue</th>
+        </tr>`;
+
+    } else if (type === 'branch') {
+        titleEl.innerText = '🏛️ Active Partner Branches';
+        const brMap = {};
+        data.forEach(item => {
+            if (!item.branch || item.branch === 'Not shared') return;
+            const key = item.branch;
+            if (!brMap[key]) brMap[key] = { branch: key, broker: item.broker_family || '—', rms: new Set(), contacts: 0, issues: {} };
+            brMap[key].contacts++;
+            if (item.rm_name && item.rm_name !== 'NA') brMap[key].rms.add(item.rm_name);
+            if (item.issue) brMap[key].issues[item.issue] = (brMap[key].issues[item.issue] || 0) + 1;
+        });
+        cohortModalAllRows = Object.values(brMap).map(r => ({
+            branch: r.branch, broker: r.broker, rms: r.rms.size,
+            contacts: r.contacts,
+            topRM: [...r.rms][0] || '—',
+            topIssue: Object.entries(r.issues).sort((a,b) => b[1]-a[1])[0]?.[0] || '—'
+        })).sort((a, b) => b.contacts - a.contacts);
+
+        headEl.innerHTML = `<tr>
+            <th data-col="branch">Branch Name<span class="sort-arr"></span></th>
+            <th data-col="broker">Broker<span class="sort-arr"></span></th>
+            <th data-col="rms"># RMs<span class="sort-arr"></span></th>
+            <th data-col="contacts"># Contacts<span class="sort-arr"></span></th>
+            <th data-col="topRM">Top RM</th>
+            <th data-col="topIssue">Top Issue</th>
+        </tr>`;
+    }
+
+    // Attach sort handlers
+    headEl.querySelectorAll('th[data-col]').forEach(th => {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-col');
+            if (cohortModalSortKey === col) cohortModalSortDir *= -1;
+            else { cohortModalSortKey = col; cohortModalSortDir = 1; }
+            renderCohortModalRows(document.getElementById('cohort-modal-search')?.value || '');
+        });
+    });
+
+    renderCohortModalRows('');
+    document.getElementById('cohort-modal-count').innerText = `${cohortModalAllRows.length} records`;
+    overlay.classList.add('visible');
+}
+
+function renderCohortModalRows(filter) {
+    const tbody = document.getElementById('cohort-table-body');
+    if (!tbody) return;
+    let rows = cohortModalAllRows;
+    if (filter) {
+        const q = filter.toLowerCase();
+        rows = rows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+    }
+    if (cohortModalSortKey) {
+        rows = [...rows].sort((a, b) => {
+            const av = a[cohortModalSortKey], bv = b[cohortModalSortKey];
+            if (typeof av === 'number') return (av - bv) * cohortModalSortDir;
+            return String(av).localeCompare(String(bv)) * cohortModalSortDir;
+        });
+    }
+    tbody.innerHTML = rows.map(r => {
+        const cells = Object.values(r).map((v, i) => {
+            if (i === 0) return `<td class="cohort-td-primary">${v}</td>`;
+            if (typeof v === 'number') return `<td class="cohort-td-count">${v.toLocaleString()}</td>`;
+            return `<td><span class="cohort-td-badge">${v}</span></td>`;
+        }).join('');
+        return `<tr>${cells}</tr>`;
+    }).join('');
+    document.getElementById('cohort-modal-count').innerText = `${rows.length} of ${cohortModalAllRows.length} records`;
+}
+
+function exportCohortToCSV() {
+    if (!cohortModalAllRows.length) return;
+    const keys = Object.keys(cohortModalAllRows[0]);
+    const header = keys.join(',');
+    const body = cohortModalAllRows.map(r => keys.map(k => `"${String(r[k]).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `cohort_${cohortModalCurrentType}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+}
+
+// Wire cohort modal events — deferred to ensure DOM is ready
+function initCohortModalEvents() {
+    const closeBtn = document.getElementById('cohort-modal-close');
+    const overlay = document.getElementById('cohort-modal-overlay');
+    const searchEl = document.getElementById('cohort-modal-search');
+    const exportBtn = document.getElementById('cohort-export-btn');
+    if (closeBtn && !closeBtn._wiredCohort) {
+        closeBtn._wiredCohort = true;
+        closeBtn.addEventListener('click', () => overlay.classList.remove('visible'));
+    }
+    if (overlay && !overlay._wiredCohort) {
+        overlay._wiredCohort = true;
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('visible'); });
+    }
+    if (searchEl && !searchEl._wiredCohort) {
+        searchEl._wiredCohort = true;
+        searchEl.addEventListener('input', e => renderCohortModalRows(e.target.value));
+    }
+    if (exportBtn && !exportBtn._wiredCohort) {
+        exportBtn._wiredCohort = true;
+        exportBtn.addEventListener('click', exportCohortToCSV);
+    }
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCohortModalEvents);
+} else {
+    initCohortModalEvents();
+}
+
+
 // 4.8. Repeat Loops analysis table
+
 function renderRepeatLoopsTable(data) {
     const tbody = document.getElementById('pulse-loops-body');
     tbody.innerHTML = '';
@@ -2795,6 +3323,18 @@ function renderExplorerWidgetList() {
     });
 
     const sorted = Object.entries(optionCounts).sort((a, b) => b[1] - a[1]);
+    const maxCount = sorted[0] ? sorted[0][1] : 1;
+
+    // Update tab badges with total unique-count per dimension
+    document.querySelectorAll('.exp-tab-btn').forEach(btn => {
+        const attr = btn.getAttribute('data-attr');
+        const dimCounts = {};
+        data.forEach(item => { const v = item[attr]; if (v) dimCounts[v] = 1; });
+        const n = Object.keys(dimCounts).length;
+        let badge = btn.querySelector('.exp-tab-badge');
+        if (!badge) { badge = document.createElement('span'); badge.className = 'exp-tab-badge'; btn.appendChild(badge); }
+        badge.textContent = n;
+    });
 
     if (sorted.length === 0) {
         list.innerHTML = '<div class="text-muted" style="padding: 10px;">No explorer options found.</div>';
@@ -2807,16 +3347,21 @@ function renderExplorerWidgetList() {
         const btn = document.createElement('button');
         btn.className = 'explorer-item-btn';
         if (explorerSelectedOption === opt) btn.classList.add('selected');
+        const barPct = maxCount > 0 ? Math.round(count / maxCount * 100) : 0;
 
         btn.innerHTML = `
-            <span>${opt}</span>
-            <span class="explorer-item-val">${count}</span>
+            <div class="explorer-item-label">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:6px;">${opt}</span>
+                <span class="explorer-item-val">${count}</span>
+            </div>
+            <div class="explorer-item-bar-track">
+                <div class="explorer-item-bar-fill" style="width:${barPct}%;"></div>
+            </div>
         `;
 
         btn.addEventListener('click', () => {
             document.querySelectorAll('#explorer-options-list button').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
-
             explorerSelectedOption = opt;
             showExplorerDissection(opt, count);
         });
@@ -2884,7 +3429,7 @@ function showExplorerDissection(optionName, totalCount) {
     Object.entries(dims).forEach(([dim, counts]) => {
         if (dim === explorerActiveTab) return;
 
-        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
         if (sorted.length === 0) return;
 
         const card = document.createElement('div');
@@ -2893,20 +3438,20 @@ function showExplorerDissection(optionName, totalCount) {
 
         const listDiv = document.createElement('div');
         listDiv.className = 'dissect-items-list';
+        const maxCnt = sorted[0][1];
 
-        sorted.forEach(([lbl, cnt]) => {
+        sorted.forEach(([lbl, cnt], idx) => {
             const pct = totalCount > 0 ? Math.round((cnt / totalCount) * 100) : 0;
+            const barW = maxCnt > 0 ? Math.round((cnt / maxCnt) * 100) : 0;
 
             listDiv.innerHTML += `
-                <div class="dissect-items-row-wrapper" style="margin-bottom: 6px;">
+                <div class="dissect-items-row-wrapper" style="margin-bottom: 7px;">
                     <div class="dissect-row">
-                        <span class="dissect-lbl">${lbl}</span>
-                        <span class="dissect-val">${cnt} (${pct}%)</span>
+                        <span class="dissect-lbl" title="${lbl}">${lbl}</span>
+                        <span class="dissect-val">${cnt} <span style="opacity:0.6;font-weight:500">(${pct}%)</span></span>
                     </div>
-                    <div class="dissect-bar-container">
-                        <div class="dissect-bar-track">
-                            <div class="dissect-bar-fill" style="width: ${pct}%;"></div>
-                        </div>
+                    <div class="dissect-bar-track">
+                        <div class="dissect-bar-fill c${idx % 4}" style="width: ${barW}%;"></div>
                     </div>
                 </div>
             `;
@@ -2983,29 +3528,34 @@ async function generateAISummary() {
     const data = window.viewModel.interactions;
     const withComments = data.filter(item => item.comments && item.comments.trim().length > 10);
 
-    // Prepare first 60 comments to build prompt payload
-    const selectedComments = withComments.slice(0, 60).map((r, i) => {
-        return `${i + 1}. [RM=${r.rm_name} | Branch=${r.branch} | Broker=${r.broker_family} | Issue=${r.issue}]: ${r.comments.substring(0, 150)}`;
-    }).join("\n");
+    // Prepare up to 80 records with full context
+    const selectedComments = withComments.slice(0, 80).map((r, i) => {
+        return `${i + 1}. [RM=${r.rm_name || 'NA'} | Broker=${r.broker_family || 'NA'} | Branch=${r.branch || 'NA'} | Issue=${r.issue || 'NA'} | Sub-Issue=${r.sub_issue || 'NA'} | Date=${r.date || 'NA'}]: "${r.comments.substring(0, 200)}"`;
+    }).join('\n');
 
     if (!selectedComments) {
         loadingState.classList.add('hidden');
         emptyState.classList.remove('hidden');
-        alert("Not enough logs with comments found in selected date range to generate AI summary.");
+        alert('Not enough logs with comments found in selected date range to generate AI summary.');
         return;
     }
 
     // API Setup
-    // Key imported directly from Code.gs
-    const key = "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";
+    const key = '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';
 
     const prompt =
-        `You are analyzing B2B fintech support ticket logs for smallcase dashboard. Here is a list of raw interaction comments:\n\n` +
-        `RECORDS:\n${selectedComments}\n\n` +
-        `TASK:\n` +
-        `Provide a premium summary including key findings, observations, and recommendations. Group the records into clusters.\n` +
-        `Return ONLY a raw JSON string matching this structure:\n` +
-        `{"narrative": "<h4>🔍 Key Observations</h4><ul><li><strong>Hotspot:</strong> Describe friction...</li></ul><h4>💡 Actionable Recommendations</h4><ul><li>Initiate...</li></ul>"}`;
+        `You are a senior B2B fintech support analyst for smallcase, analyzing raw support ticket comments from Relationship Managers (RMs) and their broker partners.\n\n` +
+        `INTERACTION RECORDS (${withComments.length} total, showing ${Math.min(80, withComments.length)}):\n${selectedComments}\n\n` +
+        `ANALYSIS TASK:\n` +
+        `Provide a comprehensive, structured analysis. Return ONLY a raw JSON string (no markdown) in this format:\n` +
+        `{"narrative": "...full HTML content..."}\n\n` +
+        `The narrative HTML should include:\n` +
+        `1. <h4>🔍 Key Observations</h4> — 4-6 bullet points covering volume patterns, repeated issues, time trends\n` +
+        `2. <h4>🏢 Broker-level Insights</h4> — Which broker families appear most? What issues do they face?\n` +
+        `3. <h4>🏛️ Branch Friction Points</h4> — Which branches show the most friction? What are their top complaints?\n` +
+        `4. <h4>📋 Issue Clustering</h4> — Group issues into 3-5 thematic clusters, with counts and representative RM quotes\n` +
+        `5. <h4>💡 Actionable Recommendations</h4> — 4-6 specific, prioritized action items for the support team\n` +
+        `Use <ul><li><strong>Label:</strong> Detail</li></ul> for all sections. Quote specific RM comments where relevant.`;
 
     try {
         const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
@@ -3049,46 +3599,278 @@ async function generateAISummary() {
 }
 
 function generateLocalFallbackSummary(commentsList) {
-    // Basic Keyword grouping for offline text summaries
-    const clusters = {
-        "SIP & Order Failures": 0,
-        "Login & Credentials": 0,
-        "Payout & Settlements": 0,
-        "API Integration Issues": 0
-    };
+    const data = window.viewModel ? window.viewModel.interactions : commentsList;
 
-    commentsList.forEach(item => {
-        const comm = item.comments.toLowerCase();
-        if (comm.includes('sip') || comm.includes('order') || comm.includes('execute')) clusters["SIP & Order Failures"]++;
-        else if (comm.includes('login') || comm.includes('password') || comm.includes('otp')) clusters["Login & Credentials"]++;
-        else if (comm.includes('payout') || comm.includes('settle') || comm.includes('payouts')) clusters["Payout & Settlements"]++;
-        else if (comm.includes('api') || comm.includes('feed') || comm.includes('integration')) clusters["API Integration Issues"]++;
+    // Real broker counts
+    const brokerCounts = {};
+    const branchCounts = {};
+    const issueCounts = {};
+    data.forEach(item => {
+        if (item.broker_family && item.broker_family !== 'NA') brokerCounts[item.broker_family] = (brokerCounts[item.broker_family] || 0) + 1;
+        if (item.branch && item.branch !== 'Not shared') branchCounts[item.branch] = (branchCounts[item.branch] || 0) + 1;
+        if (item.issue) issueCounts[item.issue] = (issueCounts[item.issue] || 0) + 1;
     });
+    const topBrokers = Object.entries(brokerCounts).sort((a,b) => b[1]-a[1]).slice(0,5);
+    const topBranches = Object.entries(branchCounts).sort((a,b) => b[1]-a[1]).slice(0,4);
+    const topIssues = Object.entries(issueCounts).sort((a,b) => b[1]-a[1]).slice(0,5);
 
-    let clustersHTML = '<h4>🔍 Friction Themes & Keyword Clusterting (Local Rules Engine)</h4><ul>';
-    Object.entries(clusters).forEach(([theme, count]) => {
-        if (count > 0) {
-            clustersHTML += `<li><strong>${theme}:</strong> Detected in ${count} support interaction transcripts.</li>`;
-        }
-    });
-    clustersHTML += '</ul>';
+    const brokersHTML = topBrokers.map(([b, c]) => `<li><strong>${b}:</strong> ${c} interactions</li>`).join('');
+    const branchesHTML = topBranches.map(([b, c]) => `<li><strong>${b}:</strong> ${c} contacts</li>`).join('');
+    const issuesHTML = topIssues.map(([i, c]) => `<li><strong>${i}:</strong> ${c} occurrences</li>`).join('');
 
-    // Build recommendations
-    const recomHTML = `
+    // Sample comments
+    const sampleComments = commentsList.slice(0, 4).map(r =>
+        `<li><em>"${r.comments.substring(0,120)}..."</em> — <strong>${r.rm_name}</strong> (${r.broker_family}, ${r.branch})</li>`
+    ).join('');
+
+    return `
+        <h4>🔍 Key Observations (Local Analysis)</h4>
+        <ul>
+            <li><strong>Total interactions with comments:</strong> ${commentsList.length} records analyzed</li>
+            <li><strong>Active brokers:</strong> ${Object.keys(brokerCounts).length} unique broker families</li>
+            <li><strong>Active branches:</strong> ${Object.keys(branchCounts).length} unique branches</li>
+            <li><strong>Top issue:</strong> ${topIssues[0] ? `${topIssues[0][0]} (${topIssues[0][1]} cases)` : '—'}</li>
+        </ul>
+        <h4>🏢 Top Broker Families</h4><ul>${brokersHTML}</ul>
+        <h4>🏛️ Most Active Branches</h4><ul>${branchesHTML}</ul>
+        <h4>📋 Issue Clusters</h4><ul>${issuesHTML}</ul>
+        <h4>💬 Sample RM Comments</h4><ul>${sampleComments}</ul>
         <h4>💡 Actionable Recommendations</h4>
         <ul>
-            <li><strong>Partner Portal Update:</strong> Investigate SIP execution delays reported by RMs at top branches.</li>
-            <li><strong>Broker sync:</strong> Resolve feed integration failures for partners experiencing order rejection.</li>
-            <li><strong>Staff training:</strong> Prioritize onboarding guides to reduce repeat query login requests.</li>
+            <li><strong>Prioritize top broker:</strong> ${topBrokers[0] ? `${topBrokers[0][0]} has the highest contact volume — assign dedicated support POC.` : 'Review broker assignment.'}</li>
+            <li><strong>Branch escalation:</strong> ${topBranches[0] ? `${topBranches[0][0]} branch is the highest friction point — schedule a review call.` : 'Monitor branch SLA compliance.'}</li>
+            <li><strong>Issue resolution:</strong> ${topIssues[0] ? `Address "${topIssues[0][0]}" systematically — it accounts for ${topIssues[0][1]} cases.` : 'Focus on reducing repeat contacts.'}</li>
+            <li><strong>Repeat contact reduction:</strong> Identify RMs contacting for the same issue 2+ times in 7 days and provide targeted resolution guides.</li>
         </ul>
     `;
+}
 
-    return clustersHTML + recomHTML;
+// -------------------------------------------------------------------------
+// AI SUMMARY TAB — Full Analytics Report
+// -------------------------------------------------------------------------
+let aiChartInstances = {};
+
+function renderAISummaryTab() {
+    const data = window.viewModel ? window.viewModel.interactions : [];
+    const calls = window.viewModel ? window.viewModel.calls : [];
+
+    // Update period badge
+    const periodBadge = document.getElementById('ai-tab-period-badge');
+    if (periodBadge) {
+        periodBadge.textContent = `${activeFilters.dateFrom} → ${activeFilters.dateTo}`;
+    }
+
+    // --- Stat Cards ---
+    const statGrid = document.getElementById('ai-report-stat-grid');
+    if (statGrid) {
+        const brokerCounts = {};
+        const issueCounts = {};
+        const rmCounts = {};
+        let repeatLoops = 0;
+        const loopMap = {};
+        data.forEach(item => {
+            if (item.broker_family && item.broker_family !== 'NA') brokerCounts[item.broker_family] = (brokerCounts[item.broker_family] || 0) + 1;
+            if (item.issue) issueCounts[item.issue] = (issueCounts[item.issue] || 0) + 1;
+            if (item.rm_name && item.rm_name !== 'NA') rmCounts[item.rm_name] = (rmCounts[item.rm_name] || 0) + 1;
+            // repeat loops
+            if (item.rm_name && item.rm_name !== 'NA' && item.issue && item.issue !== 'General') {
+                const k = `${item.rm_name}||${item.issue}`;
+                if (!loopMap[k]) loopMap[k] = [];
+                if (item.date) loopMap[k].push(safeParseDate(item.date).getTime());
+            }
+        });
+        Object.values(loopMap).forEach(ts => {
+            if (ts.length < 2) return;
+            ts.sort((a,b)=>a-b);
+            for (let i = 1; i < ts.length; i++) if (ts[i]-ts[i-1] <= 7*864e5) repeatLoops++;
+        });
+        const topBroker = Object.entries(brokerCounts).sort((a,b)=>b[1]-a[1])[0];
+        const topIssue = Object.entries(issueCounts).sort((a,b)=>b[1]-a[1])[0];
+        const topRM = Object.entries(rmCounts).sort((a,b)=>b[1]-a[1])[0];
+
+        // AHT from calls
+        let ahtAns = 0, ahtSum = 0;
+        calls.forEach(c => {
+            const ct = String(c.call_type||'').toLowerCase();
+            const st = String(c.stage||'').toLowerCase();
+            if (!ct || ct === 'inbound') {
+                if (st === 'answered' || st === 'connected') { ahtAns++; ahtSum += (c.talk_time || c.duration || 0); }
+            }
+        });
+        const ahtVal = ahtAns > 0 ? formatSeconds(Math.round(ahtSum / ahtAns)) : '—';
+
+        statGrid.innerHTML = `
+            <div class="ai-report-stat-card"><span class="stat-icon">📊</span><div class="stat-label">Total Interactions</div><div class="stat-val">${data.length.toLocaleString()}</div><div class="stat-sub">${activeFilters.dateFrom} to ${activeFilters.dateTo}</div></div>
+            <div class="ai-report-stat-card"><span class="stat-icon">🏢</span><div class="stat-label">Top Broker Family</div><div class="stat-val" style="font-size:1rem;line-height:1.3">${topBroker ? topBroker[0] : '—'}</div><div class="stat-sub">${topBroker ? topBroker[1] + ' contacts' : ''}</div></div>
+            <div class="ai-report-stat-card"><span class="stat-icon">📋</span><div class="stat-label">Top Issue</div><div class="stat-val" style="font-size:1rem;line-height:1.3">${topIssue ? topIssue[0] : '—'}</div><div class="stat-sub">${topIssue ? topIssue[1] + ' occurrences' : ''}</div></div>
+            <div class="ai-report-stat-card"><span class="stat-icon">🧑</span><div class="stat-label">Top RM</div><div class="stat-val" style="font-size:1rem;line-height:1.3">${topRM ? topRM[0] : '—'}</div><div class="stat-sub">${topRM ? topRM[1] + ' contacts' : ''}</div></div>
+            <div class="ai-report-stat-card"><span class="stat-icon">⚠️</span><div class="stat-label">Repeat Loops</div><div class="stat-val" style="color:#ef4444">${repeatLoops}</div><div class="stat-sub">7-day repeat incidents</div></div>
+            <div class="ai-report-stat-card"><span class="stat-icon">⏱️</span><div class="stat-label">Avg Handling Time</div><div class="stat-val">${ahtVal}</div><div class="stat-sub">Inbound answered calls</div></div>
+            <div class="ai-report-stat-card"><span class="stat-icon">📞</span><div class="stat-label">Total Calls</div><div class="stat-val">${calls.length.toLocaleString()}</div><div class="stat-sub">Ozonetel call records</div></div>
+        `;
+    }
+
+    // --- Charts ---
+    const destroyChart = (key) => { if (aiChartInstances[key]) { aiChartInstances[key].destroy(); delete aiChartInstances[key]; } };
+
+    // 1. Daily Volume Trend
+    const trendCanvas = document.getElementById('ai-chart-daily-trend');
+    if (trendCanvas) {
+        destroyChart('trend');
+        const dateMap = {};
+        data.forEach(item => {
+            if (item.date) {
+                const d = item.date.split(' ')[0];
+                dateMap[d] = (dateMap[d] || 0) + 1;
+            }
+        });
+        const sortedDates = Object.keys(dateMap).sort();
+        aiChartInstances['trend'] = new Chart(trendCanvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: sortedDates,
+                datasets: [{
+                    label: 'Daily Contacts',
+                    data: sortedDates.map(d => dateMap[d]),
+                    borderColor: '#8b5cf6',
+                    backgroundColor: 'rgba(139,92,246,0.1)',
+                    fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 6
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: true, ticks: { color: THEME_COLORS.textMuted, maxTicksLimit: 10, font: { size: 10 } }, grid: { color: THEME_COLORS.gridColor } }, y: { display: true, ticks: { color: THEME_COLORS.textMuted, font: { size: 10 } }, grid: { color: THEME_COLORS.gridColor } } } }
+        });
+    }
+
+    // 2. Top 10 Brokers
+    const brkCanvas = document.getElementById('ai-chart-brokers');
+    if (brkCanvas) {
+        destroyChart('brokers');
+        const bc = {};
+        data.forEach(item => { if (item.broker_family && item.broker_family !== 'NA') bc[item.broker_family] = (bc[item.broker_family] || 0) + 1; });
+        const top10 = Object.entries(bc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        aiChartInstances['brokers'] = new Chart(brkCanvas.getContext('2d'), {
+            type: 'bar',
+            data: { labels: top10.map(x=>x[0]), datasets: [{ label: 'Contacts', data: top10.map(x=>x[1]), backgroundColor: 'rgba(139,92,246,0.7)', borderColor: '#8b5cf6', borderWidth: 1, borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: THEME_COLORS.textMuted, font: { size: 9 } }, grid: { color: THEME_COLORS.gridColor } }, y: { ticks: { color: THEME_COLORS.textSecondary, font: { size: 10 } }, grid: { display: false } } } }
+        });
+    }
+
+    // 3. Issue Category Donut
+    const issCanvas = document.getElementById('ai-chart-issues');
+    if (issCanvas) {
+        destroyChart('issues');
+        const ic = {};
+        data.forEach(item => { if (item.issue) ic[item.issue] = (ic[item.issue] || 0) + 1; });
+        const top6 = Object.entries(ic).sort((a,b)=>b[1]-a[1]).slice(0,6);
+        const palette = ['#8b5cf6','#0ea5e9','#10b981','#f59e0b','#ef4444','#ec4899'];
+        aiChartInstances['issues'] = new Chart(issCanvas.getContext('2d'), {
+            type: 'doughnut',
+            data: { labels: top6.map(x=>x[0]), datasets: [{ data: top6.map(x=>x[1]), backgroundColor: palette, borderColor: THEME_COLORS.cardBg, borderWidth: 3 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: THEME_COLORS.textSecondary, font: { size: 9 }, padding: 8 } } }, cutout: '60%' }
+        });
+    }
+
+    // 4. Top 10 Branches
+    const branchCanvas = document.getElementById('ai-chart-branches');
+    if (branchCanvas) {
+        destroyChart('branches');
+        const bc2 = {};
+        data.forEach(item => { if (item.branch && item.branch !== 'Not shared') bc2[item.branch] = (bc2[item.branch] || 0) + 1; });
+        const top10b = Object.entries(bc2).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        aiChartInstances['branches'] = new Chart(branchCanvas.getContext('2d'), {
+            type: 'bar',
+            data: { labels: top10b.map(x=>x[0]), datasets: [{ label: 'Contacts', data: top10b.map(x=>x[1]), backgroundColor: 'rgba(14,165,233,0.7)', borderColor: '#0ea5e9', borderWidth: 1, borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: THEME_COLORS.textMuted, font: { size: 9 } }, grid: { color: THEME_COLORS.gridColor } }, y: { ticks: { color: THEME_COLORS.textSecondary, font: { size: 10 } }, grid: { display: false } } } }
+        });
+    }
+
+    // 5. Channel Mix Donut
+    const chCanvas = document.getElementById('ai-chart-channels');
+    if (chCanvas) {
+        destroyChart('channels');
+        const cc = { 'Call Ticket': 0, 'WhatsApp Chat': 0, 'Care Email': 0 };
+        data.forEach(item => { if (cc[item.type] !== undefined) cc[item.type]++; });
+        aiChartInstances['channels'] = new Chart(chCanvas.getContext('2d'), {
+            type: 'pie',
+            data: { labels: ['Call Tickets', 'WhatsApp', 'Care Emails'], datasets: [{ data: [cc['Call Ticket'], cc['WhatsApp Chat'], cc['Care Email']], backgroundColor: ['rgba(14,165,233,0.8)', 'rgba(34,197,94,0.8)', 'rgba(249,115,22,0.8)'], borderColor: THEME_COLORS.cardBg, borderWidth: 3 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: THEME_COLORS.textSecondary, font: { size: 10 }, padding: 10 } } } }
+        });
+    }
+
+    // Wire Generate button for standalone tab
+    const genBtn = document.getElementById('ai-generate-btn');
+    if (genBtn && !genBtn._wired_ai_tab) {
+        genBtn._wired_ai_tab = true;
+        genBtn.addEventListener('click', generateAITabNarrative);
+    }
+
+    // Wire Copy button
+    const copyBtn = document.getElementById('ai-copy-btn');
+    if (copyBtn && !copyBtn._wired) {
+        copyBtn._wired = true;
+        copyBtn.addEventListener('click', () => {
+            const content = document.getElementById('ai-narrative-content');
+            if (content) {
+                navigator.clipboard.writeText(content.innerText || content.textContent).then(() => {
+                    copyBtn.textContent = '✅ Copied!';
+                    setTimeout(() => { copyBtn.innerHTML = '📋 Copy Report'; }, 2000);
+                }).catch(() => { alert('Copy failed — please select the text manually.'); });
+            }
+        });
+    }
+}
+
+async function generateAITabNarrative() {
+    const narrativeContent = document.getElementById('ai-narrative-content');
+    if (!narrativeContent) return;
+    narrativeContent.innerHTML = '<div class="ai-loading-overlay"><div class="spinner"></div><p>Invoking NVIDIA Nemotron LLM...</p><span style="font-size:0.78rem;color:var(--text-muted)">Building comprehensive narrative from all data...</span></div>';
+
+    const data = window.viewModel ? window.viewModel.interactions : [];
+    const withComments = data.filter(item => item.comments && item.comments.trim().length > 10);
+
+    const selectedComments = withComments.slice(0, 80).map((r, i) => {
+        return `${i+1}. [RM=${r.rm_name||'NA'} | Broker=${r.broker_family||'NA'} | Branch=${r.branch||'NA'} | Issue=${r.issue||'NA'} | Sub-Issue=${r.sub_issue||'NA'}]: "${r.comments.substring(0,200)}"`;
+    }).join('\n');
+
+    if (!selectedComments) {
+        narrativeContent.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-muted)"><p>No comments found in the selected period. Try expanding the date range.</p></div>';
+        return;
+    }
+
+    const key = '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';
+    const prompt =
+        `You are a senior B2B fintech support analyst for smallcase. Analyze these ${data.length} interactions (${withComments.length} with detailed comments):\n\n` +
+        `RECORDS:\n${selectedComments}\n\n` +
+        `Write a comprehensive HTML analytics report narrative including:\n` +
+        `1. <h4>📊 Executive Summary</h4> — 3-5 high-level findings\n` +
+        `2. <h4>🔍 Key Observations</h4> — Detailed patterns, trends, volume insights\n` +
+        `3. <h4>🏢 Broker-level Analysis</h4> — Top brokers, their issues, friction patterns with quoted comments\n` +
+        `4. <h4>🏛️ Branch Intelligence</h4> — Branch hotspots, geographic friction patterns\n` +
+        `5. <h4>📋 Issue Taxonomy</h4> — Systematic issue clustering with root cause hypotheses\n` +
+        `6. <h4>💡 Prioritized Recommendations</h4> — Specific, actionable steps ordered by impact\n` +
+        `Return ONLY raw JSON: {"narrative": "...HTML..."}`;
+
+    try {
+        const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', messages: [{ role: 'user', content: prompt }], temperature: 0.6, max_tokens: 2000 })
+        });
+        if (!response.ok) throw new Error('API failed');
+        const res = await response.json();
+        const text = res.choices[0].message.content.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/,'').trim();
+        const parsed = JSON.parse(text);
+        narrativeContent.innerHTML = parsed.narrative || '<p>Narrative parsing returned empty.</p>';
+    } catch (err) {
+        console.warn('AI narrative failed, using local fallback', err);
+        narrativeContent.innerHTML = generateLocalFallbackSummary(withComments);
+    }
 }
 
 // -------------------------------------------------------------
 // 7. SCREENSHOT DOWNLOAD ENGINE (HTML2CANVAS)
 // -------------------------------------------------------------
+
 
 function captureDashboardScreenshot() {
     const captureArea = document.getElementById('weekly-pulse-dashboard-capture-area');
@@ -3297,15 +4079,28 @@ function openMetricDeepDiveModal(type, title) {
     let entries = [];
     let isCallBased = false;
 
+    // Support filtering by date from title if title contains "Interactions on YYYY-MM-DD"
+    let dateFilter = null;
+    if (title && title.includes('Interactions on')) {
+        dateFilter = title.replace('Interactions on', '').trim();
+    }
+
+    let filteredInteractions = interactions;
+    let filteredCalls = calls;
+    if (dateFilter) {
+        filteredInteractions = interactions.filter(item => item.date && item.date.substring(0, 10) === dateFilter);
+        filteredCalls = calls.filter(call => call.date && call.date.substring(0, 10) === dateFilter);
+    }
+
     // Determine the data subset based on type
-    if (type === 'interactions') {
-        entries = interactions;
+    if (type === 'all' || type === 'interactions') {
+        entries = filteredInteractions;
     } else if (type === 'tickets') {
-        entries = interactions.filter(item => item.type === 'Call Ticket');
+        entries = filteredInteractions.filter(item => item.type === 'Call Ticket');
     } else if (type === 'whatsapp') {
-        entries = interactions.filter(item => item.type === 'WhatsApp Chat');
+        entries = filteredInteractions.filter(item => item.type === 'WhatsApp Chat');
     } else if (type === 'answered') {
-        entries = interactions.filter(item => {
+        entries = filteredInteractions.filter(item => {
             if (item.type !== 'Call Ticket') return false;
             let cs = String(item.call_status || "").toLowerCase();
             if (cs === 'other' || !cs) {
@@ -3317,7 +4112,7 @@ function openMetricDeepDiveModal(type, title) {
             return cs === 'answered';
         });
     } else if (type === 'missed') {
-        entries = interactions.filter(item => {
+        entries = filteredInteractions.filter(item => {
             if (item.type !== 'Call Ticket') return false;
             let cs = String(item.call_status || "").toLowerCase();
             if (cs === 'other' || !cs) {
@@ -3329,7 +4124,7 @@ function openMetricDeepDiveModal(type, title) {
             return cs === 'missed';
         });
     } else if (type === 'aoh') {
-        entries = interactions.filter(item => {
+        entries = filteredInteractions.filter(item => {
             if (item.type !== 'Call Ticket') return false;
             let cs = String(item.call_status || "").toLowerCase();
             if (cs === 'other' || !cs) {
@@ -3342,14 +4137,14 @@ function openMetricDeepDiveModal(type, title) {
         });
     } else if (type === 'aht') {
         // Average Handling Time is calculated from answered Ozonetel calls
-        entries = calls.filter(call => {
+        entries = filteredCalls.filter(call => {
             const st = String(call.stage || "").toLowerCase();
             return st === 'answered' || st === 'connected';
         });
         isCallBased = true;
     } else if (type === 'aqt') {
         // Average Queue Time is calculated over all Ozonetel calls (irrespective of stage)
-        entries = calls;
+        entries = filteredCalls;
         isCallBased = true;
     }
 
@@ -3522,6 +4317,61 @@ function renderVisualControlDashboard() {
     };
     const repeatLoops = getLoopsCount(data);
 
+    // Compute topRepeats, rmDataPoints, and branchDataPoints dynamically
+    const getTopRepeats = (interactionsList) => {
+        const loopGroups = {};
+        interactionsList.forEach(item => {
+            if (!item.rm_name || item.rm_name === "NA" || !item.date) return;
+            if (item.issue === "General" || item.issue === "Voice Call") return;
+            const k = `${item.rm_name}||${item.broker_family || 'NA'}||${item.branch || 'Not shared'}||${item.issue}`;
+            if (!loopGroups[k]) loopGroups[k] = [];
+            try {
+                loopGroups[k].push(safeParseDate(item.date).getTime());
+            } catch (e) { }
+        });
+        const loopCounts = [];
+        Object.entries(loopGroups).forEach(([key, tss]) => {
+            if (tss.length < 2) return;
+            tss.sort((a, b) => a - b);
+            let count = 0;
+            for (let i = 1; i < tss.length; i++) {
+                if (tss[i] - tss[i - 1] <= 7 * 24 * 60 * 60 * 1000) count++;
+            }
+            if (count > 0) {
+                const [rm, broker, branch, issue] = key.split('||');
+                loopCounts.push({
+                    label: `${rm} - ${issue} (${broker})`,
+                    count: count
+                });
+            }
+        });
+        return loopCounts.sort((a, b) => b.count - a.count).slice(0, 10);
+    };
+    const topRepeats = getTopRepeats(data);
+
+    const getScatterDataPoints = (interactionsList, keyField, excludeVals = ['NA', 'Not shared', '-', 'Unknown']) => {
+        const groups = {};
+        interactionsList.forEach(item => {
+            const val = item[keyField];
+            if (!val || excludeVals.includes(val)) return;
+            if (!groups[val]) groups[val] = { count: 0, dates: new Set() };
+            groups[val].count++;
+            if (item.date) {
+                groups[val].dates.add(item.date.substring(0, 10));
+            }
+        });
+        return Object.entries(groups).map(([name, g]) => {
+            const activeDays = Math.max(1, g.dates.size);
+            return {
+                x: g.count,
+                y: parseFloat((g.count / activeDays).toFixed(2)),
+                label: name
+            };
+        });
+    };
+    const rmDataPoints = getScatterDataPoints(data, 'rm_name');
+    const branchDataPoints = getScatterDataPoints(data, 'branch');
+
     // Avg/Day: totalInteractions / number of days in selected date range
     const fromD = new Date(activeFilters.dateFrom + 'T00:00:00');
     const toD = new Date(activeFilters.dateTo + 'T23:59:59');
@@ -3556,7 +4406,7 @@ function renderVisualControlDashboard() {
     });
     data.forEach(item => {
         if (item.type !== 'Call Ticket' || !item.date) return;
-        const d = item.date.split('T')[0];
+        const d = item.date.substring(0, 10);
         if (callStatusCounts[d]) {
             callStatusCounts[d].total++;
             let cs = String(item.call_status || "").toLowerCase();
@@ -3582,7 +4432,7 @@ function renderVisualControlDashboard() {
     datesArray.forEach(d => { waCounts[d] = 0; });
     data.forEach(item => {
         if (item.type === 'WhatsApp Chat' && item.date) {
-            const d = item.date.split('T')[0];
+            const d = item.date.substring(0, 10);
             if (waCounts[d] !== undefined) waCounts[d]++;
         }
     });
@@ -3593,7 +4443,7 @@ function renderVisualControlDashboard() {
     datesArray.forEach(d => { emailCounts[d] = 0; });
     data.forEach(item => {
         if (item.type === 'Care Email' && item.date) {
-            const d = item.date.split('T')[0];
+            const d = item.date.substring(0, 10);
             if (emailCounts[d] !== undefined) emailCounts[d]++;
         }
     });
@@ -3835,7 +4685,8 @@ function renderVisualControlDashboard() {
         }
         else if (item.type === 'Care Email') {
             if (rm && rm !== 'NA') topRMsEmails[rm] = (topRMsEmails[rm] || 0) + 1;
-            if (sub) topIssuesEmails[sub] = (topIssuesEmails[sub] || 0) + 1;
+            const issueVal = item.issue || "General";
+            if (issueVal) topIssuesEmails[issueVal] = (topIssuesEmails[issueVal] || 0) + 1;
         }
     });
 
@@ -4707,9 +5558,10 @@ function renderBreakdownPanel(scorecards, selectedAgent) {
 function formatSeconds(sec) {
     if (sec === null || sec === undefined || isNaN(sec)) return '-';
     sec = Math.round(Number(sec));
-    if (sec < 60) return `${sec}s`;
-    if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
-    return `${(sec / 3600).toFixed(1)}h`;
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 // ==========================================================================
@@ -4728,11 +5580,7 @@ function destroyChartGroup(group) {
 }
 
 function formatSecondsCompact(s) {
-    if (!s || isNaN(s)) return '-';
-    s = Math.round(s);
-    if (s < 60) return `${s}s`;
-    if (s < 3600) return `${Math.floor(s/60)}m ${s%60}s`;
-    return `${(s/3600).toFixed(1)}h`;
+    return formatSeconds(s);
 }
 
 function exportTableAsCSV(tableId, filename) {
@@ -4841,6 +5689,222 @@ function renderMainOverview(data, calls) {
             </div>
         </div>
     `).join('');
+
+    // --- Core Operations Snapshot (Relocated) ---
+    // Helpers
+    const formatDuration = (sec) => {
+        return formatSeconds(sec);
+    };
+
+    const formatSecondsUnit = (sec) => {
+        if (!sec || isNaN(sec)) return "0s";
+        if (sec < 60) return `${Math.round(sec)}s`;
+        return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
+    };
+
+    // Filter calls by type
+    // Case-insensitive call_type matching to handle varied capitalisation in source data
+    const inboundCalls = calls.filter(c => (c.call_type || '').toLowerCase() === 'inbound' || (!c.call_type));
+    const progressiveCalls = calls.filter(c => (c.call_type || '').toLowerCase().includes('progressive') || (c.call_type || '').toLowerCase().includes('callback'));
+
+    // 1. TOTAL CALLS
+    const totalCallsCount = calls.length; // Inbound + Progressive
+    const callsConnected = calls.filter(c => (c.stage || '').toLowerCase() === 'answered' || (c.stage || '').toLowerCase() === 'connected').length;
+    
+    // Inbound Connected vs Inbound Unanswered
+    const inboundConnected = inboundCalls.filter(c => (c.stage || '').toLowerCase() === 'answered' || (c.stage || '').toLowerCase() === 'connected');
+    const inboundUnanswered = inboundCalls.filter(c => (c.stage || '').toLowerCase() === 'unanswered' || (c.stage || '').toLowerCase() === 'missed' || (c.stage || '').toLowerCase() === 'abandoned');
+    
+    // Outbound Answered
+    const progressiveAnswered = progressiveCalls.filter(c => (c.stage || '').toLowerCase() === 'answered' || (c.stage || '').toLowerCase() === 'connected');
+
+    // Calls Abandoned: Inbound Unanswered excluding AOH
+    const inboundAoh = inboundCalls.filter(c => (c.sub_issue || '').toLowerCase() === 'aoh');
+    const inboundAbandonedReal = inboundUnanswered.filter(c => (c.sub_issue || '').toLowerCase() !== 'aoh');
+    const callsAbandoned = inboundAbandonedReal.length;
+
+    // Render 1. TOTAL CALLS
+    const elSnapTotalCalls = document.getElementById('md-snap-total-calls');
+    if (elSnapTotalCalls) elSnapTotalCalls.innerText = totalCallsCount.toLocaleString();
+    const elSnapCallsConnected = document.getElementById('md-snap-calls-connected');
+    if (elSnapCallsConnected) elSnapCallsConnected.innerText = callsConnected.toLocaleString();
+    const elSnapCallsAbandoned = document.getElementById('md-snap-calls-abandoned');
+    if (elSnapCallsAbandoned) elSnapCallsAbandoned.innerText = callsAbandoned.toLocaleString();
+
+    // 2. INBOUND
+    const inboundCount = inboundCalls.length;
+    const inboundAohCount = inboundAoh.length;
+    const inboundAbandonedCount = inboundAbandonedReal.length;
+    const uniqueAbandonedSet = new Set(inboundAbandonedReal.map(c => c.caller_no));
+    const uniqueAbandonedCount = uniqueAbandonedSet.size;
+
+    // Abandoned Inbound Splits: Agent / User / Other
+    let inboundAbandonedAgent = 0;
+    let inboundAbandonedUser = 0;
+    let inboundAbandonedOther = 0;
+
+    inboundAbandonedReal.forEach(c => {
+        const ads = (c.agent_dial_status || '').toLowerCase();
+        const ds = (c.dial_status || '').toLowerCase();
+        const ev = (c.call_event || '').toLowerCase();
+        if (ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded')) {
+            inboundAbandonedAgent++;
+        } else if (ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue') {
+            inboundAbandonedUser++;
+        } else {
+            inboundAbandonedOther++;
+        }
+    });
+
+    const inboundAbandonedPct = inboundCount > 0 ? (inboundAbandonedCount / inboundCount * 100).toFixed(1) : '0.0';
+
+    const elSnapInboundCalls = document.getElementById('md-snap-inbound-calls');
+    if (elSnapInboundCalls) elSnapInboundCalls.innerText = inboundCount.toLocaleString();
+    const elSnapInboundAoh = document.getElementById('md-snap-inbound-aoh');
+    if (elSnapInboundAoh) elSnapInboundAoh.innerText = inboundAohCount.toLocaleString();
+    const elSnapInboundAbandoned = document.getElementById('md-snap-inbound-abandoned');
+    if (elSnapInboundAbandoned) elSnapInboundAbandoned.innerText = inboundAbandonedCount.toLocaleString();
+    const elSnapInboundUnique = document.getElementById('md-snap-inbound-unique-abandoned');
+    if (elSnapInboundUnique) elSnapInboundUnique.innerText = uniqueAbandonedCount.toLocaleString();
+    const elSnapInboundAgent = document.getElementById('md-snap-inbound-abandoned-agent');
+    if (elSnapInboundAgent) elSnapInboundAgent.innerText = inboundAbandonedAgent.toLocaleString();
+    const elSnapInboundUser = document.getElementById('md-snap-inbound-abandoned-user');
+    if (elSnapInboundUser) elSnapInboundUser.innerText = inboundAbandonedUser.toLocaleString();
+    const elSnapInboundPct = document.getElementById('md-snap-inbound-abandoned-pct');
+    if (elSnapInboundPct) elSnapInboundPct.innerText = `${inboundAbandonedPct}%`;
+
+    // 3. AHT / TIMING (Inbound Answered Calls)
+    const inboundAnsDurations = inboundConnected.map(c => Number(c.duration) || 0);
+    const inboundTalkTimes = inboundConnected.map(c => Number(c.talk_time) || 0);
+    const inboundHoldTimes = inboundConnected.map(c => Number(c.hold_time) || 0);
+    const inboundQueueAns = inboundConnected.map(c => Number(c.queue_time) || 0);
+    const inboundQueueUnans = inboundAbandonedReal.map(c => Number(c.queue_time) || 0);
+
+    const getAverageVal = arr => arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : 0;
+    const getMedianVal = arr => {
+        if (!arr.length) return 0;
+        const sorted = [...arr].sort((a,b)=>a-b);
+        const mid = Math.floor(sorted.length/2);
+        return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
+    };
+    const getPercentile90Val = arr => {
+        if (!arr.length) return 0;
+        const sorted = [...arr].sort((a,b)=>a-b);
+        const idx = Math.floor(sorted.length * 0.9);
+        return sorted[Math.min(idx, sorted.length - 1)];
+    };
+
+    const avgAht = getAverageVal(inboundAnsDurations);
+    const medianAht = getMedianVal(inboundAnsDurations);
+    const p90Aht = getPercentile90Val(inboundAnsDurations);
+    const avgTalk = getAverageVal(inboundTalkTimes);
+    const avgHold = getAverageVal(inboundHoldTimes);
+    const avgQueueAns = getAverageVal(inboundQueueAns);
+    const avgQueueUnans = getAverageVal(inboundQueueUnans);
+
+    const elSnapAvgAht = document.getElementById('md-snap-avg-aht');
+    if (elSnapAvgAht) elSnapAvgAht.innerText = formatDuration(avgAht);
+    const elSnapMedianAht = document.getElementById('md-snap-median-aht');
+    if (elSnapMedianAht) elSnapMedianAht.innerText = formatDuration(medianAht);
+    const elSnap90pAht = document.getElementById('md-snap-90p-aht');
+    if (elSnap90pAht) elSnap90pAht.innerText = formatDuration(p90Aht);
+    const elSnapAvgTalk = document.getElementById('md-snap-avg-talk');
+    if (elSnapAvgTalk) elSnapAvgTalk.innerText = formatDuration(avgTalk);
+    const elSnapAvgHold = document.getElementById('md-snap-avg-hold');
+    if (elSnapAvgHold) elSnapAvgHold.innerText = formatDuration(avgHold);
+    const elSnapQueueAns = document.getElementById('md-snap-avg-queue-ans');
+    if (elSnapQueueAns) elSnapQueueAns.innerText = formatSecondsUnit(avgQueueAns);
+    const elSnapQueueUnans = document.getElementById('md-snap-avg-queue-unans');
+    if (elSnapQueueUnans) elSnapQueueUnans.innerText = formatSecondsUnit(avgQueueUnans);
+
+    // 4. PROGRESSIVE
+    const progAttempted = progressiveCalls.length;
+    const progAnsweredCount = progressiveAnswered.length;
+    const progUnanswered = progressiveCalls.filter(c => (c.stage || '').toLowerCase() !== 'answered' && (c.stage || '').toLowerCase() !== 'connected');
+    
+    let progUnansAgent = 0;
+    let progUnansUser = 0;
+    let progUnansOther = 0;
+
+    progUnanswered.forEach(c => {
+        const ads = (c.agent_dial_status || '').toLowerCase();
+        const ds = (c.dial_status || '').toLowerCase();
+        const ev = (c.call_event || '').toLowerCase();
+        if (ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded')) {
+            progUnansAgent++;
+        } else if (ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue') {
+            progUnansUser++;
+        } else {
+            progUnansOther++;
+        }
+    });
+
+    const progAnsDurations = progressiveAnswered.map(c => Number(c.duration) || 0);
+    const progAvgAht = getAverageVal(progAnsDurations);
+
+    const elSnapProgAttempted = document.getElementById('md-snap-prog-attempted');
+    if (elSnapProgAttempted) elSnapProgAttempted.innerText = progAttempted.toLocaleString();
+    const elSnapProgAnswered = document.getElementById('md-snap-prog-answered');
+    if (elSnapProgAnswered) elSnapProgAnswered.innerText = progAnsweredCount.toLocaleString();
+    const elSnapProgAgent = document.getElementById('md-snap-prog-unans-agent');
+    if (elSnapProgAgent) elSnapProgAgent.innerText = progUnansAgent.toLocaleString();
+    const elSnapProgUser = document.getElementById('md-snap-prog-unans-user');
+    if (elSnapProgUser) elSnapProgUser.innerText = progUnansUser.toLocaleString();
+    const elSnapProgOther = document.getElementById('md-snap-prog-unans-other');
+    if (elSnapProgOther) elSnapProgOther.innerText = progUnansOther.toLocaleString();
+    const elSnapProgAht = document.getElementById('md-snap-prog-avg-aht');
+    if (elSnapProgAht) elSnapProgAht.innerText = formatDuration(progAvgAht);
+
+    // 5. WHATSAPP
+    const waChats = data.filter(d => d.type === 'WhatsApp Chat');
+    const waCount = waChats.length;
+    
+    const waFrtItems = waChats.filter(d => d.sla_frt && !isNaN(d.sla_frt));
+    const waAvgFrt = waFrtItems.length ? waFrtItems.reduce((s,d) => s + d.sla_frt, 0) / waFrtItems.length : 0;
+
+    const waResItems = waChats.filter(d => d.sla_rt && !isNaN(d.sla_rt));
+    const waAvgRes = waResItems.length ? waResItems.reduce((s,d) => s + d.sla_rt, 0) / waResItems.length : 0;
+
+    const elSnapWaChats = document.getElementById('md-snap-wa-chats');
+    if (elSnapWaChats) elSnapWaChats.innerText = waCount.toLocaleString();
+    const elSnapWaFrt = document.getElementById('md-snap-wa-frt');
+    if (elSnapWaFrt) elSnapWaFrt.innerText = waAvgFrt > 0 ? `${Math.round(waAvgFrt / 60)} min` : '-';
+    const elSnapWaRes = document.getElementById('md-snap-wa-res');
+    if (elSnapWaRes) elSnapWaRes.innerText = waAvgRes > 0 ? `${Math.round(waAvgRes / 60)} min` : '-';
+
+    // 6. CARE EMAILS
+    const emailTickets = data.filter(d => d.type === 'Care Email');
+    const emailCount = emailTickets.length;
+
+    const emailFrtItems = emailTickets.filter(d => d.sla_frt && !isNaN(d.sla_frt));
+    const emailAvgFrt = emailFrtItems.length ? emailFrtItems.reduce((s,d) => s + d.sla_frt, 0) / emailFrtItems.length : 0;
+
+    const elSnapMailTickets = document.getElementById('md-snap-mail-tickets');
+    if (elSnapMailTickets) elSnapMailTickets.innerText = emailCount.toLocaleString();
+    const elSnapMailFrt = document.getElementById('md-snap-mail-frt');
+    if (elSnapMailFrt) elSnapMailFrt.innerText = emailAvgFrt > 0 ? `${Math.round(emailAvgFrt / 60)} min` : '-';
+
+    // Badges comparisons
+    const prevInboundCalls = window.viewModel.prevInteractions.filter(d => d.type === 'Call Ticket').length;
+    const inboundDiff = inboundCount - prevInboundCalls;
+    const inboundPctDiff = prevInboundCalls > 0 ? (inboundDiff / prevInboundCalls * 100) : 0;
+    
+    const inboundBadge = document.getElementById('md-snap-inbound-change');
+    if (inboundBadge) {
+        if (inboundPctDiff >= 0) {
+            inboundBadge.className = 'change-badge up';
+            inboundBadge.innerHTML = `↑ ${Math.abs(inboundPctDiff).toFixed(0)}%`;
+        } else {
+            inboundBadge.className = 'change-badge down';
+            inboundBadge.innerHTML = `↓ ${Math.abs(inboundPctDiff).toFixed(0)}%`;
+        }
+        inboundBadge.style.display = prevInboundCalls > 0 ? 'inline-flex' : 'none';
+    }
+
+    const ahtBadge = document.getElementById('md-snap-aht-change');
+    if (ahtBadge) {
+        ahtBadge.style.display = 'none';
+    }
 
     // Combined Trend Chart
     const dateMap = {};
@@ -5117,20 +6181,218 @@ function renderEmailsDeepDive(data) {
 
 // ----- INTELLIGENCE DASHBOARD -----
 
-function renderIntelligenceDashboard() {
-    const data = window.viewModel.interactions;
+// Dynamic calculation helper functions for Intelligence
+function getDynamicRepeatLoops(interactionsList) {
+    const groups = {};
+    interactionsList.forEach(item => {
+        if (!item.rm_name || item.rm_name === "NA" || !item.date) return;
+        if (item.issue === "General" || item.issue === "Voice Call") return;
+        const k = `${item.rm_name}||${item.broker_family || 'NA'}||${item.branch || 'Not shared'}||${item.issue}`;
+        if (!groups[k]) groups[k] = [];
+        try {
+            groups[k].push(safeParseDate(item.date).getTime());
+        } catch (e) {}
+    });
 
-    // Repeat Loops
+    const list = [];
+    Object.entries(groups).forEach(([key, tss]) => {
+        if (tss.length < 2) return;
+        tss.sort((a, b) => a - b);
+        let repeatCount = 0;
+        for (let i = 1; i < tss.length; i++) {
+            if (tss[i] - tss[i - 1] <= 7 * 24 * 60 * 60 * 1000) {
+                repeatCount++;
+            }
+        }
+        if (repeatCount >= 1) {
+            const [rm_name, broker_family, branch, issue] = key.split('||');
+            list.push({
+                rm_name,
+                broker_family,
+                branch,
+                issue,
+                repeat_count: repeatCount + 1
+            });
+        }
+    });
+    return list.sort((a, b) => b.repeat_count - a.repeat_count);
+}
+
+function getDynamicOutliers(interactionsList) {
+    const groups = {};
+    interactionsList.forEach(item => {
+        if (!item.rm_name || item.rm_name === "NA") return;
+        const k = `${item.rm_name}||${item.broker_family || 'NA'}||${item.branch || 'Not shared'}`;
+        if (!groups[k]) groups[k] = { count: 0, dates: new Set() };
+        groups[k].count++;
+        if (item.date) {
+            groups[k].dates.add(item.date.substring(0, 10));
+        }
+    });
+
+    const list = [];
+    Object.entries(groups).forEach(([key, g]) => {
+        const [rm_name, broker_family, branch] = key.split('||');
+        const activeDays = Math.max(1, g.dates.size);
+        const contacts_per_day = g.count / activeDays;
+        list.push({
+            rm_name,
+            broker_family,
+            branch,
+            contacts: g.count,
+            contacts_per_day: contacts_per_day,
+            is_outlier: false
+        });
+    });
+
+    if (list.length === 0) return [];
+    const avgContactsPerDay = list.reduce((sum, item) => sum + item.contacts_per_day, 0) / list.length;
+    const stdContactsPerDay = Math.sqrt(list.reduce((sum, item) => sum + Math.pow(item.contacts_per_day - avgContactsPerDay, 2), 0) / list.length) || 1;
+    
+    list.forEach(o => {
+        o.is_outlier = o.contacts_per_day > (avgContactsPerDay + 1.2 * stdContactsPerDay) || o.contacts > 20;
+    });
+
+    return list.sort((a, b) => b.contacts_per_day - a.contacts_per_day);
+}
+
+function generateSmartInsights(data, calls) {
+    const dynamicLoops = getDynamicRepeatLoops(data);
+    const dynamicOutliers = getDynamicOutliers(data);
+    
+    let insights = '';
+    
+    // 1. Loop Hotspot
+    if (dynamicLoops.length > 0) {
+        const topLoop = dynamicLoops[0];
+        insights += `<div style="margin-bottom:12px; display:flex; align-items:start; gap:8px;">
+            <span style="font-size:1.1rem; line-height:1;">🚨</span>
+            <div>
+                <strong>Critical Repeat Loop Alert:</strong> Relationship Manager <strong>${topLoop.rm_name}</strong> has <strong>${topLoop.repeat_count}</strong> repeated contacts regarding <strong>"${topLoop.issue}"</strong> from <strong>${topLoop.broker_family}</strong> (Branch: ${topLoop.branch}) within a 7-day window. This is the highest repeat loop hotspot, suggesting a broken operational workflow or branch communication issue that needs direct coaching.
+            </div>
+        </div>`;
+    } else {
+        insights += `<div style="margin-bottom:12px; display:flex; align-items:start; gap:8px;">
+            <span style="font-size:1.1rem; line-height:1;">✅</span>
+            <div>
+                <strong>No Active Repeat Loops:</strong> No RM-Broker-Issue repeat loops detected within a 7-day window. Operational processes appear stable.
+            </div>
+        </div>`;
+    }
+
+    // 2. Outlier RM
+    const outliers = dynamicOutliers.filter(o => o.is_outlier);
+    if (outliers.length > 0) {
+        const topOutlier = outliers[0];
+        const avgContacts = dynamicOutliers.reduce((s,o)=>s+o.contacts, 0) / dynamicOutliers.length || 1;
+        const pctAbove = Math.round(((topOutlier.contacts - avgContacts) / avgContacts) * 100);
+        insights += `<div style="margin-bottom:12px; display:flex; align-items:start; gap:8px;">
+            <span style="font-size:1.1rem; line-height:1;">⚖️</span>
+            <div>
+                <strong>Workload Outlier Alert:</strong> Relationship Manager <strong>${topOutlier.rm_name}</strong> is managing <strong>${topOutlier.contacts}</strong> contacts (avg <strong>${topOutlier.contacts_per_day.toFixed(1)}/day</strong>) in this period. This is <strong>${pctAbove}%</strong> above the average active RM workload. Consider rebalancing broker accounts to prevent burnout.
+            </div>
+        </div>`;
+    }
+
+    // 3. Low-Scoring Broker Health
+    const brokerMap = {};
+    data.forEach(d => {
+        const b = d.broker_family; if (!b || b === 'NA') return;
+        if (!brokerMap[b]) brokerMap[b] = { total: 0, repeats: 0, issues: new Set() };
+        brokerMap[b].total++;
+        if (d.issue) brokerMap[b].issues.add(d.issue);
+    });
+    dynamicLoops.forEach(l => { if (brokerMap[l.broker_family]) brokerMap[l.broker_family].repeats += l.repeat_count; });
+    const brokerScores = Object.entries(brokerMap).map(([name, d]) => {
+        const repeatPenalty = Math.min(30, d.repeats * 3);
+        const diversityPenalty = Math.min(20, d.issues.size * 2);
+        const volumeScore = Math.min(25, Math.round(d.total / 5));
+        const score = Math.max(0, 100 - repeatPenalty - diversityPenalty - volumeScore);
+        return { name, score };
+    }).filter(b => b.score < 65).sort((a,b) => a.score - b.score);
+
+    if (brokerScores.length > 0) {
+        insights += `<div style="margin-bottom:12px; display:flex; align-items:start; gap:8px;">
+            <span style="font-size:1.1rem; line-height:1;">🏥</span>
+            <div>
+                <strong>Broker Health Warning:</strong> <strong>${brokerScores[0].name}</strong> has a low health score of <strong>${brokerScores[0].score}/100</strong> due to elevated repeat issue rates and issue diversity. We recommend reaching out to their assigned POC to run a proactive diagnostic sync.
+            </div>
+        </div>`;
+    }
+
+    // 4. Peak call times & Missed Calls
+    const hourCounts = Array(24).fill(0);
+    let missedCount = 0;
+    data.forEach(d => {
+        if (d.type === 'Call Ticket') {
+            const cs = String(d.call_status || '').toLowerCase();
+            const titleLower = (d.title || '').toLowerCase();
+            if (cs === 'missed' || titleLower.includes('missed')) {
+                missedCount++;
+                if (d.date) {
+                    try {
+                        const hr = safeParseDate(d.date).getHours();
+                        hourCounts[hr]++;
+                    } catch(e){}
+                }
+            }
+        }
+    });
+    let peakHour = -1;
+    let maxHourCount = 0;
+    for (let h=0; h<24; h++) {
+        if (hourCounts[h] > maxHourCount) {
+            maxHourCount = hourCounts[h];
+            peakHour = h;
+        }
+    }
+    if (peakHour !== -1 && maxHourCount > 0) {
+        const hourStr = peakHour === 0 ? '12 AM' : peakHour === 12 ? '12 PM' : peakHour > 12 ? `${peakHour - 12} PM` : `${peakHour} AM`;
+        insights += `<div style="margin-bottom:12px; display:flex; align-items:start; gap:8px;">
+            <span style="font-size:1.1rem; line-height:1;">🕒</span>
+            <div>
+                <strong>Staffing & Peak Load:</strong> Out of ${missedCount} missed calls, the peak hour for missed calls is <strong>${hourStr}</strong> (with <strong>${maxHourCount}</strong> missed calls). Staffing up agent availability or setting automated callbacks during this window will significantly reduce call abandonment.
+            </div>
+        </div>`;
+    }
+
+    // 5. Senior Manager Strategic Recommendation
+    insights += `<div style="border-top: 1px dashed var(--border-color); padding-top: 10px; margin-top: 15px; display:flex; align-items:start; gap:8px;">
+        <span style="font-size:1.1rem; line-height:1;">👔</span>
+        <div style="font-style: italic; color: var(--text-secondary);">
+            <strong>Strategic Business Recommendation:</strong> Focus operations on resolving the repeat loops first. Each loop indicates a process bottleneck. Eliminating these loops will free up approximately <strong>${data.length ? Math.round(dynamicLoops.reduce((s,l)=>s+l.repeat_count, 0) / data.length * 100) : 0}%</strong> of support capacity, allowing relationship managers to focus on high-value client acquisitions.
+        </div>
+    </div>`;
+
+    return insights;
+}
+
+function renderIntelligenceDashboard() {
+    destroyChartGroup(intelCharts);
+    const data = window.viewModel.interactions;
+    const calls = window.viewModel.calls;
+
+    // Dynamically calculate repeat loops & outliers
+    const dynamicLoops = getDynamicRepeatLoops(data);
+    const dynamicOutliers = getDynamicOutliers(data);
+
+    // Populate smart AI insights panel
+    const smartInsightsDiv = document.getElementById('intel-smart-insights');
+    if (smartInsightsDiv) {
+        smartInsightsDiv.innerHTML = generateSmartInsights(data, calls);
+    }
+
+    // Repeat Loops list
     const loopsDiv = document.getElementById('intel-repeat-loops');
-    if (loopsDiv && rawData.repeat_loops) {
-        const filteredLoops = rawData.repeat_loops.filter(l => l.repeat_count >= 2).sort((a,b) => b.repeat_count - a.repeat_count).slice(0, 15);
+    if (loopsDiv) {
+        const filteredLoops = dynamicLoops.filter(l => l.repeat_count >= 2).slice(0, 15);
         loopsDiv.innerHTML = filteredLoops.length ? `<table class="dashboard-table" style="font-size:0.82rem;"><thead><tr><th>RM</th><th>Broker</th><th>Branch</th><th>Issue</th><th style="text-align:right">Repeats</th></tr></thead><tbody>${filteredLoops.map(l => `<tr><td>${l.rm_name}</td><td>${l.broker_family}</td><td>${l.branch}</td><td>${l.issue}</td><td style="text-align:right"><span class="freq-badge high">${l.repeat_count}</span></td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--text-muted);text-align:center;padding:20px;">No repeat loops detected in this period.</p>';
     }
 
-    // Outlier Detection
+    // Outlier Detection list
     const outliersDiv = document.getElementById('intel-outliers');
-    if (outliersDiv && rawData.outliers) {
-        const outliers = rawData.outliers.filter(o => o.is_outlier).sort((a,b) => b.contacts_per_day - a.contacts_per_day).slice(0, 15);
+    if (outliersDiv) {
+        const outliers = dynamicOutliers.filter(o => o.is_outlier).slice(0, 15);
         outliersDiv.innerHTML = outliers.length ? `<table class="dashboard-table" style="font-size:0.82rem;"><thead><tr><th>RM</th><th>Broker</th><th>Branch</th><th style="text-align:right">Contacts</th><th style="text-align:right">Per Day</th></tr></thead><tbody>${outliers.map(o => `<tr><td>${o.rm_name}</td><td>${o.broker_family}</td><td>${o.branch}</td><td style="text-align:right">${o.contacts}</td><td style="text-align:right"><span class="freq-badge high">${o.contacts_per_day.toFixed(1)}</span></td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--text-muted);text-align:center;padding:20px;">No outliers detected.</p>';
     }
 
@@ -5145,9 +6407,7 @@ function renderIntelligenceDashboard() {
             if (d.issue) brokerMap[b].issues.add(d.issue);
             if ((d.sentiment||'').toLowerCase() === 'negative') brokerMap[b].sentiment_neg++;
         });
-        if (rawData.repeat_loops) {
-            rawData.repeat_loops.forEach(l => { if (brokerMap[l.broker_family]) brokerMap[l.broker_family].repeats += l.repeat_count; });
-        }
+        dynamicLoops.forEach(l => { if (brokerMap[l.broker_family]) brokerMap[l.broker_family].repeats += l.repeat_count; });
         const brokerScores = Object.entries(brokerMap).map(([name, d]) => {
             const repeatPenalty = Math.min(30, d.repeats * 3);
             const diversityPenalty = Math.min(20, d.issues.size * 2);
@@ -5175,21 +6435,90 @@ function renderIntelligenceDashboard() {
         data.forEach(d => {
             if (!d.date) return;
             const dt = safeParseDate(d.date);
-            if (dt) { hourGrid[dt.getDay()][dt.getHours()]++; maxVal = Math.max(maxVal, hourGrid[dt.getDay()][dt.getHours()]); }
+            if (dt) { 
+                const dayIdx = dt.getDay();
+                const hourIdx = dt.getHours();
+                hourGrid[dayIdx][hourIdx]++; 
+                maxVal = Math.max(maxVal, hourGrid[dayIdx][hourIdx]); 
+            }
         });
-        let html = '<div style="display:flex;gap:4px;flex-direction:column;">';
+
+        const getHourLabel = (h) => {
+            if (h === 0) return '12a';
+            if (h === 12) return '12p';
+            return h < 12 ? `${h}a` : `${h - 12}p`;
+        };
+
+        let html = `
+            <div style="font-family: 'Outfit', sans-serif; color: var(--text-primary);">
+                <!-- Header row with hour labels -->
+                <div style="display: flex; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                    <span style="width: 45px; flex-shrink: 0; font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Day</span>
+                    <div style="display: flex; gap: 3px; flex: 1;">
+        `;
+        for (let h = 0; h < 24; h++) {
+            html += `<span style="flex: 1; text-align: center; font-size: 0.65rem; color: var(--text-muted); font-weight: 600;">${getHourLabel(h)}</span>`;
+        }
+        html += `
+                    </div>
+                </div>
+                <!-- Heatmap grid rows -->
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+        `;
+
         dayNames.forEach((dayName, dayIdx) => {
-            html += `<div style="display:flex;align-items:center;gap:4px;"><span style="width:32px;font-size:0.72rem;color:var(--text-muted);font-weight:600;">${dayName}</span><div style="display:flex;gap:2px;flex:1;">`;
+            html += `
+                <div style="display: flex; align-items: center;">
+                    <span style="width: 45px; flex-shrink: 0; font-size: 0.78rem; color: var(--text-secondary); font-weight: 700;">${dayName}</span>
+                    <div style="display: flex; gap: 3px; flex: 1;">
+            `;
             for (let h = 0; h < 24; h++) {
                 const val = hourGrid[dayIdx][h];
-                const intensity = maxVal ? Math.round((val / maxVal) * 255) : 0;
-                const bg = val === 0 ? 'var(--bg-card)' : `rgba(139, 92, 246, ${(intensity/255).toFixed(2)})`;
-                html += `<div class="heatmap-cell" style="background:${bg};flex:1;height:24px;border-radius:3px;" title="${dayName} ${h}:00 - ${val} contacts"></div>`;
+                const pct = maxVal ? (val / maxVal) : 0;
+                
+                let bg, shadow;
+                if (val === 0) {
+                    bg = 'rgba(255, 255, 255, 0.02)';
+                    shadow = 'none';
+                } else {
+                    bg = `rgba(139, 92, 246, ${Math.max(0.12, pct * 0.95).toFixed(2)})`;
+                    shadow = pct > 0.7 ? '0 0 8px rgba(139, 92, 246, 0.4)' : 'none';
+                }
+
+                html += `
+                    <div class="heatmap-cell" 
+                         style="background: ${bg}; box-shadow: ${shadow}; flex: 1; aspect-ratio: 1; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03); cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); min-width: 10px;"
+                         title="${dayName} ${getHourLabel(h)} - ${val} contact${val === 1 ? '' : 's'}"
+                         onmouseover="this.style.transform='scale(1.35)'; this.style.zIndex='10'; this.style.boxShadow='0 4px 12px rgba(139,92,246,0.6)';"
+                         onmouseout="this.style.transform='scale(1)'; this.style.zIndex='1'; this.style.boxShadow='${shadow}';">
+                    </div>
+                `;
             }
-            html += '</div></div>';
+            html += `
+                    </div>
+                </div>
+            `;
         });
-        html += '<div style="display:flex;align-items:center;gap:4px;margin-top:4px;"><span style="width:32px;"></span><div style="display:flex;justify-content:space-between;flex:1;"><span style="font-size:0.65rem;color:var(--text-muted);">12am</span><span style="font-size:0.65rem;color:var(--text-muted);">6am</span><span style="font-size:0.65rem;color:var(--text-muted);">12pm</span><span style="font-size:0.65rem;color:var(--text-muted);">6pm</span><span style="font-size:0.65rem;color:var(--text-muted);">11pm</span></div></div>';
-        html += '</div>';
+
+        html += `
+                </div>
+                <!-- Legend and explanation -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.72rem; color: var(--text-secondary);">
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span>Less</span>
+                        <div style="display: flex; gap: 3px;">
+                            <div style="width: 10px; height: 10px; border-radius: 2px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255,255,255,0.03);"></div>
+                            <div style="width: 10px; height: 10px; border-radius: 2px; background: rgba(139, 92, 246, 0.25);"></div>
+                            <div style="width: 10px; height: 10px; border-radius: 2px; background: rgba(139, 92, 246, 0.5);"></div>
+                            <div style="width: 10px; height: 10px; border-radius: 2px; background: rgba(139, 92, 246, 0.75);"></div>
+                            <div style="width: 10px; height: 10px; border-radius: 2px; background: rgba(139, 92, 246, 1.0); box-shadow: 0 0 6px rgba(139,92,246,0.4);"></div>
+                        </div>
+                        <span>More</span>
+                    </div>
+                    <span style="font-weight: 500; font-size: 0.7rem; color: var(--text-muted);">Hover cells to view exact count</span>
+                </div>
+            </div>
+        `;
         heatmapDiv.innerHTML = html;
     }
 
@@ -5207,14 +6536,133 @@ function renderIntelligenceDashboard() {
 
     // Render Capacity Simulator Sandbox
     renderCapacitySimulator();
+
+    // Render Issue Trending Chart
+    renderIssueTrendingChart();
+}
+
+function renderIssueTrendingChart() {
+    const data = window.viewModel.interactions;
+    const canvas = document.getElementById('intel-issue-trend-chart');
+    if (!canvas) return;
+
+    if (intelCharts.issueTrend) {
+        intelCharts.issueTrend.destroy();
+        intelCharts.issueTrend = null;
+    }
+
+    const issueCounts = {};
+    data.forEach(item => {
+        const issue = item.issue || "General";
+        issueCounts[issue] = (issueCounts[issue] || 0) + 1;
+    });
+    const topIssues = Object.entries(issueCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(entry => entry[0]);
+
+    const fromD = new Date(activeFilters.dateFrom + 'T00:00:00');
+    const toD = new Date(activeFilters.dateTo + 'T23:59:59');
+    const datesArray = [];
+    let currDate = new Date(fromD.getTime());
+    while (currDate <= toD) {
+        datesArray.push(currDate.toISOString().split('T')[0]);
+        currDate.setDate(currDate.getDate() + 1);
+    }
+
+    const trends = {};
+    topIssues.forEach(issue => {
+        trends[issue] = {};
+        datesArray.forEach(d => { trends[issue][d] = 0; });
+    });
+
+    data.forEach(item => {
+        if (!item.date) return;
+        const d = item.date.substring(0, 10);
+        const issue = item.issue || "General";
+        if (trends[issue] && trends[issue][d] !== undefined) {
+            trends[issue][d]++;
+        }
+    });
+
+    const colors = [THEME_COLORS.purple, THEME_COLORS.blue, THEME_COLORS.orange];
+    const datasets = topIssues.map((issue, idx) => {
+        return {
+            label: issue,
+            data: datesArray.map(d => trends[issue][d]),
+            borderColor: colors[idx % colors.length],
+            backgroundColor: 'transparent',
+            tension: 0.35,
+            borderWidth: 2
+        };
+    });
+
+    const formatDateLabel = (dStr) => {
+        try {
+            const [year, month, day] = dStr.split('-');
+            const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+        } catch (e) { return dStr; }
+    };
+    const formattedLabels = datesArray.map(formatDateLabel);
+
+    const ctx = canvas.getContext('2d');
+    intelCharts.issueTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: formattedLabels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: THEME_COLORS.textSecondary,
+                        font: { family: 'SF Pro Text', size: 10 }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: THEME_COLORS.border },
+                    ticks: { color: THEME_COLORS.textSecondary, font: { family: 'SF Pro Text', size: 8 } }
+                },
+                y: {
+                    grid: { color: THEME_COLORS.border },
+                    ticks: { color: THEME_COLORS.textSecondary, font: { family: 'SF Pro Text', size: 9 }, stepSize: 1 }
+                }
+            }
+        }
+    });
 }
 
 // ----- MONTHLY VIEW -----
 
 function renderMonthlyView() {
     if (!rawData) return;
-    const allInteractions = rawData.support_interactions;
-    const allCalls = rawData.calls;
+    let allInteractions = rawData.support_interactions;
+    let allCalls = rawData.calls;
+
+    // Apply sidebar filters (excluding date since Monthly View is month-specific)
+    if (activeFilters.broker !== 'all') {
+        allInteractions = allInteractions.filter(d => d.broker_family === activeFilters.broker);
+        allCalls = allCalls.filter(c => c.broker_family === activeFilters.broker);
+    }
+    if (activeFilters.poc !== 'all') {
+        allInteractions = allInteractions.filter(d => d.poc === activeFilters.poc);
+        allCalls = allCalls.filter(c => c.poc === activeFilters.poc);
+    }
+    if (activeFilters.agent !== 'all') {
+        allInteractions = allInteractions.filter(d => d.agent === activeFilters.agent);
+        allCalls = allCalls.filter(c => c.agent === activeFilters.agent);
+    }
+    if (activeFilters.branch && activeFilters.branch !== 'all') {
+        allInteractions = allInteractions.filter(d => d.branch === activeFilters.branch);
+        allCalls = allCalls.filter(c => c.branch === activeFilters.branch);
+    }
 
     // Populate month/year selectors
     const monthSelect = document.getElementById('monthly-month-select');
@@ -5229,7 +6677,7 @@ function renderMonthlyView() {
     if (yearSelect && !yearSelect._populated) {
         yearSelect._populated = true;
         yearSelect.innerHTML = yearsArr.map(y => `<option value="${y}">${y}</option>`).join('');
-        yearSelect.value = yearsArr[yearsArr.length - 1];
+        yearSelect.value = yearsArr[yearsArr.length - 1] || new Date().getFullYear();
         yearSelect.addEventListener('change', () => renderMonthlyView());
     }
     if (monthSelect && !monthSelect._populated) {
@@ -5243,66 +6691,408 @@ function renderMonthlyView() {
     const selectedMonth = parseInt(monthSelect.value);
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
 
+    // Local timing format helpers
+    const formatDuration = (sec) => {
+        return formatSeconds(sec);
+    };
+
+    const formatSecondsUnit = (sec) => {
+        if (!sec || isNaN(sec)) return "0s";
+        if (sec < 60) return `${Math.round(sec)}s`;
+        return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
+    };
+
+    const formatMinutesVal = (sec) => {
+        if (!sec || isNaN(sec)) return "-";
+        if (sec < 60) return `${Math.round(sec)}s`;
+        if (sec < 3600) return `${Math.round(sec / 60)} min`;
+        return `${(sec / 3600).toFixed(1)}h`;
+    };
+
     // Build date-wise data
     const rows = [];
-    const totals = { calls: 0, wa: 0, emails: 0, total: 0, answered: 0, missed: 0, aoh: 0, ahtSum: 0, ahtCount: 0, aqtSum: 0, aqtCount: 0, rms: new Set(), brokers: new Set(), open: 0, closed: 0 };
-
     for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${selectedYear}-${String(selectedMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-        const dayInteractions = allInteractions.filter(d => d.date && d.date.substring(0,10) === dateStr);
-        const dayCalls = allCalls.filter(c => c.date && c.date.substring(0,10) === dateStr);
+        const dayInteractions = allInteractions.filter(d => {
+            if (!d.date) return false;
+            const parsed = safeParseDate(d.date);
+            return parsed && parsed.getFullYear() === selectedYear && parsed.getMonth() === selectedMonth && parsed.getDate() === day;
+        });
+        const dayCalls = allCalls.filter(c => {
+            if (!c.date) return false;
+            const parsed = safeParseDate(c.date);
+            return parsed && parsed.getFullYear() === selectedYear && parsed.getMonth() === selectedMonth && parsed.getDate() === day;
+        });
 
-        const callTix = dayInteractions.filter(d => d.type === 'Call Ticket');
-        const wa = dayInteractions.filter(d => d.type === 'WhatsApp Chat');
-        const em = dayInteractions.filter(d => d.type === 'Care Email');
-        const answered = callTix.filter(t => (t.call_status||'').toLowerCase().includes('answered')).length;
-        const missed = callTix.filter(t => (t.call_status||'').toLowerCase().includes('missed')).length;
-        const aoh = callTix.filter(t => (t.call_status||'').toLowerCase().includes('aoh')).length;
+        // Case-insensitive call_type matching
+        const inboundCalls = dayCalls.filter(c => (c.call_type || '').toLowerCase() === 'inbound' || (!c.call_type));
+        const progressiveCalls = dayCalls.filter(c => (c.call_type || '').toLowerCase().includes('progressive') || (c.call_type || '').toLowerCase().includes('callback'));
 
-        const answeredCalls = dayCalls.filter(c => (c.stage||'').toLowerCase() === 'answered' || (c.stage||'').toLowerCase() === 'connected');
-        const aht = answeredCalls.length ? Math.round(answeredCalls.reduce((s,c) => s + (Number(c.duration)||0), 0) / answeredCalls.length) : 0;
-        const aqt = dayCalls.length ? Math.round(dayCalls.reduce((s,c) => s + (Number(c.queue_time)||0), 0) / dayCalls.length) : 0;
+        // Total Calls
+        const totalCallsCount = dayCalls.length;
+        const callsConnected = dayCalls.filter(c => (c.stage || '').toLowerCase() === 'answered' || (c.stage || '').toLowerCase() === 'connected').length;
 
-        const uniqueRMs = new Set(); const uniqueBrokers = new Set();
-        dayInteractions.forEach(d => { if (d.rm_name && d.rm_name !== '-') uniqueRMs.add(d.rm_name); if (d.broker_family && d.broker_family !== 'NA') uniqueBrokers.add(d.broker_family); });
+        const inboundConnected = inboundCalls.filter(c => (c.stage || '').toLowerCase() === 'answered' || (c.stage || '').toLowerCase() === 'connected');
+        const inboundUnanswered = inboundCalls.filter(c => (c.stage || '').toLowerCase() === 'unanswered' || (c.stage || '').toLowerCase() === 'missed' || (c.stage || '').toLowerCase() === 'abandoned');
+        const progressiveAnswered = progressiveCalls.filter(c => (c.stage || '').toLowerCase() === 'answered' || (c.stage || '').toLowerCase() === 'connected');
 
-        const openCount = dayInteractions.filter(d => ['new','open','in progress'].includes((d.stage||'').toLowerCase())).length;
-        const closedCount = dayInteractions.filter(d => (d.stage||'').toLowerCase() === 'closed').length;
+        const inboundAoh = inboundCalls.filter(c => (c.sub_issue || '').toLowerCase() === 'aoh');
+        const inboundAbandonedReal = inboundUnanswered.filter(c => (c.sub_issue || '').toLowerCase() !== 'aoh');
+        const callsAbandoned = inboundAbandonedReal.length;
 
-        const total = callTix.length + wa.length + em.length;
-        rows.push({ dateStr, calls: callTix.length, wa: wa.length, emails: em.length, total, answered, missed, aoh, aht, aqt, rms: uniqueRMs.size, brokers: uniqueBrokers.size, open: openCount, closed: closedCount });
+        // Inbound
+        const inboundCount = inboundCalls.length;
+        const inboundAohCount = inboundAoh.length;
+        const inboundAbandonedCount = inboundAbandonedReal.length;
+        const uniqueAbandonedSet = new Set(inboundAbandonedReal.map(c => c.caller_no));
+        const uniqueAbandonedCount = uniqueAbandonedSet.size;
 
-        totals.calls += callTix.length; totals.wa += wa.length; totals.emails += em.length; totals.total += total;
-        totals.answered += answered; totals.missed += missed; totals.aoh += aoh;
-        if (aht > 0) { totals.ahtSum += aht * answeredCalls.length; totals.ahtCount += answeredCalls.length; }
-        if (aqt > 0) { totals.aqtSum += aqt * dayCalls.length; totals.aqtCount += dayCalls.length; }
-        uniqueRMs.forEach(r => totals.rms.add(r)); uniqueBrokers.forEach(b => totals.brokers.add(b));
-        totals.open += openCount; totals.closed += closedCount;
+        let inboundAbandonedAgent = 0;
+        let inboundAbandonedUser = 0;
+        let inboundAbandonedOther = 0;
+
+        inboundAbandonedReal.forEach(c => {
+            const ads = (c.agent_dial_status || '').toLowerCase();
+            const ds = (c.dial_status || '').toLowerCase();
+            const ev = (c.call_event || '').toLowerCase();
+            if (ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded')) {
+                inboundAbandonedAgent++;
+            } else if (ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue') {
+                inboundAbandonedUser++;
+            } else {
+                inboundAbandonedOther++;
+            }
+        });
+
+        const inboundAbandonedPct = inboundCount > 0 ? (inboundAbandonedCount / inboundCount * 100).toFixed(1) : '0.0';
+
+        // AHT / Timing
+        // AHT = talk time (actual handling time, not total call duration which includes ring time)
+        const inboundAnsDurations = inboundConnected.map(c => Number(c.talk_time) || Number(c.duration) || 0);
+        const inboundTalkTimes = inboundConnected.map(c => Number(c.talk_time) || 0);
+        const inboundHoldTimes = inboundConnected.map(c => Number(c.hold_time) || 0);
+        const inboundQueueAns = inboundConnected.map(c => Number(c.queue_time) || 0);
+        const inboundQueueUnans = inboundAbandonedReal.map(c => Number(c.queue_time) || 0);
+
+        const getAverageVal = arr => arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : 0;
+        const getMedianVal = arr => {
+            if (!arr.length) return 0;
+            const sorted = [...arr].sort((a,b)=>a-b);
+            const mid = Math.floor(sorted.length/2);
+            return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
+        };
+        const getPercentile90Val = arr => {
+            if (!arr.length) return 0;
+            const sorted = [...arr].sort((a,b)=>a-b);
+            const idx = Math.floor(sorted.length * 0.9);
+            return sorted[Math.min(idx, sorted.length - 1)];
+        };
+
+        const avgAht = getAverageVal(inboundAnsDurations);
+        const medianAht = getMedianVal(inboundAnsDurations);
+        const p90Aht = getPercentile90Val(inboundAnsDurations);
+        const avgTalk = getAverageVal(inboundTalkTimes);
+        const avgHold = getAverageVal(inboundHoldTimes);
+        const avgQueueAns = getAverageVal(inboundQueueAns);
+        const avgQueueUnans = getAverageVal(inboundQueueUnans);
+
+        // Progressive
+        const progAttempted = progressiveCalls.length;
+        const progAnsweredCount = progressiveAnswered.length;
+        const progUnanswered = progressiveCalls.filter(c => (c.stage || '').toLowerCase() !== 'answered' && (c.stage || '').toLowerCase() !== 'connected');
+        
+        let progUnansAgent = 0;
+        let progUnansUser = 0;
+        let progUnansOther = 0;
+
+        progUnanswered.forEach(c => {
+            const ads = (c.agent_dial_status || '').toLowerCase();
+            const ds = (c.dial_status || '').toLowerCase();
+            const ev = (c.call_event || '').toLowerCase();
+            if (ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded')) {
+                progUnansAgent++;
+            } else if (ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue') {
+                progUnansUser++;
+            } else {
+                progUnansOther++;
+            }
+        });
+
+        const progAnsDurations = progressiveAnswered.map(c => Number(c.duration) || 0);
+        const progAvgAht = getAverageVal(progAnsDurations);
+
+        // WhatsApp
+        const waChats = dayInteractions.filter(d => d.type === 'WhatsApp Chat');
+        const waCount = waChats.length;
+        const waFrtItems = waChats.filter(d => d.sla_frt && !isNaN(d.sla_frt));
+        const waAvgFrt = waFrtItems.length ? waFrtItems.reduce((s,d) => s + d.sla_frt, 0) / waFrtItems.length : 0;
+        const waResItems = waChats.filter(d => d.sla_rt && !isNaN(d.sla_rt));
+        const waAvgRes = waResItems.length ? waResItems.reduce((s,d) => s + d.sla_rt, 0) / waResItems.length : 0;
+
+        // Care Emails
+        const emailTickets = dayInteractions.filter(d => d.type === 'Care Email');
+        const emailCount = emailTickets.length;
+        const emailFrtItems = emailTickets.filter(d => d.sla_frt && !isNaN(d.sla_frt));
+        const emailAvgFrt = emailFrtItems.length ? emailFrtItems.reduce((s,d) => s + d.sla_frt, 0) / emailFrtItems.length : 0;
+
+        rows.push({
+            dateStr,
+            day,
+            calls: totalCallsCount,
+            connected: callsConnected,
+            abandoned: callsAbandoned,
+            inbound: inboundCount,
+            inbound_aoh: inboundAohCount,
+            inbound_abandoned: inboundAbandonedCount,
+            inbound_unique_abandoned: uniqueAbandonedCount,
+            inbound_abandoned_agent: inboundAbandonedAgent,
+            inbound_abandoned_user: inboundAbandonedUser,
+            inbound_abandoned_other: inboundAbandonedOther,
+            inbound_abandoned_pct: parseFloat(inboundAbandonedPct),
+            avg_aht: avgAht,
+            median_aht: medianAht,
+            p90_aht: p90Aht,
+            avg_talk: avgTalk,
+            avg_hold: avgHold,
+            avg_queue_ans: avgQueueAns,
+            avg_queue_unans: avgQueueUnans,
+            prog_attempted: progAttempted,
+            prog_answered: progAnsweredCount,
+            prog_unans_agent: progUnansAgent,
+            prog_unans_user: progUnansUser,
+            prog_unans_other: progUnansOther,
+            prog_avg_aht: progAvgAht,
+            wa_chats: waCount,
+            wa_frt: waAvgFrt,
+            wa_res: waAvgRes,
+            email_tickets: emailCount,
+            email_frt: emailAvgFrt
+        });
     }
 
-    const tbody = document.getElementById('monthly-table-body');
-    tbody.innerHTML = rows.map(r => `
-        <tr class="clickable-row" data-date="${r.dateStr}">
-            <td>${r.dateStr}</td><td>${r.calls}</td><td>${r.wa}</td><td>${r.emails}</td><td><strong>${r.total}</strong></td>
-            <td>${r.answered}</td><td>${r.missed}</td><td>${r.aoh}</td>
-            <td>${formatSecondsCompact(r.aht)}</td><td>${formatSecondsCompact(r.aqt)}</td>
-            <td>${r.rms}</td><td>${r.brokers}</td><td>${r.open}</td><td>${r.closed}</td>
-        </tr>
-    `).join('') + `
-        <tr class="aggregate-row">
-            <td>TOTAL / AVG</td><td>${totals.calls}</td><td>${totals.wa}</td><td>${totals.emails}</td><td><strong>${totals.total}</strong></td>
-            <td>${totals.answered}</td><td>${totals.missed}</td><td>${totals.aoh}</td>
-            <td>${formatSecondsCompact(totals.ahtCount ? Math.round(totals.ahtSum/totals.ahtCount) : 0)}</td>
-            <td>${formatSecondsCompact(totals.aqtCount ? Math.round(totals.aqtSum/totals.aqtCount) : 0)}</td>
-            <td>${totals.rms.size}</td><td>${totals.brokers.size}</td><td>${totals.open}</td><td>${totals.closed}</td>
-        </tr>
-    `;
+    // Build monthly aggregates
+    const monthKey = `${selectedYear}-${String(selectedMonth+1).padStart(2,'0')}`;
+    const monthCalls = allCalls.filter(c => {
+        if (!c.date) return false;
+        const parsed = safeParseDate(c.date);
+        return parsed && parsed.getFullYear() === selectedYear && parsed.getMonth() === selectedMonth;
+    });
+    const monthInteractions = allInteractions.filter(i => {
+        if (!i.date) return false;
+        const parsed = safeParseDate(i.date);
+        return parsed && parsed.getFullYear() === selectedYear && parsed.getMonth() === selectedMonth;
+    });
+    
+    // Inbound month aggregates
+    // Case-insensitive call_type matching for monthly aggregates
+    const mInbound = monthCalls.filter(c => (c.call_type || '').toLowerCase() === 'inbound' || (!c.call_type));
+    const mInboundConnected = mInbound.filter(c => (c.stage || '').toLowerCase() === 'answered' || (c.stage || '').toLowerCase() === 'connected');
+    const mInboundUnanswered = mInbound.filter(c => (c.stage || '').toLowerCase() === 'unanswered' || (c.stage || '').toLowerCase() === 'missed' || (c.stage || '').toLowerCase() === 'abandoned');
+    const mInboundAoh = mInbound.filter(c => (c.sub_issue || '').toLowerCase() === 'aoh');
+    const mInboundAbandonedReal = mInboundUnanswered.filter(c => (c.sub_issue || '').toLowerCase() !== 'aoh');
 
-    // Click handler for date rows
-    tbody.querySelectorAll('.clickable-row').forEach(row => {
-        row.addEventListener('click', () => {
-            const date = row.getAttribute('data-date');
-            const dayData = rawData.support_interactions.filter(d => d.date && d.date.substring(0,10) === date);
+    // Progressive month aggregates
+    const mProg = monthCalls.filter(c => (c.call_type || '').toLowerCase().includes('progressive') || (c.call_type || '').toLowerCase().includes('callback'));
+    const mProgAnswered = mProg.filter(c => (c.stage || '').toLowerCase() === 'answered' || (c.stage || '').toLowerCase() === 'connected');
+
+    // WhatsApp / Emails month aggregates
+    const mWa = monthInteractions.filter(d => d.type === 'WhatsApp Chat');
+    const mEmail = monthInteractions.filter(d => d.type === 'Care Email');
+
+    const monthAggregates = {
+        calls: monthCalls.length,
+        connected: monthCalls.filter(c => (c.stage || '').toLowerCase() === 'answered' || (c.stage || '').toLowerCase() === 'connected').length,
+        abandoned: mInboundAbandonedReal.length,
+        inbound: mInbound.length,
+        inbound_aoh: mInboundAoh.length,
+        inbound_abandoned: mInboundAbandonedReal.length,
+        inbound_unique_abandoned: new Set(mInboundAbandonedReal.map(c => c.caller_no)).size,
+        inbound_abandoned_agent: mInboundAbandonedReal.filter(c => {
+            const ads = (c.agent_dial_status || '').toLowerCase();
+            return ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded');
+        }).length,
+        inbound_abandoned_user: mInboundAbandonedReal.filter(c => {
+            const ads = (c.agent_dial_status || '').toLowerCase();
+            const ds = (c.dial_status || '').toLowerCase();
+            const ev = (c.call_event || '').toLowerCase();
+            return ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue';
+        }).length,
+        inbound_abandoned_other: mInboundAbandonedReal.filter(c => {
+            const ads = (c.agent_dial_status || '').toLowerCase();
+            const ds = (c.dial_status || '').toLowerCase();
+            const ev = (c.call_event || '').toLowerCase();
+            const isAgent = ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded');
+            const isUser = ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue';
+            return !isAgent && !isUser;
+        }).length,
+        inbound_abandoned_pct: mInbound.length ? (mInboundAbandonedReal.length / mInbound.length * 100).toFixed(1) + '%' : '0.0%',
+        // AHT uses talk_time (actual handling), fallback to duration
+        avg_aht: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.talk_time)||Number(c.duration)||0),0)/mInboundConnected.length) : 0,
+        median_aht: (() => {
+            const durs = mInboundConnected.map(c => Number(c.talk_time)||Number(c.duration)||0);
+            if(!durs.length) return 0;
+            durs.sort((a,b)=>a-b);
+            const mid = Math.floor(durs.length/2);
+            return durs.length % 2 !== 0 ? durs[mid] : (durs[mid-1] + durs[mid]) / 2;
+        })(),
+        p90_aht: (() => {
+            const durs = mInboundConnected.map(c => Number(c.talk_time)||Number(c.duration)||0);
+            if(!durs.length) return 0;
+            durs.sort((a,b)=>a-b);
+            const idx = Math.floor(durs.length * 0.9);
+            return durs[Math.min(idx, durs.length-1)];
+        })(),
+        avg_talk: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.talk_time)||0),0)/mInboundConnected.length) : 0,
+        avg_hold: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.hold_time)||0),0)/mInboundConnected.length) : 0,
+        avg_queue_ans: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.queue_time)||0),0)/mInboundConnected.length) : 0,
+        avg_queue_unans: mInboundAbandonedReal.length ? Math.round(mInboundAbandonedReal.reduce((s,c)=>s+(Number(c.queue_time)||0),0)/mInboundAbandonedReal.length) : 0,
+        prog_attempted: mProg.length,
+        prog_answered: mProgAnswered.length,
+        prog_unans_agent: mProg.filter(c => (c.stage || '').toLowerCase() !== 'answered' && (c.stage || '').toLowerCase() !== 'connected').filter(c => {
+            const ads = (c.agent_dial_status || '').toLowerCase();
+            return ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded');
+        }).length,
+        prog_unans_user: mProg.filter(c => (c.stage || '').toLowerCase() !== 'answered' && (c.stage || '').toLowerCase() !== 'connected').filter(c => {
+            const ads = (c.agent_dial_status || '').toLowerCase();
+            const ds = (c.dial_status || '').toLowerCase();
+            const ev = (c.call_event || '').toLowerCase();
+            return ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue';
+        }).length,
+        prog_unans_other: mProg.filter(c => (c.stage || '').toLowerCase() !== 'answered' && (c.stage || '').toLowerCase() !== 'connected').filter(c => {
+            const ads = (c.agent_dial_status || '').toLowerCase();
+            const ds = (c.dial_status || '').toLowerCase();
+            const ev = (c.call_event || '').toLowerCase();
+            const isAgent = ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded');
+            const isUser = ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue';
+            return !isAgent && !isUser;
+        }).length,
+        prog_avg_aht: mProgAnswered.length ? Math.round(mProgAnswered.reduce((s,c)=>s+(Number(c.duration)||0),0)/mProgAnswered.length) : 0,
+        wa_chats: mWa.length,
+        wa_frt: (() => {
+            const items = mWa.filter(d => d.sla_frt && !isNaN(d.sla_frt));
+            return items.length ? Math.round(items.reduce((s,d)=>s+d.sla_frt,0)/items.length) : 0;
+        })(),
+        wa_res: (() => {
+            const items = mWa.filter(d => d.sla_rt && !isNaN(d.sla_rt));
+            return items.length ? Math.round(items.reduce((s,d)=>s+d.sla_rt,0)/items.length) : 0;
+        })(),
+        email_tickets: mEmail.length,
+        email_frt: (() => {
+            const items = mEmail.filter(d => d.sla_frt && !isNaN(d.sla_frt));
+            return items.length ? Math.round(items.reduce((s,d)=>s+d.sla_frt,0)/items.length) : 0;
+        })()
+    };
+
+    // 1. Build the Thead (headers): first cell "Metric / Date", then dates (1, 2, ..., N), last cell "Total / Avg"
+    const thead = document.getElementById('monthly-table-head');
+    let headerHtml = `<tr><th>Metric / Date</th>`;
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${selectedYear}-${String(selectedMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        headerHtml += `<th class="clickable-date-header" data-date="${dateStr}" style="cursor: pointer; text-decoration: underline;" title="Click to view deep dive for ${dateStr}">${day}</th>`;
+    }
+    headerHtml += `<th>Total / Avg</th></tr>`;
+    thead.innerHTML = headerHtml;
+
+    // 2. Build the Tbody (rows representing metrics)
+    const metricRows = [
+        { label: 'TOTAL CALLS', isHeader: true },
+        { label: 'Inbound + Progressive', key: 'calls', isTime: false, aggregateType: 'val' },
+        { label: 'Calls Connected', key: 'connected', isTime: false, aggregateType: 'val', cls: 'text-green' },
+        { label: 'Calls Abandoned', key: 'abandoned', isTime: false, aggregateType: 'val', cls: 'text-red' },
+        
+        { label: 'INBOUND', isHeader: true },
+        { label: 'Inbound Calls', key: 'inbound', isTime: false, aggregateType: 'val' },
+        { label: 'AOH Calls', key: 'inbound_aoh', isTime: false, aggregateType: 'val' },
+        { label: 'Abandoned', key: 'inbound_abandoned', isTime: false, aggregateType: 'val' },
+        { label: 'Unique Abandoned', key: 'inbound_unique_abandoned', isTime: false, aggregateType: 'val' },
+        { label: 'Abandoned by Agent', key: 'inbound_abandoned_agent', isTime: false, aggregateType: 'val' },
+        { label: 'Abandoned by User', key: 'inbound_abandoned_user', isTime: false, aggregateType: 'val' },
+        { label: 'Abandoned by Other', key: 'inbound_abandoned_other', isTime: false, aggregateType: 'val' },
+        { label: 'Abandoned %', key: 'inbound_abandoned_pct', isPercent: true, aggregateType: 'pct' },
+        
+        { label: 'AHT / TIMING', isHeader: true },
+        { label: 'Avg Handling Time (AHT)', key: 'avg_aht', isTime: true, aggregateType: 'time' },
+        { label: 'Median AHT', key: 'median_aht', isTime: true, aggregateType: 'time' },
+        { label: '90th Percentile AHT', key: 'p90_aht', isTime: true, aggregateType: 'time' },
+        { label: 'Avg Talk Time', key: 'avg_talk', isTime: true, aggregateType: 'time' },
+        { label: 'Avg Hold Time', key: 'avg_hold', isTime: true, aggregateType: 'time' },
+        { label: 'Avg Queue Time (Answered)', key: 'avg_queue_ans', isTime: true, aggregateType: 'time' },
+        { label: 'Avg Queue Time (Unanswered)', key: 'avg_queue_unans', isTime: true, aggregateType: 'time' },
+        
+        { label: 'PROGRESSIVE', isHeader: true },
+        { label: 'Progressive Attempted', key: 'prog_attempted', isTime: false, aggregateType: 'val' },
+        { label: 'PG Answered', key: 'prog_answered', isTime: false, aggregateType: 'val' },
+        { label: 'PG Unanswered (Agent)', key: 'prog_unans_agent', isTime: false, aggregateType: 'val' },
+        { label: 'PG Unanswered (User)', key: 'prog_unans_user', isTime: false, aggregateType: 'val' },
+        { label: 'PG Unanswered (Other)', key: 'prog_unans_other', isTime: false, aggregateType: 'val' },
+        { label: 'Progressive Avg AHT', key: 'prog_avg_aht', isTime: true, aggregateType: 'time' },
+        
+        { label: 'WHATSAPP', isHeader: true },
+        { label: 'Total Chats', key: 'wa_chats', isTime: false, aggregateType: 'val' },
+        { label: 'Avg FRT', key: 'wa_frt', isTime: false, isMinute: true, aggregateType: 'min' },
+        { label: 'Avg Resolution', key: 'wa_res', isTime: false, isMinute: true, aggregateType: 'min' },
+        
+        { label: 'CARE EMAILS', isHeader: true },
+        { label: 'Total Tickets', key: 'email_tickets', isTime: false, aggregateType: 'val' },
+        { label: 'Avg FRT', key: 'email_frt', isTime: false, isMinute: true, aggregateType: 'min' }
+    ];
+
+    const tbody = document.getElementById('monthly-table-body');
+    let bodyHtml = '';
+
+    metricRows.forEach(metric => {
+        if (metric.isHeader) {
+            bodyHtml += `<tr style="background: var(--bg-card); font-weight: 800; color: var(--purple);">`;
+            bodyHtml += `<td colspan="${daysInMonth + 2}" style="text-align: left; padding: 12px 16px; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px;">${metric.label}</td>`;
+            bodyHtml += `</tr>`;
+            return;
+        }
+
+        const isBoldStyle = metric.isBold ? 'font-weight: 800; color: var(--purple);' : '';
+        const aggregateRowClass = metric.isBold ? 'class="aggregate-row"' : '';
+        bodyHtml += `<tr ${aggregateRowClass} style="${isBoldStyle}">`;
+        bodyHtml += `<td>${metric.label}</td>`;
+
+        // Daily values
+        rows.forEach(r => {
+            let val = r[metric.key];
+            if (metric.isTime) {
+                // All time metrics rendered as hh:mm:ss for consistency
+                bodyHtml += `<td>${formatDuration(val)}</td>`;
+            } else if (metric.isMinute) {
+                bodyHtml += `<td>${formatMinutesVal(val)}</td>`;
+            } else if (metric.isPercent) {
+                // val is a plain number (percentage), add % sign
+                bodyHtml += `<td>${typeof val === 'string' ? val : val + '%'}</td>`;
+            } else {
+                bodyHtml += `<td>${val !== undefined && val !== null ? val.toLocaleString() : 0}</td>`;
+            }
+        });
+
+        // Aggregate value (last column)
+        let aggValHtml = '';
+        const aggVal = monthAggregates[metric.key];
+        if (metric.aggregateType === 'val') {
+            aggValHtml = `${typeof aggVal === 'number' ? aggVal.toLocaleString() : (aggVal || 0)}`;
+        } else if (metric.aggregateType === 'pct') {
+            // aggVal already contains '%' from monthAggregates computation
+            aggValHtml = `${aggVal}`;
+        } else if (metric.aggregateType === 'time') {
+            // All time aggregates as hh:mm:ss
+            aggValHtml = `${formatDuration(aggVal)}`;
+        } else if (metric.aggregateType === 'min') {
+            aggValHtml = `${formatMinutesVal(aggVal)}`;
+        }
+        
+        bodyHtml += `<td style="font-weight: 800; color: var(--purple);">${aggValHtml}</td>`;
+        bodyHtml += `</tr>`;
+    });
+    tbody.innerHTML = bodyHtml;
+
+    // Click handler for date headers
+    thead.querySelectorAll('.clickable-date-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const date = header.getAttribute('data-date');
             openMetricDeepDiveModal('all', `Interactions on ${date}`);
         });
     });
@@ -5348,7 +7138,17 @@ function renderAgentPerformance() {
 
         // QA Score
         const qaItems = agentData.filter(d => d.qa_overall && !isNaN(d.qa_overall));
-        const avgQA = qaItems.length ? (qaItems.reduce((s,d) => s + Number(d.qa_overall), 0) / qaItems.length).toFixed(1) : '-';
+        let sumQA = 0;
+        let countQA = 0;
+        qaItems.forEach(d => {
+            const v = Number(d.qa_overall);
+            if (!isNaN(v)) {
+                const pct = v > 45 ? v : (v / 45) * 100;
+                sumQA += pct;
+                countQA++;
+            }
+        });
+        const avgQA = countQA > 0 ? Math.round(sumQA / countQA) : '-';
 
         // SLA
         const frtItems = agentData.filter(d => d.sla_frt_status);
@@ -5359,7 +7159,7 @@ function renderAgentPerformance() {
         // Breaks from scorecards
         const scorecard = (rawData.agent_scorecards || []).find(s => s.agent_name === agent);
         const breakTime = scorecard ? scorecard.total_breaks_sec : 0;
-        const occupancy = scorecard ? (scorecard.occupancy_rate * 100).toFixed(1) : '-';
+        const occupancy = scorecard ? Number(scorecard.occupancy_rate || 0).toFixed(1) : '-';
 
         agentMetrics[agent] = { calls: agentCalls.length, wa: agentWA.length, emails: agentEmails.length, total: agentData.length, avgTalkTime, avgQA, frtMet, rtMet, breakTime, occupancy };
     });
@@ -5385,7 +7185,7 @@ function renderAgentPerformance() {
             { label: 'Care Emails', value: m.emails || 0 },
             { label: 'Total', value: m.total || 0 },
             { label: 'Avg Talk Time', value: formatSecondsCompact(m.avgTalkTime) },
-            { label: 'QA Score', value: m.avgQA + '/45' },
+            { label: 'QA Score', value: m.avgQA !== '-' ? m.avgQA + '%' : '-' },
             { label: 'FRT Met', value: m.frtMet + '%' },
             { label: 'RT Met', value: m.rtMet + '%' },
             { label: 'Break Time', value: formatSecondsCompact(m.breakTime) },
@@ -5400,7 +7200,7 @@ function renderAgentPerformance() {
         const isHighlight = agent === selectedAgent;
         return `<tr class="clickable-row ${isHighlight ? 'highlight' : ''}" data-agent="${agent}" style="cursor:pointer;">
             <td>${agent}</td><td>${m.calls}</td><td>${m.wa}</td><td>${m.emails}</td><td><strong>${m.total}</strong></td>
-            <td>${formatSecondsCompact(m.avgTalkTime)}</td><td>${m.avgQA}/45</td>
+            <td>${formatSecondsCompact(m.avgTalkTime)}</td><td>${m.avgQA !== '-' ? m.avgQA + '%' : '-'}</td>
             <td>${m.frtMet}%</td><td>${m.rtMet}%</td>
             <td>${formatSecondsCompact(m.breakTime)}</td><td>${m.occupancy}%</td>
         </tr>`;
@@ -5438,7 +7238,72 @@ function renderAgentPerformance() {
     renderAgentQACoaching(selectedAgent);
 }
 
-// ----- TICKETS & CHATS VIEW -----
+const STATUS_CONFIGS = {
+    'all': [
+        { label: 'All', value: 'all' },
+        { label: 'New', value: 'new' },
+        { label: 'Open', value: 'open' },
+        { label: 'In Progress', value: 'in_progress' },
+        { label: 'Resolved', value: 'resolved' },
+        { label: 'Closed', value: 'closed' },
+        { label: 'Snoozed', value: 'snoozed' },
+        { label: 'Queued', value: 'queued' },
+        { label: 'Work in progress', value: 'work_in_progress' },
+        { label: 'Awaiting customer response', value: 'awaiting_customer_response' },
+        { label: 'Awaiting partner response', value: 'awaiting_partner_response' },
+        { label: 'Cancelled', value: 'cancelled' },
+        { label: 'Needs Response', value: 'needs_response' },
+        { label: 'Hold', value: 'hold' },
+        { label: 'Waiting for user', value: 'waiting_for_user' },
+        { label: 'Archived', value: 'archived' }
+    ],
+    'Call Ticket': [
+        { label: 'All', value: 'all' },
+        { label: 'Queued', value: 'queued' },
+        { label: 'Work in progress', value: 'work_in_progress' },
+        { label: 'Awaiting customer response', value: 'awaiting_customer_response' },
+        { label: 'Awaiting partner response', value: 'awaiting_partner_response' },
+        { label: 'Resolved', value: 'resolved' },
+        { label: 'Cancelled', value: 'cancelled' }
+    ],
+    'WhatsApp Chat': [
+        { label: 'All', value: 'all' },
+        { label: 'New', value: 'new' },
+        { label: 'Needs Response', value: 'needs_response' },
+        { label: 'Hold', value: 'hold' },
+        { label: 'Waiting for user', value: 'waiting_for_user' },
+        { label: 'Resolved', value: 'resolved' },
+        { label: 'Archived', value: 'archived' }
+    ],
+    'Care Email': [
+        { label: 'All', value: 'all' },
+        { label: 'New', value: 'new' },
+        { label: 'Open', value: 'open' },
+        { label: 'In Progress', value: 'in_progress' },
+        { label: 'Resolved', value: 'resolved' },
+        { label: 'Closed', value: 'closed' },
+        { label: 'Snoozed', value: 'snoozed' }
+    ]
+};
+
+const STATUS_COLORS = {
+    'all': 'var(--purple)',
+    'new': '#ec4899',
+    'open': '#f97316',
+    'in_progress': '#0284c7',
+    'resolved': '#8b5cf6',
+    'closed': '#22c55e',
+    'snoozed': '#6b7280',
+    'queued': '#3b82f6',
+    'work_in_progress': '#0284c7',
+    'awaiting_customer_response': '#f59e0b',
+    'awaiting_partner_response': '#a855f7',
+    'cancelled': '#ef4444',
+    'needs_response': '#f43f5e',
+    'hold': '#d97706',
+    'waiting_for_user': '#06b6d4',
+    'archived': '#94a3b8'
+};
 
 let ticketsState = { statusFilter: 'all', channelFilter: 'all', search: '', page: 1, perPage: 50, sortField: 'date', sortDir: -1 };
 
@@ -5447,13 +7312,27 @@ function renderTicketsChatsView() {
     // Use ALL interactions (not filtered by date for browsing), but respect global date filter
     let allData = window.viewModel.interactions.slice();
 
-    // Setup event listeners once
-    const statusPills = document.getElementById('tickets-status-pills');
-    if (statusPills && !statusPills._bound) {
-        statusPills._bound = true;
-        statusPills.querySelectorAll('.status-pill').forEach(pill => {
+    // Setup event listeners & build dynamic status pills
+    const statusPillsContainer = document.getElementById('tickets-status-pills');
+    if (statusPillsContainer) {
+        const activeChan = ticketsState.channelFilter;
+        const config = STATUS_CONFIGS[activeChan] || STATUS_CONFIGS['all'];
+        
+        // Ensure that the active status filter is still valid for this channel
+        const isValid = config.some(opt => opt.value === ticketsState.statusFilter);
+        if (!isValid) {
+            ticketsState.statusFilter = 'all';
+        }
+        
+        statusPillsContainer.innerHTML = config.map(opt => {
+            const isActive = opt.value === ticketsState.statusFilter ? 'active' : '';
+            return `<button class="status-pill ${isActive}" data-status="${opt.value}">${opt.label}</button>`;
+        }).join('');
+        
+        // Bind event listeners to new pills
+        statusPillsContainer.querySelectorAll('.status-pill').forEach(pill => {
             pill.addEventListener('click', () => {
-                statusPills.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
+                statusPillsContainer.querySelectorAll('.status-pill').forEach(p => p.classList.remove('active'));
                 pill.classList.add('active');
                 ticketsState.statusFilter = pill.getAttribute('data-status');
                 ticketsState.page = 1;
@@ -5461,6 +7340,7 @@ function renderTicketsChatsView() {
             });
         });
     }
+
     const channelPills = document.getElementById('tickets-channel-pills');
     if (channelPills && !channelPills._bound) {
         channelPills._bound = true;
@@ -5500,18 +7380,223 @@ function renderTicketsChatsView() {
         exportBtn.addEventListener('click', () => exportTableAsCSV('tickets-data-table', 'tickets_export.csv'));
     }
 
-    // Apply filters
+    // Apply channel filter
     let filtered = allData;
+    if (ticketsState.channelFilter !== 'all') {
+        filtered = filtered.filter(d => d.type === ticketsState.channelFilter);
+    }
+
+    // Apply stage/status filter
     if (ticketsState.statusFilter !== 'all') {
         filtered = filtered.filter(d => {
             const stage = (d.stage || '').toLowerCase().replace(/\s+/g, '_');
             return stage === ticketsState.statusFilter || stage.includes(ticketsState.statusFilter);
         });
     }
-    if (ticketsState.channelFilter !== 'all') {
-        filtered = filtered.filter(d => d.type === ticketsState.channelFilter);
+
+    // Apply search filter
+    if (ticketsState.search) {
+        const query = ticketsState.search.trim().toLowerCase();
+        filtered = filtered.filter(d => {
+            return (
+                (d.id && String(d.id).toLowerCase().includes(query)) ||
+                (d.rm_name && String(d.rm_name).toLowerCase().includes(query)) ||
+                (d.broker_family && String(d.broker_family).toLowerCase().includes(query)) ||
+                (d.branch && String(d.branch).toLowerCase().includes(query)) ||
+                (d.issue && String(d.issue).toLowerCase().includes(query)) ||
+                (d.agent && String(d.agent).toLowerCase().includes(query)) ||
+                (d.stage && String(d.stage).toLowerCase().includes(query))
+            );
+        });
     }
-    // NOTE: renderTicketsChatsView continues in next append block (search, sort, pagination, table render)
+
+    // Update sort indicators in headers
+    if (table) {
+        table.querySelectorAll('th[data-sort]').forEach(th => {
+            const indicator = th.querySelector('.sort-indicator');
+            if (indicator) {
+                const field = th.getAttribute('data-sort');
+                if (ticketsState.sortField === field) {
+                    indicator.innerText = ticketsState.sortDir === 1 ? ' ▲' : ' ▼';
+                } else {
+                    indicator.innerText = '';
+                }
+            }
+        });
+    }
+
+    // Sort data
+    filtered.sort((a, b) => {
+        let valA = a[ticketsState.sortField];
+        let valB = b[ticketsState.sortField];
+        
+        // Handle dates
+        if (ticketsState.sortField === 'date') {
+            const timeA = valA ? new Date(valA).getTime() : 0;
+            const timeB = valB ? new Date(valB).getTime() : 0;
+            return (timeA - timeB) * ticketsState.sortDir;
+        }
+
+        // Standard string/number comparison
+        if (valA === undefined || valA === null) valA = '';
+        if (valB === undefined || valB === null) valB = '';
+        
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+
+        if (valA < valB) return -1 * ticketsState.sortDir;
+        if (valA > valB) return 1 * ticketsState.sortDir;
+        return 0;
+    });
+
+    // Populate stats bar based on the full active filter set (before stage filter to show options)
+    let statsData = allData;
+    if (ticketsState.channelFilter !== 'all') {
+        statsData = statsData.filter(d => d.type === ticketsState.channelFilter);
+    }
+    const activeChan = ticketsState.channelFilter;
+    const config = STATUS_CONFIGS[activeChan] || STATUS_CONFIGS['all'];
+
+    const counts = { all: statsData.length };
+    config.forEach(opt => {
+        if (opt.value !== 'all') counts[opt.value] = 0;
+    });
+
+    statsData.forEach(d => {
+        const stage = (d.stage || '').toLowerCase().replace(/\s+/g, '_');
+        let matchedKey = null;
+        config.forEach(opt => {
+            if (opt.value === 'all') return;
+            if (stage === opt.value || stage.replace('-', '_') === opt.value) {
+                matchedKey = opt.value;
+            } else if (stage.includes(opt.value) || opt.value.includes(stage)) {
+                matchedKey = opt.value;
+            }
+        });
+        if (matchedKey && counts[matchedKey] !== undefined) {
+            counts[matchedKey]++;
+        }
+    });
+
+    const statsBar = document.getElementById('tickets-stats-bar');
+    if (statsBar) {
+        let barHtml = `<span class="tickets-stat-badge">Total: ${counts.all}</span>`;
+        config.forEach(opt => {
+            if (opt.value === 'all') return;
+            const color = STATUS_COLORS[opt.value] || '#6b7280';
+            barHtml += `<span class="tickets-stat-badge" style="border-left: 3px solid ${color};">${opt.label}: ${counts[opt.value] || 0}</span>`;
+        });
+        statsBar.innerHTML = barHtml;
+    }
+
+    // Pagination
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / ticketsState.perPage) || 1;
+    if (ticketsState.page > totalPages) ticketsState.page = totalPages;
+    const startIndex = (ticketsState.page - 1) * ticketsState.perPage;
+    const endIndex = Math.min(startIndex + ticketsState.perPage, totalItems);
+    const pageData = filtered.slice(startIndex, endIndex);
+
+    // Render table body rows
+    const tbody = document.getElementById('tickets-table-body');
+    if (tbody) {
+        if (pageData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">No matching records found.</td></tr>`;
+        } else {
+            tbody.innerHTML = pageData.map(d => {
+                const typeIcon = d.type === 'Call Ticket' ? '📞' : (d.type === 'WhatsApp Chat' ? '💬' : '📧');
+                const cleanStage = d.stage || 'New';
+                const cleanSeverity = d.severity || 'Medium';
+                
+                // Dynamic style for status badge
+                const stageKey = cleanStage.toLowerCase().replace(/\s+/g, '_');
+                const badgeColor = STATUS_COLORS[stageKey] || '#6b7280';
+                const badgeBg = badgeColor + '1a'; // 10% opacity
+
+                // severity dot class
+                let sevCls = 'medium';
+                const sevLower = cleanSeverity.toLowerCase();
+                if (sevLower === 'blocker') sevCls = 'blocker';
+                else if (sevLower === 'high') sevCls = 'high';
+                else if (sevLower === 'low') sevCls = 'low';
+
+                return `
+                    <tr class="clickable-ticket-row" data-id="${d.id}">
+                        <td>${getDevRevLinkHTML(d.id, d.type)}</td>
+                        <td>${typeIcon} ${d.type}</td>
+                        <td>${d.date ? d.date.substring(0, 16) : '-'}</td>
+                        <td>${d.rm_name || '-'}</td>
+                        <td>${d.broker_family || '-'}</td>
+                        <td>${d.branch || '-'}</td>
+                        <td>${d.issue || '-'}</td>
+                        <td>${d.agent || '-'}</td>
+                        <td><span class="stage-badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}33; padding: 3px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; display: inline-block;">${cleanStage}</span></td>
+                        <td><span class="severity-dot ${sevCls}"></span>${cleanSeverity}</td>
+                    </tr>
+                    <tr class="ticket-detail-row" id="detail-row-${d.id}" style="display: none; background: rgba(255,255,255,0.01);">
+                        <td colspan="10" style="padding: 0;">
+                            <div class="ticket-detail-panel">
+                                <div class="detail-grid">
+                                    <div class="detail-item"><span class="detail-label">Sub-Issue</span><span class="detail-value">${d.sub_issue || '-'}</span></div>
+                                    <div class="detail-item"><span class="detail-label">SLA Status</span><span class="detail-value">${d.sla_status || 'MET'}</span></div>
+                                    <div class="detail-item"><span class="detail-label">Sentiment</span><span class="detail-value">${d.sentiment || 'Neutral'}</span></div>
+                                    <div class="detail-item"><span class="detail-label">CSAT</span><span class="detail-value">${d.csat ? '⭐'.repeat(Math.round(d.csat)) : '-'}</span></div>
+                                    ${d.recording_url ? `<div class="detail-item"><span class="detail-label">Call Recording</span><span class="detail-value"><a href="${d.recording_url}" target="_blank" style="color: var(--accent-primary); font-weight:700;">Listen Call 🎧</a></span></div>` : ''}
+                                    ${d.resolution_time ? `<div class="detail-item"><span class="detail-label">Resolution Time</span><span class="detail-value">${formatSecondsCompact(d.resolution_time)}</span></div>` : ''}
+                                </div>
+                                <div style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                                    <span class="detail-label">Comments / Conversation Summary</span>
+                                    <p style="font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary); margin: 6px 0 0 0;">${d.comments || 'No details shared.'}</p>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Click handler to toggle details
+            tbody.querySelectorAll('.clickable-ticket-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const id = row.getAttribute('data-id');
+                    const detailRow = document.getElementById(`detail-row-${id}`);
+                    if (detailRow) {
+                        const isVisible = detailRow.style.display !== 'none';
+                        detailRow.style.display = isVisible ? 'none' : 'table-row';
+                    }
+                });
+            });
+        }
+    }
+
+    // Render pagination controls
+    const pagination = document.getElementById('tickets-pagination');
+    if (pagination) {
+        pagination.innerHTML = `
+            <button id="tickets-prev-btn" ${ticketsState.page === 1 ? 'disabled' : ''}>Previous</button>
+            <span class="pagination-info">Page ${ticketsState.page} of ${totalPages} (Showing ${startIndex + 1} - ${endIndex} of ${totalItems})</span>
+            <button id="tickets-next-btn" ${ticketsState.page === totalPages ? 'disabled' : ''}>Next</button>
+        `;
+        
+        const prevBtn = document.getElementById('tickets-prev-btn');
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                if (ticketsState.page > 1) {
+                    ticketsState.page--;
+                    renderTicketsChatsView();
+                }
+            });
+        }
+
+        const nextBtn = document.getElementById('tickets-next-btn');
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                if (ticketsState.page < totalPages) {
+                    ticketsState.page++;
+                    renderTicketsChatsView();
+                }
+            });
+        }
+    }
 }
 
 // ==========================================================================
@@ -6403,6 +8488,13 @@ function renderAgentQACoaching(selectedAgent) {
 
     const listContainer = document.getElementById('agent-qa-dimensions-list');
     const adviceTextEl = document.getElementById('agent-qa-coaching-text');
+    const auditedTbody = document.getElementById('agent-qa-audited-tbody');
+    const agentTitleName = document.getElementById('qa-agent-title-name');
+
+    if (agentTitleName) agentTitleName.innerText = selectedAgent;
+    if (auditedTbody) {
+        auditedTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); font-style:italic; padding:20px;">No audited tickets for ${selectedAgent} in this period.</td></tr>`;
+    }
 
     if (!listContainer) return;
 
@@ -6455,6 +8547,24 @@ function renderAgentQACoaching(selectedAgent) {
     };
     if (adviceTextEl) {
         adviceTextEl.innerHTML = advices[lowestKey] || advices.none;
+    }
+
+    // Populate audited tickets list
+    if (auditedTbody && audited.length > 0) {
+        auditedTbody.innerHTML = audited.map(d => {
+            const v = Number(d.qa_overall);
+            const qaPct = Math.round(v > 45 ? v : (v / 45) * 100);
+            const csatStars = d.csat ? '★'.repeat(Math.round(d.csat)) + '☆'.repeat(5 - Math.round(d.csat)) : '-';
+            const commentsEscaped = (d.comments || '').replace(/"/g, '&quot;');
+            return `<tr>
+                <td>${getDevRevLinkHTML(d.id, d.type)}</td>
+                <td>${d.date ? d.date.substring(0, 10) : '-'}</td>
+                <td>${d.issue || '-'} (${d.sub_issue || '-'})</td>
+                <td style="text-align:center; font-weight:700; color:var(--purple);">${qaPct}%</td>
+                <td style="text-align:center; color:#facc15;">${csatStars}</td>
+                <td style="text-align:left; font-size:0.78rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${commentsEscaped}">${d.comments || '-'}</td>
+            </tr>`;
+        }).join('');
     }
 }
 
