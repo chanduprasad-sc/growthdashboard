@@ -60,9 +60,79 @@ function destroyVCCharts() {
 
 function safeParseDate(dStr) {
     if (!dStr) return null;
-    if (dStr.includes('T')) return new Date(dStr);
-    return new Date(dStr.replace(' ', 'T'));
+    let s = String(dStr).trim();
+    if (!s) return null;
+
+    // Handle T indicator (standard ISO)
+    if (s.includes('T')) {
+        let d = new Date(s);
+        if (!isNaN(d.getTime())) return d;
+    }
+
+    // Try standard constructor on cleaned space-to-T format
+    let clean = s.replace(' ', 'T');
+    let d = new Date(clean);
+    if (!isNaN(d.getTime())) return d;
+
+    // Parse DD/MM/YYYY or YYYY-MM-DD manually to be safe
+    let datePart = s;
+    let timePart = '00:00:00';
+    if (s.includes(' ')) {
+        const parts = s.split(' ');
+        datePart = parts[0];
+        timePart = parts[1] || '00:00:00';
+    } else if (s.includes('T')) {
+        const parts = s.split('T');
+        datePart = parts[0];
+        timePart = parts[1] || '00:00:00';
+    }
+
+    let year = new Date().getFullYear();
+    let month = 0;
+    let day = 1;
+
+    if (datePart.includes('/')) {
+        const parts = datePart.split('/');
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                year = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                day = parseInt(parts[2], 10);
+            } else {
+                day = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                year = parseInt(parts[2], 10);
+            }
+        }
+    } else if (datePart.includes('-')) {
+        const parts = datePart.split('-');
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                year = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                day = parseInt(parts[2], 10);
+            } else {
+                day = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                year = parseInt(parts[2], 10);
+            }
+        }
+    }
+
+    let hours = 0, minutes = 0, seconds = 0;
+    if (timePart.includes(':')) {
+        const parts = timePart.split(':');
+        hours = parseInt(parts[0], 10) || 0;
+        minutes = parseInt(parts[1], 10) || 0;
+        seconds = parseInt(parts[2], 10) || 0;
+    }
+
+    d = new Date(year, month, day, hours, minutes, seconds);
+    if (!isNaN(d.getTime())) return d;
+
+    return new Date(dStr);
 }
+
 
 function getDevRevLinkHTML(id, type) {
     if (!id || id === '-') return '-';
@@ -239,8 +309,8 @@ function cleanDate(val) {
             let parts = sClean.split('T');
             return `${parts[0]} ${parts[1]}`;
         }
-        let d = new Date(s);
-        if (!isNaN(d.getTime())) {
+        let d = safeParseDate(s);
+        if (d && !isNaN(d.getTime())) {
             let y = d.getFullYear();
             let m = String(d.getMonth() + 1).padStart(2, '0');
             let day = String(d.getDate()).padStart(2, '0');
@@ -632,6 +702,7 @@ function compileRawCache(cache) {
                 "title": title,
                 "rm_name": reported_by || "NA",
                 "broker_family": broker_fam,
+                "account_display_name": cleanStr(row["Account.display_name"]) || broker_fam || "Unknown",
                 "branch": norm_branch,
                 "poc": poc,
                 "channel": "Email",
@@ -4651,6 +4722,24 @@ function renderVisualControlDashboard() {
         });
     };
 
+    // Check toggle selection for Care Emails Top RMs/Brokers chart
+    let careEmailToggle = 'reporters';
+    const toggleInput = document.querySelector('input[name="vc-email-rm-toggle"]:checked');
+    if (toggleInput) {
+        careEmailToggle = toggleInput.value;
+    }
+
+    // Wire Care Email toggle listener once
+    if (!window._wired_vc_email_toggle) {
+        window._wired_vc_email_toggle = true;
+        // Listen on the document body to handle elements correctly (event delegation)
+        document.body.addEventListener('change', (e) => {
+            if (e.target && e.target.name === 'vc-email-rm-toggle') {
+                renderVisualControlDashboard();
+            }
+        });
+    }
+
     // Calculate distributions
     const topRMsCalls = {};
     const topRMsWhatsApp = {};
@@ -4665,8 +4754,8 @@ function renderVisualControlDashboard() {
     data.forEach(item => {
         const rm = item.rm_name;
         const broker = item.broker_family;
-        const sub = item.sub_issue || "General";
         const poc = item.poc;
+        const issueSubKey = `${item.issue || 'General'}/${item.sub_issue || 'General'}`;
 
         if (broker && broker !== 'NA') {
             topBrokers[broker] = (topBrokers[broker] || 0) + 1;
@@ -4677,23 +4766,41 @@ function renderVisualControlDashboard() {
 
         if (item.type === 'Call Ticket') {
             if (rm && rm !== 'NA') topRMsCalls[rm] = (topRMsCalls[rm] || 0) + 1;
-            if (sub) topIssuesCalls[sub] = (topIssuesCalls[sub] || 0) + 1;
+            topIssuesCalls[issueSubKey] = (topIssuesCalls[issueSubKey] || 0) + 1;
         }
         else if (item.type === 'WhatsApp Chat') {
             if (rm && rm !== 'NA') topRMsWhatsApp[rm] = (topRMsWhatsApp[rm] || 0) + 1;
-            if (sub) topIssuesWhatsApp[sub] = (topIssuesWhatsApp[sub] || 0) + 1;
+            topIssuesWhatsApp[issueSubKey] = (topIssuesWhatsApp[issueSubKey] || 0) + 1;
         }
         else if (item.type === 'Care Email') {
-            if (rm && rm !== 'NA') topRMsEmails[rm] = (topRMsEmails[rm] || 0) + 1;
-            const issueVal = item.issue || "General";
-            if (issueVal) topIssuesEmails[issueVal] = (topIssuesEmails[issueVal] || 0) + 1;
+            const key = (careEmailToggle === 'broker') ? (item.account_display_name || item.broker_family || 'Unknown') : (item.rm_name || 'Unknown');
+            if (key && key !== 'NA' && key !== 'Unknown') {
+                topRMsEmails[key] = (topRMsEmails[key] || 0) + 1;
+            }
+            topIssuesEmails[issueSubKey] = (topIssuesEmails[issueSubKey] || 0) + 1;
         }
     });
 
     // Render Row 3 Bar Charts
     vcCharts.topRMsCalls = makeTopHBarChart('vc-chart-top-rms-calls', 'Calls', topRMsCalls, THEME_COLORS.purple);
     vcCharts.topRMsWhatsApp = makeTopHBarChart('vc-chart-top-rms-whatsapp', 'Chats', topRMsWhatsApp, THEME_COLORS.green);
-    vcCharts.topRMsEmails = makeTopHBarChart('vc-chart-top-rms-emails', 'Emails', topRMsEmails, THEME_COLORS.yellow);
+    
+    // Update top RMs/Brokers Emails Card Title & Render
+    const emailChartCanvas = document.getElementById('vc-chart-top-rms-emails');
+    if (emailChartCanvas) {
+        const emailChartCard = emailChartCanvas.closest('.visual-card');
+        if (emailChartCard) {
+            const titleEl = emailChartCard.querySelector('.card-title');
+            const subtitleEl = emailChartCard.querySelector('.card-subtitle-right');
+            if (titleEl) {
+                titleEl.textContent = (careEmailToggle === 'broker') ? 'Top Brokers - Care Emails' : 'Top RMs - Care Emails';
+            }
+            if (subtitleEl) {
+                subtitleEl.textContent = (careEmailToggle === 'broker') ? 'BROKER FAMILIES IN CARE EMAIL FLOW' : 'RMS/REPORTERS IN CARE EMAIL FLOW';
+            }
+        }
+    }
+    vcCharts.topRMsEmails = makeTopHBarChart('vc-chart-top-rms-emails', (careEmailToggle === 'broker') ? 'Emails (Broker)' : 'Emails (RM)', topRMsEmails, THEME_COLORS.yellow);
     vcCharts.topBrokers = makeTopHBarChart('vc-chart-top-brokers', 'Interactions', topBrokers, THEME_COLORS.purple);
 
     // Render Row 4 Bar Charts
@@ -5973,16 +6080,44 @@ function renderMainOverview(data, calls) {
 function renderCallsDeepDive(data, calls) {
     destroyChartGroup(mdCharts);
     const callTickets = data.filter(d => d.type === 'Call Ticket');
-    const answered = callTickets.filter(t => (t.call_status||'').toLowerCase().includes('answered'));
-    const missed = callTickets.filter(t => (t.call_status||'').toLowerCase().includes('missed'));
-    const aoh = callTickets.filter(t => (t.call_status||'').toLowerCase().includes('aoh'));
+    const answered = [];
+    const missed = [];
+    const aoh = [];
+    const other = [];
 
-    // AHT/AQT from calls
-    const answeredCalls = calls.filter(c => (c.stage||'').toLowerCase() === 'answered' || (c.stage||'').toLowerCase() === 'connected');
-    const totalDuration = answeredCalls.reduce((s, c) => s + (Number(c.duration) || 0), 0);
-    const aht = answeredCalls.length ? Math.round(totalDuration / answeredCalls.length) : 0;
-    const totalQueue = calls.reduce((s, c) => s + (Number(c.queue_time) || 0), 0);
-    const aqt = calls.length ? Math.round(totalQueue / calls.length) : 0;
+    callTickets.forEach(item => {
+        let cs = String(item.call_status || "").toLowerCase();
+        if (cs === 'other' || !cs) {
+            const titleLower = (item.title || "").toLowerCase();
+            if (titleLower.includes('missed call')) cs = 'missed';
+            else if (titleLower.includes('aoh call')) cs = 'aoh';
+            else if (titleLower.includes('answered call')) cs = 'answered';
+        }
+        if (cs === 'answered') answered.push(item);
+        else if (cs === 'missed') missed.push(item);
+        else if (cs === 'aoh') aoh.push(item);
+        else other.push(item);
+    });
+
+    // AHT/AQT from Ozonetel Calls sheet (calls)
+    let callAns = 0;
+    let totalCallDuration = 0;
+    let totalCallQueue = 0;
+    
+    calls.forEach(call => {
+        const ct = String(call.call_type || '').toLowerCase();
+        const st = String(call.stage || '').toLowerCase();
+        if (!ct || ct === 'inbound') {
+            if (st === 'answered' || st === 'connected') {
+                callAns++;
+                totalCallDuration += (call.talk_time || 0);
+                totalCallQueue += (call.queue_time || 0);
+            }
+        }
+    });
+
+    const aht = callAns > 0 ? Math.round(totalCallDuration / callAns) : 0;
+    const aqt = callAns > 0 ? Math.round(totalCallQueue / callAns) : 0;
 
     const kpiGrid = document.getElementById('md-calls-kpi-grid');
     kpiGrid.innerHTML = [
@@ -5998,7 +6133,22 @@ function renderCallsDeepDive(data, calls) {
 
     // Call Volume Trend
     const dateMap = {};
-    callTickets.forEach(t => { const d = (t.date||'').substring(0,10); if(d) { if(!dateMap[d]) dateMap[d]={a:0,m:0,o:0}; if((t.call_status||'').toLowerCase().includes('answered')) dateMap[d].a++; else if((t.call_status||'').toLowerCase().includes('missed')) dateMap[d].m++; else dateMap[d].o++; } });
+    callTickets.forEach(item => {
+        const d = (item.date||'').substring(0,10);
+        if(d) {
+            if(!dateMap[d]) dateMap[d]={a:0,m:0,o:0};
+            let cs = String(item.call_status || "").toLowerCase();
+            if (cs === 'other' || !cs) {
+                const titleLower = (item.title || "").toLowerCase();
+                if (titleLower.includes('missed call')) cs = 'missed';
+                else if (titleLower.includes('aoh call')) cs = 'aoh';
+                else if (titleLower.includes('answered call')) cs = 'answered';
+            }
+            if (cs === 'answered') dateMap[d].a++;
+            else if (cs === 'missed') dateMap[d].m++;
+            else dateMap[d].o++;
+        }
+    });
     const dates = Object.keys(dateMap).sort();
     const ctx1 = document.getElementById('md-call-volume-chart');
     if (ctx1) {
@@ -6044,6 +6194,57 @@ function renderCallsDeepDive(data, calls) {
                 <div class="agent-score-card"><div class="score-label">Callbacks Triggered</div><div class="score-value">${callbacks.length}</div><div class="score-sub">${inboundMissed.length ? Math.round(callbacks.length/inboundMissed.length*100) : 0}% conversion</div></div>
                 <div class="agent-score-card"><div class="score-label">Callbacks Answered</div><div class="score-value">${cbAnswered.length}</div></div>
                 <div class="agent-score-card"><div class="score-label">Success Rate</div><div class="score-value">${callbacks.length ? Math.round(cbAnswered.length/callbacks.length*100) : 0}%</div></div>
+            </div>
+        `;
+    }
+
+    // SLA Compliance — Calls table rendering
+    const callsSlaTable = document.getElementById('md-calls-sla-table');
+    if (callsSlaTable) {
+        const frtItems = callTickets.filter(t => t.sla_frt !== null && t.sla_frt !== undefined);
+        const rtItems = callTickets.filter(t => t.sla_rt !== null && t.sla_rt !== undefined);
+        
+        const frtMet = frtItems.filter(t => String(t.sla_frt_status || '').toUpperCase() === 'MET').length;
+        const rtMet = rtItems.filter(t => String(t.sla_rt_status || '').toUpperCase() === 'MET').length;
+        
+        const avgFrt = frtItems.length ? frtItems.reduce((s, t) => s + t.sla_frt, 0) / frtItems.length : 0;
+        const avgRt = rtItems.length ? rtItems.reduce((s, t) => s + t.sla_rt, 0) / rtItems.length : 0;
+        
+        const frtCompliance = frtItems.length ? `${Math.round((frtMet / frtItems.length) * 100)}%` : '-';
+        const rtCompliance = rtItems.length ? `${Math.round((rtMet / rtItems.length) * 100)}%` : '-';
+        
+        callsSlaTable.innerHTML = `
+            <div class="monthly-table-wrapper">
+                <table class="monthly-table">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left;">Metric Type</th>
+                            <th>Target SLA</th>
+                            <th>Total Covered</th>
+                            <th>Average Time</th>
+                            <th>SLA Met</th>
+                            <th>SLA Compliance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="text-align: left;"><strong>First Response Time (FRT)</strong></td>
+                            <td>&lt; 5 min</td>
+                            <td>${frtItems.length}</td>
+                            <td>${avgFrt > 0 ? formatSecondsCompact(avgFrt) : '-'}</td>
+                            <td>${frtMet}</td>
+                            <td class="${frtMet/frtItems.length < 0.9 ? 'text-red' : 'text-green'}" style="font-weight: 700;">${frtCompliance}</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: left;"><strong>Resolution Time (RT)</strong></td>
+                            <td>&lt; 30 min</td>
+                            <td>${rtItems.length}</td>
+                            <td>${avgRt > 0 ? formatSecondsCompact(avgRt) : '-'}</td>
+                            <td>${rtMet}</td>
+                            <td class="${rtMet/rtItems.length < 0.9 ? 'text-red' : 'text-green'}" style="font-weight: 700;">${rtCompliance}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         `;
     }
@@ -6093,7 +6294,12 @@ function renderWhatsAppDeepDive(data) {
 
     // Top Issues
     const issueCounts = {};
-    wa.forEach(d => { if(d.issue && d.issue !== '-') issueCounts[d.issue] = (issueCounts[d.issue]||0)+1; });
+    wa.forEach(d => {
+        if (d.issue && d.issue !== '-') {
+            const key = `${d.issue}/${d.sub_issue || 'General'}`;
+            issueCounts[key] = (issueCounts[key] || 0) + 1;
+        }
+    });
     const topIssues = Object.entries(issueCounts).sort((a,b) => b[1]-a[1]).slice(0,8);
     const ctx3 = document.getElementById('md-wa-issues-chart');
     if (ctx3) {
@@ -6153,11 +6359,23 @@ function renderEmailsDeepDive(data) {
         });
     }
 
-    // Top Senders
+    // Top Senders (Changed to Top Brokers per user request)
     const senderCounts = {};
-    emails.forEach(d => { const s = d.rm_name || 'Unknown'; if (s !== '-') senderCounts[s] = (senderCounts[s]||0)+1; });
+    emails.forEach(d => {
+        const s = d.account_display_name || d.broker_family || 'Unknown';
+        if (s && s !== '-' && s !== 'Unknown' && s !== 'NA') {
+            senderCounts[s] = (senderCounts[s]||0)+1;
+        }
+    });
     const topSenders = Object.entries(senderCounts).sort((a,b) => b[1]-a[1]).slice(0,8);
-    const ctx3 = document.getElementById('md-email-senders-chart');
+    
+    // Dynamically update chart card title to "Top Brokers by Email"
+    const sendersChartCanvas = document.getElementById('md-email-senders-chart');
+    if (sendersChartCanvas) {
+        const cardTitle = sendersChartCanvas.closest('.deepdive-chart-card').querySelector('.chart-title');
+        if (cardTitle) cardTitle.innerHTML = '🏢 Top Brokers by Email';
+    }
+    const ctx3 = sendersChartCanvas;
     if (ctx3) {
         mdCharts.emailSenders = new Chart(ctx3.getContext('2d'), {
             type: 'bar', data: { labels: topSenders.map(i=>i[0]), datasets: [{ label: 'Emails', data: topSenders.map(i=>i[1]), backgroundColor: THEME_COLORS.orange + '70', borderRadius: 6 }] },

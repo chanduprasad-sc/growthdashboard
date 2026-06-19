@@ -978,9 +978,17 @@
                         </div>
                     </div>
                     <div class="visual-card">
-                        <div class="card-header-row">
+                        <div class="card-header-row" style="flex-wrap: wrap; gap: 8px;">
                             <h3 class="card-title">Top RMs - Care Emails</h3>
-                            <span class="card-subtitle-right">RMS/REPORTERS IN CARE EMAIL FLOW</span>
+                            <div style="display: flex; gap: 12px; align-items: center; font-size: 0.72rem; margin-left: auto;">
+                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); font-weight: 600;">
+                                    <input type="radio" name="vc-email-rm-toggle" value="reporters" checked style="accent-color: var(--purple); cursor: pointer; margin: 0;"> Reporters
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); font-weight: 600;">
+                                    <input type="radio" name="vc-email-rm-toggle" value="broker" style="accent-color: var(--purple); cursor: pointer; margin: 0;"> Broker Name
+                                </label>
+                            </div>
+                            <span class="card-subtitle-right" style="width: 100%; text-align: right; display: block; margin-top: 2px;">RMS/REPORTERS IN CARE EMAIL FLOW</span>
                         </div>
                         <div class="chart-container">
                             <canvas id="vc-chart-top-rms-emails"></canvas>
