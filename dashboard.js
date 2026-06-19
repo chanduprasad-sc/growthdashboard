@@ -432,6 +432,7 @@ function compileRawCache(cache) {
 
     let tickets = [];
     let rm_contacts_map = {};
+    let rm_phone_lookup = {};
 
     // 2. Parse Call Tickets
     if (cache.callTkts && Array.isArray(cache.callTkts)) {
@@ -445,6 +446,9 @@ function compileRawCache(cache) {
             let owner = cleanStr(row["Owner[0]"]);
             let rm_name = cleanStr(row["RM Name"]);
             let rm_num = cleanStr(row["RM Number"]);
+            if (rm_name && rm_name !== 'NA' && rm_num) {
+                rm_phone_lookup[rm_name] = rm_num;
+            }
             let stage = cleanStr(row["Stage"]);
             let severity = cleanStr(row["Severity.label"]);
             let sla_status = cleanStr(row["SLA Name.status"]);
@@ -515,6 +519,7 @@ function compileRawCache(cache) {
                 "close_date": close_date,
                 "title": title,
                 "rm_name": rm_name || "NA",
+                "rm_number": rm_num || "—",
                 "broker_family": broker_fam,
                 "branch": norm_branch,
                 "poc": poc,
@@ -558,6 +563,9 @@ function compileRawCache(cache) {
             let owner = cleanStr(row["Owners[0]"]);
             let rm_name = cleanStr(row["RM Name"]);
             let rm_num = cleanStr(row["RM Number"]);
+            if (rm_name && rm_name !== 'NA' && rm_num) {
+                rm_phone_lookup[rm_name] = rm_num;
+            }
             let stage = cleanStr(row["Stage"]);
 
             let broker_name = cleanStr(row["RM Broker Name"]) || cleanStr(row["Broker ID (B2B)"]);
@@ -613,6 +621,7 @@ function compileRawCache(cache) {
                 "close_date": null,
                 "title": `Chat with ${rm_name || 'RM'}`,
                 "rm_name": rm_name || "NA",
+                "rm_number": rm_num || "—",
                 "broker_family": broker_fam,
                 "branch": norm_branch,
                 "poc": poc,
@@ -653,6 +662,7 @@ function compileRawCache(cache) {
             let close_date = cleanDate(row["Close date"]);
             let owner = cleanStr(row["Owner[0]"]);
             let reported_by = cleanStr(row["Reported by[0]"]);
+            let rm_num = reported_by ? (rm_phone_lookup[reported_by] || "—") : "—";
             let stage = cleanStr(row["Stage"]);
             let sentiment = cleanStr(row["Sentiment.label"]);
 
@@ -701,6 +711,7 @@ function compileRawCache(cache) {
                 "close_date": close_date,
                 "title": title,
                 "rm_name": reported_by || "NA",
+                "rm_number": rm_num || "—",
                 "broker_family": broker_fam,
                 "account_display_name": cleanStr(row["Account.display_name"]) || broker_fam || "Unknown",
                 "branch": norm_branch,
@@ -744,7 +755,8 @@ function compileRawCache(cache) {
             let start_time_val = cleanStr(row["Start Time"]);
             let call_date;
             if (call_date_val && start_time_val) {
-                call_date = `${call_date_val} ${start_time_val}`;
+                let time_part = start_time_val.includes(' ') ? start_time_val.split(' ')[1] : start_time_val;
+                call_date = cleanDate(`${call_date_val} ${time_part}`);
             } else {
                 call_date = cleanDate(row["Call Date"]);
             }
@@ -2071,9 +2083,22 @@ function buildViewModel() {
         return true;
     });
 
+    // Filter active raw agent breaks
+    const filteredBreaks = (rawData.agent_breaks || []).filter(b => {
+        if (!b.date) return false;
+        const breakTs = safeParseDate(b.date).getTime();
+        if (isNaN(breakTs)) return false;
+        if (breakTs < fromTs || breakTs > toTs) return false;
+
+        if (activeFilters.agent !== 'all' && b.agent_name !== activeFilters.agent) return false;
+
+        return true;
+    });
+
     window.viewModel = {
         interactions: filteredInteractions,
         calls: filteredCalls,
+        breaks: filteredBreaks,
         prevInteractions: prevInteractions,
         fromTs,
         toTs,
@@ -3058,8 +3083,8 @@ function openCohortDrilldownModal(type) {
             const key = item.rm_name;
             if (!rmMap[key]) {
                 rmMap[key] = {
-                    rm: item.rm_name, broker: item.broker_family || '—', branch: item.branch || '—',
-                    channels: new Set(), contacts: 0, lastDate: null, issues: {}
+                    rm: item.rm_name, broker: item.broker_family || '—', rm_number: item.rm_number || '—', branch: item.branch || '—',
+                    channels: new Set(), contacts: 0, lastDate: null, issues: {}, poc: item.poc || '—'
                 };
             }
             rmMap[key].contacts++;
@@ -3069,9 +3094,10 @@ function openCohortDrilldownModal(type) {
             if (item.issue) rmMap[key].issues[item.issue] = (rmMap[key].issues[item.issue] || 0) + 1;
         });
         cohortModalAllRows = Object.values(rmMap).map(r => ({
-            rm: r.rm, broker: r.broker, branch: r.branch,
+            rm: r.rm, broker: r.broker, rm_number: r.rm_number, branch: r.branch,
             channels: [...r.channels].join(', '),
             contacts: r.contacts,
+            poc: r.poc,
             lastContact: r.lastDate ? r.lastDate.toLocaleDateString('en-IN') : '—',
             topIssue: Object.entries(r.issues).sort((a,b) => b[1]-a[1])[0]?.[0] || '—'
         })).sort((a, b) => b.contacts - a.contacts);
@@ -3079,9 +3105,11 @@ function openCohortDrilldownModal(type) {
         headEl.innerHTML = `<tr>
             <th data-col="rm">RM Name<span class="sort-arr"></span></th>
             <th data-col="broker">Broker Name<span class="sort-arr"></span></th>
+            <th data-col="rm_number">RM Number<span class="sort-arr"></span></th>
             <th data-col="branch">Branch<span class="sort-arr"></span></th>
             <th data-col="channels">Channels</th>
             <th data-col="contacts"># Contacts<span class="sort-arr"></span></th>
+            <th data-col="poc">POC<span class="sort-arr"></span></th>
             <th data-col="lastContact">Last Contact<span class="sort-arr"></span></th>
             <th data-col="topIssue">Top Issue</th>
         </tr>`;
@@ -3187,11 +3215,55 @@ function renderCohortModalRows(filter) {
 }
 
 function exportCohortToCSV() {
-    if (!cohortModalAllRows.length) return;
-    const keys = Object.keys(cohortModalAllRows[0]);
-    const header = keys.join(',');
-    const body = cohortModalAllRows.map(r => keys.map(k => `"${String(r[k]).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
+    const data = window.viewModel ? (window.viewModel.interactions || []) : [];
+    if (!data.length) return;
+
+    // Build RM-level breakdown
+    const rmMap = {};
+    data.forEach(item => {
+        if (!item.rm_name || item.rm_name === 'NA') return;
+        const key = item.rm_name;
+        if (!rmMap[key]) {
+            rmMap[key] = {
+                rm: item.rm_name,
+                broker: item.broker_family || '—',
+                rm_number: item.rm_number || '—',
+                branch: item.branch || '—',
+                channels: new Set(),
+                contacts: 0,
+                poc: item.poc || '—'
+            };
+        }
+        rmMap[key].contacts++;
+        rmMap[key].channels.add(item.channel || item.type || '—');
+    });
+
+    const rmRows = Object.values(rmMap).map(r => ({
+        rm: r.rm,
+        broker: r.broker,
+        rm_number: r.rm_number,
+        channels: [...r.channels].join(', '),
+        branch: r.branch,
+        contacts: r.contacts,
+        poc: r.poc
+    })).sort((a, b) => b.contacts - a.contacts);
+
+    const headers = ["RM Name", "RM Broker Name", "RM Number", "Channel (B2B)", "Branch", "number of contacts", "POC"];
+    let csvContent = headers.join(',') + '\n';
+    rmRows.forEach(r => {
+        const rowData = [
+            r.rm || '',
+            r.broker || '',
+            r.rm_number || '',
+            r.channels || '',
+            r.branch || '',
+            r.contacts || 0,
+            r.poc || ''
+        ];
+        csvContent += rowData.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `cohort_${cohortModalCurrentType}_${new Date().toISOString().slice(0,10)}.csv`;
@@ -3868,23 +3940,25 @@ function renderAISummaryTab() {
         });
     }
 
-    // Wire Generate button for standalone tab
+    // Clone and replace Generate button to clear duplicate listeners
     const genBtn = document.getElementById('ai-generate-btn');
-    if (genBtn && !genBtn._wired_ai_tab) {
-        genBtn._wired_ai_tab = true;
-        genBtn.addEventListener('click', generateAITabNarrative);
+    if (genBtn) {
+        const newGenBtn = genBtn.cloneNode(true);
+        genBtn.parentNode.replaceChild(newGenBtn, genBtn);
+        newGenBtn.addEventListener('click', generateAITabNarrative);
     }
 
-    // Wire Copy button
+    // Clone and replace Copy button
     const copyBtn = document.getElementById('ai-copy-btn');
-    if (copyBtn && !copyBtn._wired) {
-        copyBtn._wired = true;
-        copyBtn.addEventListener('click', () => {
+    if (copyBtn) {
+        const newCopyBtn = copyBtn.cloneNode(true);
+        copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
+        newCopyBtn.addEventListener('click', () => {
             const content = document.getElementById('ai-narrative-content');
             if (content) {
                 navigator.clipboard.writeText(content.innerText || content.textContent).then(() => {
-                    copyBtn.textContent = '✅ Copied!';
-                    setTimeout(() => { copyBtn.innerHTML = '📋 Copy Report'; }, 2000);
+                    newCopyBtn.textContent = '✅ Copied!';
+                    setTimeout(() => { newCopyBtn.innerHTML = '📋 Copy Report'; }, 2000);
                 }).catch(() => { alert('Copy failed — please select the text manually.'); });
             }
         });
@@ -6889,7 +6963,18 @@ function renderMonthlyView() {
 
     // Find available years/months
     const availableYears = new Set();
-    allInteractions.forEach(d => { if (d.date) availableYears.add(safeParseDate(d.date).getFullYear()); });
+    allInteractions.forEach(d => {
+        if (d.date) {
+            const parsed = safeParseDate(d.date);
+            if (parsed) availableYears.add(parsed.getFullYear());
+        }
+    });
+    allCalls.forEach(c => {
+        if (c.date) {
+            const parsed = safeParseDate(c.date);
+            if (parsed) availableYears.add(parsed.getFullYear());
+        }
+    });
     const yearsArr = [...availableYears].sort();
 
     if (yearSelect && !yearSelect._populated) {
@@ -6986,7 +7071,7 @@ function renderMonthlyView() {
 
         // AHT / Timing
         // AHT = talk time (actual handling time, not total call duration which includes ring time)
-        const inboundAnsDurations = inboundConnected.map(c => Number(c.talk_time) || Number(c.duration) || 0);
+        const inboundAnsDurations = inboundConnected.map(c => Number(c.talk_time) || 0);
         const inboundTalkTimes = inboundConnected.map(c => Number(c.talk_time) || 0);
         const inboundHoldTimes = inboundConnected.map(c => Number(c.hold_time) || 0);
         const inboundQueueAns = inboundConnected.map(c => Number(c.queue_time) || 0);
@@ -7144,17 +7229,17 @@ function renderMonthlyView() {
             return !isAgent && !isUser;
         }).length,
         inbound_abandoned_pct: mInbound.length ? (mInboundAbandonedReal.length / mInbound.length * 100).toFixed(1) + '%' : '0.0%',
-        // AHT uses talk_time (actual handling), fallback to duration
-        avg_aht: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.talk_time)||Number(c.duration)||0),0)/mInboundConnected.length) : 0,
+        // AHT uses talk_time only
+        avg_aht: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.talk_time)||0),0)/mInboundConnected.length) : 0,
         median_aht: (() => {
-            const durs = mInboundConnected.map(c => Number(c.talk_time)||Number(c.duration)||0);
+            const durs = mInboundConnected.map(c => Number(c.talk_time)||0);
             if(!durs.length) return 0;
             durs.sort((a,b)=>a-b);
             const mid = Math.floor(durs.length/2);
             return durs.length % 2 !== 0 ? durs[mid] : (durs[mid-1] + durs[mid]) / 2;
         })(),
         p90_aht: (() => {
-            const durs = mInboundConnected.map(c => Number(c.talk_time)||Number(c.duration)||0);
+            const durs = mInboundConnected.map(c => Number(c.talk_time)||0);
             if(!durs.length) return 0;
             durs.sort((a,b)=>a-b);
             const idx = Math.floor(durs.length * 0.9);
@@ -7374,10 +7459,29 @@ function renderAgentPerformance() {
         const rtItems = agentData.filter(d => d.sla_rt_status);
         const rtMet = rtItems.length ? Math.round(rtItems.filter(d => d.sla_rt_status === 'met').length / rtItems.length * 100) : '-';
 
-        // Breaks from scorecards
-        const scorecard = (rawData.agent_scorecards || []).find(s => s.agent_name === agent);
-        const breakTime = scorecard ? scorecard.total_breaks_sec : 0;
-        const occupancy = scorecard ? Number(scorecard.occupancy_rate || 0).toFixed(1) : '-';
+        // Breaks from window.viewModel.breaks dynamically
+        const agentBreaks = (window.viewModel.breaks || []).filter(b => b.agent_name === agent);
+        const breakTime = agentBreaks.reduce((s, b) => s + (b.duration_sec || 0), 0);
+
+        // Calculate active days
+        const activeDaysSet = new Set();
+        agentBreaks.forEach(b => {
+            if (b.date) {
+                const d = b.date.substring(0, 10);
+                if (d) activeDaysSet.add(d);
+            }
+        });
+        calls.filter(c => c.agent === agent).forEach(c => {
+            if (c.date) {
+                const d = c.date.substring(0, 10);
+                if (d) activeDaysSet.add(d);
+            }
+        });
+        const activeDays = Math.max(1, activeDaysSet.size);
+        const totalShiftTime = activeDays * 9 * 3600; // 9 hours in seconds
+        const totalTalkTime = agentCallRecords.reduce((s, c) => s + (Number(c.talk_time) || 0), 0);
+        const netWorkTime = totalShiftTime - breakTime;
+        const occupancy = netWorkTime > 0 ? ((totalTalkTime / netWorkTime) * 100).toFixed(1) : '0.0';
 
         agentMetrics[agent] = { calls: agentCalls.length, wa: agentWA.length, emails: agentEmails.length, total: agentData.length, avgTalkTime, avgQA, frtMet, rtMet, breakTime, occupancy };
     });
@@ -7404,11 +7508,11 @@ function renderAgentPerformance() {
             { label: 'Total', value: m.total || 0 },
             { label: 'Avg Talk Time', value: formatSecondsCompact(m.avgTalkTime) },
             { label: 'QA Score', value: m.avgQA !== '-' ? m.avgQA + '%' : '-' },
-            { label: 'FRT Met', value: m.frtMet + '%' },
-            { label: 'RT Met', value: m.rtMet + '%' },
+            { label: 'FRT Met', value: m.frtMet !== '-' ? m.frtMet + '%' : '-' },
+            { label: 'RT Met', value: m.rtMet !== '-' ? m.rtMet + '%' : '-' },
             { label: 'Break Time', value: formatSecondsCompact(m.breakTime) },
-            { label: 'Occupancy', value: m.occupancy + '%' }
-        ].map(k => `<div class="agent-score-card"><div class="score-label">${k.label}</div><div class="score-value">${k.value}</div></div>`).join('');
+            { label: 'Occupancy', value: m.occupancy !== '-' ? m.occupancy + '%' : '-', tooltip: 'Occupancy = (Talk Time / (Shift Time - Break Time)) * 100%, where Shift Time is 9 hours per active day.' }
+        ].map(k => `<div class="agent-score-card" ${k.tooltip ? `title="${k.tooltip}" style="cursor: help;"` : ''}><div class="score-label">${k.label}</div><div class="score-value">${k.value}</div></div>`).join('');
     }
 
     // Comparison Table
@@ -7419,8 +7523,8 @@ function renderAgentPerformance() {
         return `<tr class="clickable-row ${isHighlight ? 'highlight' : ''}" data-agent="${agent}" style="cursor:pointer;">
             <td>${agent}</td><td>${m.calls}</td><td>${m.wa}</td><td>${m.emails}</td><td><strong>${m.total}</strong></td>
             <td>${formatSecondsCompact(m.avgTalkTime)}</td><td>${m.avgQA !== '-' ? m.avgQA + '%' : '-'}</td>
-            <td>${m.frtMet}%</td><td>${m.rtMet}%</td>
-            <td>${formatSecondsCompact(m.breakTime)}</td><td>${m.occupancy}%</td>
+            <td>${m.frtMet !== '-' ? m.frtMet + '%' : '-'}</td><td>${m.rtMet !== '-' ? m.rtMet + '%' : '-'}</td>
+            <td>${formatSecondsCompact(m.breakTime)}</td><td>${m.occupancy !== '-' ? m.occupancy + '%' : '-'}</td>
         </tr>`;
     }).join('');
 
