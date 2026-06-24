@@ -1,94 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+
 /* ==========================================================================
    DESIGN SYSTEM - CSS VARIABLES & ROOT
    ========================================================================== */
 :root {
     /* Typography */
-    --font-heading: 'SF Pro Display', -apple-system, 'BlinkMacSystemFont', 'Helvetica Neue', sans-serif;
-    --font-body: 'SF Pro Text', -apple-system, 'BlinkMacSystemFont', sans-serif;
+    --font-heading: 'Fira Sans', -apple-system, 'BlinkMacSystemFont', 'Helvetica Neue', sans-serif;
+    --font-body: 'Fira Sans', -apple-system, 'BlinkMacSystemFont', sans-serif;
+    --font-mono: 'Fira Code', monospace;
     
     /* Animation settings */
-    --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     
-    /* Glass blur baseline */
-    --glass-blur: blur(24px) saturate(180%);
+    /* Glass blur baseline - disabled in minimalism */
+    --glass-blur: none;
 
     /* Unified Theme Colors mappings */
     --orange: #f97316;
 }
 
 body.dark-mode {
-    --bg-main: #0a0e1a;
-    --bg-sidebar: rgba(10, 14, 26, 0.4);
-    --bg-card: rgba(255, 255, 255, 0.06);
-    --border-color: rgba(255, 255, 255, 0.16);
-    --text-primary: #f0f4ff;
-    --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
+    --bg-main: #0a0e17;
+    --bg-sidebar: #101726;
+    --bg-card: #151e2f;
+    --border-color: #243049;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
     
-    --accent-primary: #a78bfa;     /* Soft Violet */
-    --accent-primary-rgb: 167, 139, 250;
-    --accent-blue: #00d4ff;        /* Electric Cyan */
-    --accent-blue-rgb: 0, 212, 255;
-    --accent-green: #10b981;       /* Emerald */
-    --accent-green-rgb: 16, 185, 129;
-    --accent-red: #f43f5e;         /* Coral Red */
-    --accent-red-rgb: 244, 63, 94;
-    --accent-yellow: #fbbf24;      /* Warm Amber */
+    --accent-primary: #818cf8;     /* Soft Indigo */
+    --accent-primary-rgb: 129, 140, 248;
+    --accent-blue: #38bdf8;        /* Slate Blue */
+    --accent-blue-rgb: 56, 189, 248;
+    --accent-green: #34d399;       /* Mint Green */
+    --accent-green-rgb: 52, 211, 153;
+    --accent-red: #fb7185;         /* Soft Red */
+    --accent-red-rgb: 251, 113, 133;
+    --accent-yellow: #fbbf24;      /* Amber Yellow */
     --accent-yellow-rgb: 251, 191, 36;
     
-    --card-shadow: rgba(0, 0, 0, 0.25);
-    --card-glow: rgba(0, 212, 255, 0.12);
-    --shadow-color: rgba(0, 0, 0, 0.4);
+    --card-shadow: none;
+    --card-glow: none;
+    --shadow-color: transparent;
 }
 
 body.light-mode {
-    --bg-main: #fcfcff;
-    --bg-sidebar: rgba(255, 255, 255, 0.55);
-    --bg-card: rgba(255, 255, 255, 0.7);
-    --border-color: rgba(0, 0, 0, 0.07);
+    --bg-main: #ffffff;
+    --bg-sidebar: #f8fafc;
+    --bg-card: #ffffff;
+    --border-color: #e2e8f0;
     --text-primary: #0f172a;
-    --text-secondary: #334155;
+    --text-secondary: #475569;
     --text-muted: #94a3b8;
     
-    --accent-primary: #8b5cf6;     /* Bright Violet */
-    --accent-primary-rgb: 139, 92, 246;
+    --accent-primary: #4f46e5;     /* Vibrant Indigo */
+    --accent-primary-rgb: 79, 70, 229;
     --accent-blue: #0284c7;        /* Sky Blue */
     --accent-blue-rgb: 2, 132, 199;
-    --accent-green: #059669;       /* Forest Green */
-    --accent-green-rgb: 5, 150, 105;
-    --accent-red: #e11d48;         /* Rose Red */
-    --accent-red-rgb: 225, 29, 72;
-    --accent-yellow: #d97706;      /* Amber Yellow */
-    --accent-yellow-rgb: 217, 119, 6;
+    --accent-green: #10b981;       /* Emerald */
+    --accent-green-rgb: 16, 185, 129;
+    --accent-red: #ef4444;         /* Coral Red */
+    --accent-red-rgb: 239, 68, 68;
+    --accent-yellow: #f59e0b;      /* Warm Amber */
+    --accent-yellow-rgb: 245, 158, 11;
     
-    --card-shadow: rgba(15, 23, 42, 0.04);
-    --card-glow: rgba(139, 92, 246, 0.03);
-    --shadow-color: rgba(15, 23, 42, 0.01);
+    --card-shadow: none;
+    --card-glow: none;
+    --shadow-color: transparent;
 }
 
 body.black-mode {
     --bg-main: #000000;
-    --bg-sidebar: rgba(0, 0, 0, 0.65);
-    --bg-card: rgba(20, 20, 20, 0.35);
-    --border-color: rgba(255, 255, 255, 0.10);
-    --text-primary: #f8fafc;
-    --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
+    --bg-sidebar: #050505;
+    --bg-card: #0a0a0a;
+    --border-color: #1c1c1c;
+    --text-primary: #ffffff;
+    --text-secondary: #a3a3a3;
+    --text-muted: #525252;
     
-    --accent-primary: #c084fc;     /* Brighter Violet */
-    --accent-primary-rgb: 192, 132, 252;
-    --accent-blue: #38bdf8;        /* Brighter Cyan */
-    --accent-blue-rgb: 56, 189, 248;
-    --accent-green: #34d399;       /* Brighter Emerald */
-    --accent-green-rgb: 52, 211, 153;
-    --accent-red: #fb7185;         /* Brighter Coral */
-    --accent-red-rgb: 251, 113, 133;
-    --accent-yellow: #fcd34d;      /* Brighter Yellow */
-    --accent-yellow-rgb: 252, 211, 77;
+    --accent-primary: #a855f7;     /* Tech Violet */
+    --accent-primary-rgb: 168, 85, 247;
+    --accent-blue: #0ea5e9;        /* Electric Blue */
+    --accent-blue-rgb: 14, 165, 233;
+    --accent-green: #22c55e;       /* Emerald Green */
+    --accent-green-rgb: 34, 197, 94;
+    --accent-red: #ef4444;         /* Rose Red */
+    --accent-red-rgb: 239, 68, 68;
+    --accent-yellow: #eab308;      /* Gold Yellow */
+    --accent-yellow-rgb: 234, 179, 8;
     
-    --card-shadow: rgba(0, 0, 0, 0.85);
-    --card-glow: rgba(56, 189, 248, 0.05);
-    --shadow-color: rgba(0, 0, 0, 0.95);
+    --card-shadow: none;
+    --card-glow: none;
+    --shadow-color: transparent;
 }
 
 /* ==========================================================================
@@ -117,7 +120,7 @@ body {
     --yellow: var(--accent-yellow);
 }
 
-/* Dynamic Animated Gradient Mesh */
+/* Dynamic Animated Gradient Mesh - disabled in minimalism */
 .bg-mesh {
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
@@ -127,60 +130,12 @@ body {
     background-color: var(--bg-main);
 }
 .blob {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(120px);
-    opacity: 0.16;
-    mix-blend-mode: screen;
-    animation: float 25s infinite ease-in-out alternate;
-    pointer-events: none;
-}
-body.light-mode .blob {
-    opacity: 0.10;
-    mix-blend-mode: multiply;
-}
-.blob-1 {
-    top: -10%; left: -10%;
-    width: 60vw; height: 60vw;
-    background: radial-gradient(circle, var(--accent-blue) 0%, transparent 80%);
-    animation-duration: 25s;
-}
-.blob-2 {
-    bottom: -15%; right: -10%;
-    width: 70vw; height: 70vw;
-    background: radial-gradient(circle, var(--accent-primary) 0%, transparent 80%);
-    animation-duration: 35s;
-    animation-delay: -5s;
-}
-.blob-3 {
-    top: 35%; left: 45%;
-    width: 50vw; height: 50vw;
-    background: radial-gradient(circle, var(--accent-yellow) 0%, transparent 80%);
-    animation-duration: 20s;
-    animation-delay: -10s;
-}
-.blob-4 {
-    bottom: 25%; left: -15%;
-    width: 65vw; height: 65vw;
-    background: radial-gradient(circle, #3b82f6 0%, transparent 80%);
-    animation-duration: 30s;
-    animation-delay: -15s;
-}
-@keyframes float {
-    0% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(8vw, 6vh) scale(1.15); }
-    100% { transform: translate(-6vw, -8vh) scale(0.9); }
+    display: none;
 }
 
-/* Faint tactile noise gradient overlay */
+/* Faint tactile noise gradient overlay - disabled in minimalism */
 .noise-overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100vw; height: 100vh;
-    content: "";
-    opacity: 0.022;
-    pointer-events: none;
-    z-index: 9999;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    display: none;
 }
 
 /* Custom Scrollbars */
@@ -3740,4 +3695,201 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     background: rgba(139,92,246,0.12);
     color: var(--purple);
     border: 1px solid rgba(139,92,246,0.25);
+}
+
+/* ==========================================================================
+   MINIMALISM & SWISS STYLE THEME OVERRIDES
+   ========================================================================== */
+
+/* Typography & Monospace Numbers */
+.kpi-card .card-value,
+.snapshot-card .card-body,
+.channel-avg,
+.channel-volume,
+.channel-stat-item .stat-value,
+.monthly-table td,
+.agent-comparison-table td,
+.tickets-table td,
+.rm-frequency-table td,
+.pagination-info,
+.ai-report-stat-card .stat-val,
+.agent-score-card .score-value,
+.stat-val,
+.metric-value,
+.breakdown-num,
+.percentage,
+.count,
+.timer,
+.duration,
+.avg-time,
+.health-score-badge,
+.freq-badge {
+    font-family: var(--font-mono) !important;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* Sharp Corners Reset */
+.kpi-card,
+.visual-card,
+.snapshot-card,
+.channel-summary-card,
+.agent-score-card,
+.deepdive-chart-card,
+.rm-frequency-matrix,
+.monthly-table-wrapper,
+.tickets-table-wrapper,
+.agent-comparison-table-wrapper,
+.intelligence-panel,
+.ai-narrative-panel,
+.ai-insight-card,
+.guide-card,
+.sidebar,
+.sidebar-footer,
+.filter-card,
+.modal-content,
+.ticket-detail-panel,
+.ai-report-stat-card,
+.ai-report-chart-card,
+.ai-report-narrative,
+.sub-tab-pill,
+.status-pill,
+.export-btn,
+.search-input,
+.stage-badge,
+.ai-tab-period-badge,
+.pagination-controls button,
+.sidebar-collapse-btn,
+.sidebar-expand-btn,
+select,
+button,
+input,
+textarea {
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    text-shadow: none !important;
+}
+
+/* Flat Backgrounds & Crisp Solid Borders */
+.kpi-card,
+.visual-card,
+.snapshot-card,
+.channel-summary-card,
+.agent-score-card,
+.deepdive-chart-card,
+.rm-frequency-matrix,
+.monthly-table-wrapper,
+.tickets-table-wrapper,
+.agent-comparison-table-wrapper,
+.intelligence-panel,
+.ai-narrative-panel,
+.ai-insight-card,
+.guide-card,
+.filter-card,
+.modal-content,
+.ticket-detail-panel,
+.ai-report-stat-card,
+.ai-report-chart-card,
+.ai-report-narrative {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* Active elements, buttons and hover states */
+.sub-tab-pill.active {
+    background: var(--accent-primary) !important;
+    color: var(--bg-main) !important;
+    border-color: var(--accent-primary) !important;
+}
+
+.status-pill.active {
+    background: var(--accent-primary) !important;
+    color: var(--bg-main) !important;
+    border-color: var(--accent-primary) !important;
+}
+
+.pagination-controls button.active {
+    background: var(--accent-primary) !important;
+    color: var(--bg-main) !important;
+    border-color: var(--accent-primary) !important;
+}
+
+.ai-generate-btn {
+    background: var(--accent-primary) !important;
+    color: var(--bg-main) !important;
+    border: 1px solid var(--accent-primary) !important;
+    font-weight: 700;
+}
+
+.ai-generate-btn:hover {
+    background: transparent !important;
+    color: var(--accent-primary) !important;
+}
+
+/* General button states */
+button, .export-btn {
+    border: 1px solid var(--border-color) !important;
+    background: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+button:hover, .export-btn:hover {
+    background: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--text-muted) !important;
+}
+
+/* Input elements focus state */
+input:focus, select:focus, textarea:focus {
+    border-color: var(--accent-primary) !important;
+    outline: none !important;
+}
+
+/* Remove decorative gradient fills from badges */
+.stage-badge, .ai-tab-period-badge, .health-score-badge, .freq-badge {
+    background: var(--bg-main) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* Add accent border to indicators instead of solid glow colors */
+.stage-badge.open { border-color: var(--accent-red) !important; color: var(--accent-red) !important; }
+.stage-badge.closed { border-color: var(--accent-green) !important; color: var(--accent-green) !important; }
+.stage-badge.in-progress { border-color: var(--accent-blue) !important; color: var(--accent-blue) !important; }
+.stage-badge.resolved { border-color: var(--accent-primary) !important; color: var(--accent-primary) !important; }
+.stage-badge.new { border-color: var(--accent-yellow) !important; color: var(--accent-yellow) !important; }
+
+.health-score-badge.excellent { border-color: var(--accent-green) !important; color: var(--accent-green) !important; }
+.health-score-badge.good { border-color: var(--accent-blue) !important; color: var(--accent-blue) !important; }
+.health-score-badge.moderate { border-color: var(--accent-yellow) !important; color: var(--accent-yellow) !important; }
+.health-score-badge.poor { border-color: var(--accent-red) !important; color: var(--accent-red) !important; }
+
+.freq-badge.high { border-color: var(--accent-red) !important; color: var(--accent-red) !important; }
+.freq-badge.medium { border-color: var(--accent-yellow) !important; color: var(--accent-yellow) !important; }
+.freq-badge.low { border-color: var(--accent-green) !important; color: var(--accent-green) !important; }
+
+/* Subtle table formatting */
+th {
+    font-family: var(--font-heading) !important;
+    font-weight: 700 !important;
+    border-bottom: 2px solid var(--border-color) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+td {
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* Header & title simplicity */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading) !important;
+    letter-spacing: -0.02em !important;
+    font-weight: 700 !important;
+}
+
+/* Hide floating scrollbar styles when not needed */
+.scrollbar-themed::-webkit-scrollbar-thumb {
+    background: var(--border-color) !important;
 }

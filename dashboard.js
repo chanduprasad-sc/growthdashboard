@@ -145,20 +145,51 @@ function getDevRevLinkHTML(id, type) {
     return `<code>${cleanId}</code>`;
 }
 
+// Configure Chart.js global defaults for minimalism and Swiss style
+function applyChartMinimalistDefaults(isLight) {
+    if (typeof Chart === 'undefined') return;
+
+    // Use Fira Sans for labels, legends, etc.
+    Chart.defaults.font.family = "'Fira Sans', -apple-system, BlinkMacSystemFont, sans-serif";
+    Chart.defaults.font.size = 11;
+    Chart.defaults.color = isLight ? '#475569' : '#cbd5e1';
+
+    // Tooltip minimalism styling
+    Chart.defaults.plugins.tooltip.backgroundColor = isLight ? '#ffffff' : '#0a0a0a';
+    Chart.defaults.plugins.tooltip.titleColor = isLight ? '#0f172a' : '#ffffff';
+    Chart.defaults.plugins.tooltip.bodyColor = isLight ? '#475569' : '#a3a3a3';
+    Chart.defaults.plugins.tooltip.titleFont = { family: "'Fira Sans', sans-serif", weight: '700', size: 12 };
+    Chart.defaults.plugins.tooltip.bodyFont = { family: "'Fira Code', monospace", size: 11 };
+    Chart.defaults.plugins.tooltip.borderColor = isLight ? '#e2e8f0' : '#1c1c1c';
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 4;
+    Chart.defaults.plugins.tooltip.boxWidth = 8;
+    Chart.defaults.plugins.tooltip.boxHeight = 8;
+    Chart.defaults.plugins.tooltip.boxPadding = 4;
+    Chart.defaults.plugins.tooltip.usePointStyle = true;
+
+    // Scales / Gridlines
+    Chart.defaults.scale.grid.color = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.05)';
+    Chart.defaults.scale.grid.borderColor = 'transparent';
+    Chart.defaults.scale.ticks.font = { family: "'Fira Code', monospace", size: 10 };
+    Chart.defaults.scale.ticks.color = isLight ? '#64748b' : '#94a3b8';
+}
+
 // Colors Matching CSS variables (Light Mode default)
 const THEME_COLORS = {
-    purple: '#8b5cf6',     // Bright Violet
+    purple: '#4f46e5',     // Vibrant Indigo
     blue: '#0284c7',       // Sky Blue
-    green: '#059669',      // Forest Green
-    red: '#e11d48',        // Rose Red
-    yellow: '#d97706',     // Amber Yellow
-    orange: '#f97316',     // Vibrant Orange
-    cyan: '#06b6d4',       // Teal Cyan
-    pink: '#ec4899',       // Hot Pink
+    green: '#10b981',      // Emerald Green
+    red: '#ef4444',        // Coral Red
+    yellow: '#f59e0b',     // Warm Amber
+    orange: '#f97316',     // Orange
+    cyan: '#06b6d4',
+    pink: '#ec4899',
     gray: '#64748b',
-    border: 'rgba(0, 0, 0, 0.07)', // light mode border
-    textPrimary: '#0f172a', // light mode primary text
-    textSecondary: '#334155' // light mode secondary text
+    border: '#e2e8f0',
+    textPrimary: '#0f172a',
+    textSecondary: '#475569'
 };
 
 // Hex to RGBA Utility for gradients & glow effects
@@ -1205,6 +1236,9 @@ function compileRawCache(cache) {
 // 1. DATA INITIALIZATION & ENTRY
 // -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
+    // Configure Chart.js global defaults for minimalism theme first
+    applyChartMinimalistDefaults(document.body.classList.contains('light-mode'));
+
     // 1. Instantly load from localStorage if available to speed up load time
     const cachedDataStr = localStorage.getItem('b2b_dashboard_raw_payload');
     if (cachedDataStr) {
@@ -1664,42 +1698,43 @@ function setupEventListeners() {
             body.classList.remove('light-mode');
             body.classList.add('dark-mode');
             btnText.innerText = 'Black Mode';
-            THEME_COLORS.textPrimary = '#f0f4ff';
-            THEME_COLORS.textSecondary = '#cbd5e1';
-            THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
-            THEME_COLORS.blue = '#00d4ff';       // Electric Cyan
-            THEME_COLORS.purple = '#a78bfa';     // Soft Violet
-            THEME_COLORS.green = '#10b981';      // Emerald
-            THEME_COLORS.red = '#f43f5e';        // Coral Red
-            THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
+            THEME_COLORS.textPrimary = '#f8fafc';
+            THEME_COLORS.textSecondary = '#94a3b8';
+            THEME_COLORS.border = '#243049';
+            THEME_COLORS.blue = '#38bdf8';       // Slate Blue
+            THEME_COLORS.purple = '#818cf8';     // Soft Indigo
+            THEME_COLORS.green = '#34d399';      // Mint Green
+            THEME_COLORS.red = '#fb7185';        // Soft Red
+            THEME_COLORS.yellow = '#fbbf24';     // Amber Yellow
         } else if (body.classList.contains('dark-mode')) {
             // Dark -> Black
             body.classList.remove('dark-mode');
             body.classList.add('black-mode');
             btnText.innerText = 'Light Mode';
-            THEME_COLORS.textPrimary = '#f8fafc';
-            THEME_COLORS.textSecondary = '#cbd5e1';
-            THEME_COLORS.border = 'rgba(255, 255, 255, 0.1)';
-            THEME_COLORS.blue = '#38bdf8';       // Bright Cyan
-            THEME_COLORS.purple = '#c084fc';     // Light Violet
-            THEME_COLORS.green = '#34d399';      // Mint
-            THEME_COLORS.red = '#fb7185';        // Rose
-            THEME_COLORS.yellow = '#fcd34d';     // Amber
+            THEME_COLORS.textPrimary = '#ffffff';
+            THEME_COLORS.textSecondary = '#a3a3a3';
+            THEME_COLORS.border = '#1c1c1c';
+            THEME_COLORS.blue = '#0ea5e9';       // Electric Blue
+            THEME_COLORS.purple = '#a855f7';     // Tech Violet
+            THEME_COLORS.green = '#22c55e';      // Emerald Green
+            THEME_COLORS.red = '#ef4444';        // Rose Red
+            THEME_COLORS.yellow = '#eab308';     // Gold Yellow
         } else {
             // Black -> Light
             body.classList.remove('black-mode');
             body.classList.add('light-mode');
             btnText.innerText = 'Dark Mode';
             THEME_COLORS.textPrimary = '#0f172a';
-            THEME_COLORS.textSecondary = '#334155';
-            THEME_COLORS.border = 'rgba(0, 0, 0, 0.07)';
+            THEME_COLORS.textSecondary = '#475569';
+            THEME_COLORS.border = '#e2e8f0';
             THEME_COLORS.blue = '#0284c7';       // Sky Blue
-            THEME_COLORS.purple = '#8b5cf6';     // Bright Violet
-            THEME_COLORS.green = '#059669';      // Forest Green
-            THEME_COLORS.red = '#e11d48';        // Rose Red
-            THEME_COLORS.yellow = '#d97706';     // Amber Yellow
+            THEME_COLORS.purple = '#4f46e5';     // Vibrant Indigo
+            THEME_COLORS.green = '#10b981';      // Emerald
+            THEME_COLORS.red = '#ef4444';        // Coral Red
+            THEME_COLORS.yellow = '#f59e0b';     // Warm Amber
         }
 
+        applyChartMinimalistDefaults(body.classList.contains('light-mode'));
         buildViewModel();
     });
 
