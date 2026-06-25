@@ -15,7 +15,8 @@ let activeFilters = {
     agent: 'all',
     branch: 'all',
     searchQuery: '',
-    includeCareEmails: false
+    includeCareEmails: false,
+    hiddenSmallcaseRMs: []
 };
 
 // Explorer Widget State
@@ -147,18 +148,18 @@ function getDevRevLinkHTML(id, type) {
 
 // Colors Matching CSS variables (Light Mode default)
 const THEME_COLORS = {
-    purple: '#1f7ae0',     // smallcase Brand Blue
-    blue: '#0284c7',       // Sky Blue
-    green: '#059669',      // Forest Green
-    red: '#e11d48',        // Rose Red
-    yellow: '#d97706',     // Amber Yellow
+    purple: '#6750A4',     // MD3 Primary Purple
+    blue: '#7D5260',       // MD3 Tertiary
+    green: '#10B981',      // Emerald Green
+    red: '#DB2777',        // Rose/Pink
+    yellow: '#F59E0B',     // Amber Yellow
     orange: '#f97316',     // Vibrant Orange
-    cyan: '#06b6d4',       // Teal Cyan
-    pink: '#ec4899',       // Hot Pink
-    gray: '#64748b',
-    border: 'rgba(0, 0, 0, 0.07)', // light mode border
-    textPrimary: '#0f172a', // light mode primary text
-    textSecondary: '#334155' // light mode secondary text
+    cyan: '#06b6d4',
+    pink: '#DB2777',
+    gray: '#79747E',
+    border: 'rgba(121, 116, 126, 0.2)', // MD3 outline
+    textPrimary: '#1C1B1F', // MD3 primary text
+    textSecondary: '#49454F' // MD3 secondary text
 };
 
 // Hex to RGBA Utility for gradients & glow effects
@@ -1611,7 +1612,8 @@ function setupEventListeners() {
             agent: 'all',
             branch: 'all',
             searchQuery: '',
-            includeCareEmails: false
+            includeCareEmails: false,
+            hiddenSmallcaseRMs: []
         };
 
         if (includeEmailsCheckbox) {
@@ -1637,6 +1639,13 @@ function setupEventListeners() {
         document.getElementById('filter-poc').value = 'all';
         document.getElementById('filter-agent').value = 'all';
 
+        const smallcaseRMSelect = document.getElementById('filter-hide-smallcase-rm');
+        if (smallcaseRMSelect) {
+            Array.from(smallcaseRMSelect.options).forEach(opt => opt.selected = false);
+            smallcaseRMSelect.value = '';
+            smallcaseRMSelect.dispatchEvent(new Event('change'));
+        }
+
         setDefaultDateRange();
         buildViewModel();
     });
@@ -1654,6 +1663,14 @@ function setupEventListeners() {
         activeFilters.agent = e.target.value;
         buildViewModel();
     });
+    const hideRMSelect = document.getElementById('filter-hide-smallcase-rm');
+    if (hideRMSelect) {
+        hideRMSelect.addEventListener('change', (e) => {
+            const selectedOptions = Array.from(e.target.selectedOptions);
+            activeFilters.hiddenSmallcaseRMs = selectedOptions.map(o => o.value).filter(val => val !== "");
+            buildViewModel();
+        });
+    }
 
     // Theme Switcher (Light / Dark / Black)
     document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
@@ -1665,41 +1682,29 @@ function setupEventListeners() {
                 // Light -> Dark
                 body.classList.remove('light-mode');
                 body.classList.add('dark-mode');
-                btnText.innerText = 'Black Mode';
-                THEME_COLORS.textPrimary = '#f0f4ff';
-                THEME_COLORS.textSecondary = '#cbd5e1';
-                THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
-                THEME_COLORS.blue = '#00d4ff';       // Electric Cyan
-                THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Dark mode)
-                THEME_COLORS.green = '#10b981';      // Emerald
-                THEME_COLORS.red = '#f43f5e';        // Coral Red
-                THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
-            } else if (body.classList.contains('dark-mode')) {
-                // Dark -> Black
-                body.classList.remove('dark-mode');
-                body.classList.add('black-mode');
                 btnText.innerText = 'Light Mode';
-                THEME_COLORS.textPrimary = '#f8fafc';
-                THEME_COLORS.textSecondary = '#cbd5e1';
-                THEME_COLORS.border = 'rgba(255, 255, 255, 0.1)';
-                THEME_COLORS.blue = '#38bdf8';       // Bright Cyan
-                THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Black mode)
-                THEME_COLORS.green = '#34d399';      // Mint
+                THEME_COLORS.textPrimary = '#EDEDEF';
+                THEME_COLORS.textSecondary = '#8A8F98';
+                THEME_COLORS.border = 'rgba(255, 255, 255, 0.06)';
+                THEME_COLORS.blue = '#38bdf8';       // Cyan
+                THEME_COLORS.purple = '#5E6AD2';     // Linear Indigo Accent
+                THEME_COLORS.green = '#10b981';      // Emerald
                 THEME_COLORS.red = '#fb7185';        // Rose
                 THEME_COLORS.yellow = '#fcd34d';     // Amber
             } else {
-                // Black -> Light
+                // Dark -> Light
+                body.classList.remove('dark-mode');
                 body.classList.remove('black-mode');
                 body.classList.add('light-mode');
                 btnText.innerText = 'Dark Mode';
-                THEME_COLORS.textPrimary = '#0f172a';
-                THEME_COLORS.textSecondary = '#334155';
-                THEME_COLORS.border = 'rgba(0, 0, 0, 0.07)';
-                THEME_COLORS.blue = '#0284c7';       // Sky Blue
-                THEME_COLORS.purple = '#1f7ae0';     // smallcase Brand Blue (Light mode)
-                THEME_COLORS.green = '#059669';      // Forest Green
-                THEME_COLORS.red = '#e11d48';        // Rose Red
-                THEME_COLORS.yellow = '#d97706';     // Amber Yellow
+                THEME_COLORS.textPrimary = '#1C1B1F';
+                THEME_COLORS.textSecondary = '#49454F';
+                THEME_COLORS.border = 'rgba(121, 116, 126, 0.2)';
+                THEME_COLORS.blue = '#7D5260';       // Tertiary accent
+                THEME_COLORS.purple = '#6750A4';     // Material You Primary purple
+                THEME_COLORS.green = '#10B981';      // Emerald
+                THEME_COLORS.red = '#DB2777';        // Rose/Pink
+                THEME_COLORS.yellow = '#F59E0B';     // Amber
             }
 
             buildViewModel();
@@ -1906,6 +1911,7 @@ function populateFilterDropdowns() {
     const brokers = new Set();
     const pocs = new Set();
     const agents = new Set();
+    const smallcaseRMs = new Set();
 
     const allowedBrokers = new Set([
         'Axis', 'Axis MTF', 'HDFC', 'HDFC MTF', 'SBI', 'SBI MTF', 'HDFCsky',
@@ -1921,6 +1927,22 @@ function populateFilterDropdowns() {
         }
         if (item.poc && item.poc !== 'Not shared' && item.poc !== 'No POC') pocs.add(item.poc);
         if (item.agent && item.agent !== 'Unassigned' && item.agent !== 'System') agents.add(item.agent);
+        
+        // Extract unique RMs from smallcase branch
+        if (item.branch && (item.branch === 'smallcase' || item.branch.toLowerCase() === 'smallcase')) {
+            if (item.rm_name && item.rm_name !== 'NA' && item.rm_name !== 'Unknown') {
+                smallcaseRMs.add(item.rm_name);
+            }
+        }
+    });
+
+    // Also scan calls to be thorough
+    rawData.calls.forEach(call => {
+        if (call.branch && (call.branch === 'smallcase' || call.branch.toLowerCase() === 'smallcase')) {
+            if (call.rm_name && call.rm_name !== 'NA' && call.rm_name !== 'Unknown') {
+                smallcaseRMs.add(call.rm_name);
+            }
+        }
     });
 
     const brokerSelect = document.getElementById('filter-broker');
@@ -1954,6 +1976,17 @@ function populateFilterDropdowns() {
         });
         agentSelect.innerHTML = html;
         agentSelect.value = currentAgent;
+    }
+
+    const smallcaseRMSelect = document.getElementById('filter-hide-smallcase-rm');
+    if (smallcaseRMSelect) {
+        const previouslySelected = Array.from(smallcaseRMSelect.selectedOptions).map(o => o.value);
+        let html = '<option value="">Hide smallcase RMs</option>';
+        Array.from(smallcaseRMs).sort().forEach(rm => {
+            const isSelected = previouslySelected.includes(rm) ? 'selected' : '';
+            html += `<option value="${rm}" ${isSelected}>${rm}</option>`;
+        });
+        smallcaseRMSelect.innerHTML = html;
     }
 }
 
@@ -2083,6 +2116,11 @@ function buildViewModel() {
         if (activeFilters.poc !== 'all' && item.poc !== activeFilters.poc) return false;
         if (activeFilters.agent !== 'all' && item.agent !== activeFilters.agent) return false;
         if (activeFilters.branch && activeFilters.branch !== 'all' && item.branch !== activeFilters.branch) return false;
+        
+        // Hide entries of certain RMs from branch 'smallcase'
+        if (item.branch && (item.branch === 'smallcase' || item.branch.toLowerCase() === 'smallcase')) {
+            if (activeFilters.hiddenSmallcaseRMs && activeFilters.hiddenSmallcaseRMs.includes(item.rm_name)) return false;
+        }
 
         return true;
     });
@@ -2099,6 +2137,11 @@ function buildViewModel() {
         if (activeFilters.poc !== 'all' && call.poc !== activeFilters.poc) return false;
         if (activeFilters.agent !== 'all' && call.agent !== activeFilters.agent) return false;
         if (activeFilters.branch && activeFilters.branch !== 'all' && call.branch !== activeFilters.branch) return false;
+
+        // Hide entries of certain RMs from branch 'smallcase'
+        if (call.branch && (call.branch === 'smallcase' || call.branch.toLowerCase() === 'smallcase')) {
+            if (activeFilters.hiddenSmallcaseRMs && activeFilters.hiddenSmallcaseRMs.includes(call.rm_name)) return false;
+        }
 
         return true;
     });
@@ -2121,6 +2164,11 @@ function buildViewModel() {
         if (activeFilters.broker !== 'all' && item.broker_family !== activeFilters.broker) return false;
         if (activeFilters.poc !== 'all' && item.poc !== activeFilters.poc) return false;
         if (activeFilters.agent !== 'all' && item.agent !== activeFilters.agent) return false;
+
+        // Hide entries of certain RMs from branch 'smallcase'
+        if (item.branch && (item.branch === 'smallcase' || item.branch.toLowerCase() === 'smallcase')) {
+            if (activeFilters.hiddenSmallcaseRMs && activeFilters.hiddenSmallcaseRMs.includes(item.rm_name)) return false;
+        }
 
         return true;
     });
@@ -8950,6 +8998,8 @@ function convertSelectToCustomDropdown(select) {
     if (select.dataset.customDropdownInitialized) return;
     select.dataset.customDropdownInitialized = 'true';
 
+    const isMultiple = select.hasAttribute('multiple');
+
     // Hide native select
     select.style.display = 'none';
 
@@ -9009,47 +9059,92 @@ function convertSelectToCustomDropdown(select) {
 
     // Sync selected value text and highlight option
     function syncValue() {
-        const selectedOption = select.options[select.selectedIndex];
-        valueSpan.textContent = selectedOption ? selectedOption.textContent : '';
-        
-        const val = select.value;
-        panel.querySelectorAll('.custom-select-option').forEach(opt => {
-            if (opt.dataset.value === val) {
-                opt.classList.add('selected');
-            } else {
-                opt.classList.remove('selected');
-            }
-        });
+        if (isMultiple) {
+            const selectedOptions = Array.from(select.selectedOptions);
+            const count = selectedOptions.filter(o => o.value !== "").length;
+            valueSpan.textContent = count > 0 ? `Hidden: ${count} RMs` : 'Hide smallcase RMs';
+            
+            const selectedVals = selectedOptions.map(o => o.value);
+            panel.querySelectorAll('.custom-select-option').forEach(opt => {
+                const checkbox = opt.querySelector('input[type="checkbox"]');
+                if (selectedVals.includes(opt.dataset.value)) {
+                    opt.classList.add('selected');
+                    if (checkbox) checkbox.checked = true;
+                } else {
+                    opt.classList.remove('selected');
+                    if (checkbox) checkbox.checked = false;
+                }
+            });
+        } else {
+            const selectedOption = select.options[select.selectedIndex];
+            valueSpan.textContent = selectedOption ? selectedOption.textContent : '';
+            
+            const val = select.value;
+            panel.querySelectorAll('.custom-select-option').forEach(opt => {
+                if (opt.dataset.value === val) {
+                    opt.classList.add('selected');
+                } else {
+                    opt.classList.remove('selected');
+                }
+            });
+        }
     }
 
     // Rebuild option list
     function rebuildOptions() {
         panel.innerHTML = '';
         Array.from(select.options).forEach(option => {
+            // Skip the first empty/placeholder option for multiple
+            if (isMultiple && option.value === "") return;
+
             const optDiv = document.createElement('div');
             optDiv.className = 'custom-select-option';
-            optDiv.textContent = option.textContent;
             optDiv.dataset.value = option.value;
             
-            if (option.value === select.value) {
+            if (isMultiple) {
+                // Add checkbox
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.style.marginRight = '8px';
+                checkbox.style.cursor = 'pointer';
+                checkbox.checked = option.selected;
+                optDiv.appendChild(checkbox);
+                
+                const label = document.createElement('span');
+                label.textContent = option.textContent;
+                optDiv.appendChild(label);
+            } else {
+                optDiv.textContent = option.textContent;
+            }
+            
+            if (option.selected) {
                 optDiv.classList.add('selected');
             }
             
             optDiv.addEventListener('click', (e) => {
                 e.stopPropagation();
-                select.value = option.value;
-                syncValue();
-                
-                if (hasPopover) {
-                    panel.hidePopover();
+                if (isMultiple) {
+                    option.selected = !option.selected;
+                    syncValue();
+                    
+                    // Dispatch change event to trigger filters
+                    const event = new Event('change', { bubbles: true });
+                    select.dispatchEvent(event);
                 } else {
-                    panel.classList.remove('show');
-                    trigger.classList.remove('active');
+                    select.value = option.value;
+                    syncValue();
+                    
+                    if (hasPopover) {
+                        panel.hidePopover();
+                    } else {
+                        panel.classList.remove('show');
+                        trigger.classList.remove('active');
+                    }
+                    
+                    // Dispatch change event to trigger filters
+                    const event = new Event('change', { bubbles: true });
+                    select.dispatchEvent(event);
                 }
-                
-                // Dispatch change event to trigger filters
-                const event = new Event('change', { bubbles: true });
-                select.dispatchEvent(event);
             });
             panel.appendChild(optDiv);
         });
@@ -9112,6 +9207,11 @@ function convertSelectToCustomDropdown(select) {
     });
     observer.observe(select, { childList: true });
 
+    // Sync when native code triggers select.change
+    select.addEventListener('change', () => {
+        syncValue();
+    });
+
     // Intercept select.value assignments to keep custom UI in sync
     const originalDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
     Object.defineProperty(select, 'value', {
@@ -9130,6 +9230,7 @@ function initCustomDropdowns() {
         '#filter-broker',
         '#filter-poc',
         '#filter-agent',
+        '#filter-hide-smallcase-rm',
         '#monthly-month-select',
         '#monthly-year-select',
         '#agent-perf-select'

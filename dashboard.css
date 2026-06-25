@@ -19,132 +19,109 @@
 }
 
 body.dark-mode {
-    --bg-main: #14121a;               /* Matte dark purple-charcoal canvas */
-    --bg-sidebar: rgba(38, 34, 47, 0.6);
-    --bg-card: #26222F;
+    --bg-main: #050506;               /* Near-black canvas */
+    --bg-sidebar: rgba(10, 10, 12, 0.8);
+    --bg-card: rgba(255, 255, 255, 0.04);
     --border-color: rgba(255, 255, 255, 0.06);
-    --text-primary: #f0f4ff;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
+    --text-primary: #EDEDEF;          /* Off-white text */
+    --text-secondary: #8A8F98;        /* Muted text */
+    --text-muted: rgba(255, 255, 255, 0.4);
     
-    --accent-primary: #82b1ff;
-    --accent-primary-rgb: 130, 177, 255;
-    --accent-blue: #00d4ff;
-    --accent-blue-rgb: 0, 212, 255;
-    --accent-green: #10b981;
-    --accent-green-rgb: 16, 185, 129;
-    --accent-red: #f43f5e;
-    --accent-red-rgb: 244, 63, 94;
-    --accent-yellow: #fbbf24;
-    --accent-yellow-rgb: 251, 191, 36;
+    --accent-primary: #5E6AD2;        /* Indigo Accent */
+    --accent-primary-rgb: 94, 106, 210;
+    --accent-blue: #38bdf8;           /* Cyan */
+    --accent-green: #10b981;          /* Emerald */
+    --accent-red: #fb7185;            /* Rose */
+    --accent-yellow: #fcd34d;         /* Amber */
     
-    --card-shadow: 16px 16px 32px rgba(0, 0, 0, 0.4), -8px -8px 20px rgba(255, 255, 255, 0.05);
-    --card-glow: rgba(130, 177, 255, 0.08);
-    --shadow-color: rgba(0, 0, 0, 0.6);
-
-    /* UI Kit Color Tokens */
-    --color-cloud: #26222F;
-    --color-edge: rgba(255, 255, 255, 0.08);
-    --color-mist: #9ca3af;
-    --color-ink: #ffffff;
-
-    /* Claymorphism Tokens mapped to existing glass properties */
-    --glass-bg: #26222F;
-    --glass-border: rgba(255, 255, 255, 0.05);
-    --glass-shadow: 16px 16px 32px rgba(0, 0, 0, 0.45), -8px -8px 20px rgba(255, 255, 255, 0.05), inset 4px 4px 8px rgba(255, 255, 255, 0.08), inset -4px -4px 8px rgba(0, 0, 0, 0.4);
-    --glass-shadow-high: 24px 24px 48px rgba(0, 0, 0, 0.55), -12px -12px 28px rgba(255, 255, 255, 0.07), inset 6px 6px 12px rgba(255, 255, 255, 0.12), inset -6px -6px 12px rgba(0, 0, 0, 0.5);
-    --glass-radius: 32px;
-    --glass-easing: cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy spring-like easing for tactile feel */
-    
-    --clay-pressed: inset 6px 6px 12px rgba(0, 0, 0, 0.55), inset -6px -6px 12px rgba(255, 255, 255, 0.06);
-    --clay-button: 10px 10px 20px rgba(0, 0, 0, 0.45), -6px -6px 12px rgba(255, 255, 255, 0.06), inset 3px 3px 6px rgba(255, 255, 255, 0.08), inset -3px -3px 6px rgba(0, 0, 0, 0.4);
-    --clay-button-active: inset 6px 6px 12px rgba(0, 0, 0, 0.5), inset -6px -6px 12px rgba(255, 255, 255, 0.05);
-}
-
-body.light-mode {
-    --bg-main: #F4F1FA;               /* Soft cool lavender-white canvas */
-    --bg-sidebar: rgba(255, 255, 255, 0.7);
-    --bg-card: #ffffff;
-    --border-color: rgba(139, 92, 246, 0.08);
-    --text-primary: #332F3A;          /* Soft Charcoal for high readability */
-    --text-secondary: #635F69;        /* Dark Lavender-Gray */
-    --text-muted: #8e8a94;
-    
-    --accent-primary: #7C3AED;       /* Vivid Violet */
-    --accent-primary-rgb: 124, 58, 237;
-    --accent-blue: #0EA5E9;          /* Sky Blue */
-    --accent-blue-rgb: 14, 165, 233;
-    --accent-green: #10B981;         /* Emerald Green */
-    --accent-green-rgb: 16, 185, 129;
-    --accent-red: #DB2777;           /* Hot Pink accent */
-    --accent-red-rgb: 219, 39, 119;
-    --accent-yellow: #F59E0B;         /* Amber Yellow */
-    --accent-yellow-rgb: 245, 158, 11;
-    
-    --card-shadow: 16px 16px 32px rgba(160, 150, 180, 0.18), -10px -10px 24px rgba(255, 255, 255, 0.9);
-    --card-glow: rgba(124, 58, 237, 0.05);
-    --shadow-color: rgba(160, 150, 180, 0.15);
-
-    /* UI Kit Color Tokens */
-    --color-cloud: #ffffff;
-    --color-edge: #e5e0f0;
-    --color-mist: #635F69;
-    --color-ink: #7C3AED;
-
-    /* Claymorphism Tokens mapped to existing glass properties */
-    --glass-bg: #ffffff;
-    --glass-border: rgba(139, 92, 246, 0.08);
-    --glass-shadow: 16px 16px 32px rgba(160, 150, 180, 0.2), -10px -10px 24px rgba(255, 255, 255, 0.9), inset 6px 6px 12px rgba(139, 92, 246, 0.03), inset -6px -6px 12px rgba(255, 255, 255, 1);
-    --glass-shadow-high: 24px 24px 48px rgba(160, 150, 180, 0.28), -14px -14px 32px rgba(255, 255, 255, 0.95), inset 8px 8px 16px rgba(139, 92, 246, 0.04), inset -8px -8px 16px rgba(255, 255, 255, 1);
-    --glass-radius: 32px;
-    --glass-easing: cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy spring-like easing for tactile feel */
-    
-    --clay-pressed: inset 8px 8px 16px #d9d4e3, inset -8px -8px 16px #ffffff;
-    --clay-button: 10px 10px 20px rgba(124, 58, 237, 0.22), -6px -6px 12px rgba(255, 255, 255, 0.6), inset 3px 3px 6px rgba(255, 255, 255, 0.4), inset -3px -3px 6px rgba(0, 0, 0, 0.08);
-    --clay-button-active: inset 6px 6px 12px rgba(124, 58, 237, 0.25), inset -6px -6px 12px #ffffff;
-}
-
-body.black-mode {
-    --bg-main: #08070a;               /* Pitch-black canvas */
-    --bg-sidebar: rgba(18, 16, 21, 0.6);
-    --bg-card: #121015;
-    --border-color: rgba(255, 255, 255, 0.04);
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #475569;
-    
-    --accent-primary: #82b1ff;
-    --accent-primary-rgb: 130, 177, 255;
-    --accent-blue: #a8c7fa;
-    --accent-blue-rgb: 168, 199, 250;
-    --accent-green: #b4dfb4;
-    --accent-green-rgb: 180, 223, 180;
-    --accent-red: #f2b8b5;
-    --accent-red-rgb: 242, 184, 181;
-    --accent-yellow: #efb8c8;
-    --accent-yellow-rgb: 239, 184, 200;
-    
-    --card-shadow: 16px 16px 32px rgba(0, 0, 0, 0.65), -8px -8px 20px rgba(255, 255, 255, 0.03);
-    --card-glow: rgba(130, 177, 255, 0.04);
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 0, 0, 0.2);
+    --card-glow: rgba(94, 106, 210, 0.1);
     --shadow-color: rgba(0, 0, 0, 0.8);
 
     /* UI Kit Color Tokens */
-    --color-cloud: #121015;
+    --color-cloud: rgba(255, 255, 255, 0.05);
     --color-edge: rgba(255, 255, 255, 0.06);
-    --color-mist: #94a3b8;
-    --color-ink: #ffffff;
+    --color-mist: #8A8F98;
+    --color-ink: #5E6AD2;
 
-    /* Claymorphism Tokens mapped to existing glass properties */
-    --glass-bg: #121015;
-    --glass-border: rgba(255, 255, 255, 0.04);
-    --glass-shadow: 16px 16px 32px rgba(0, 0, 0, 0.7), -8px -8px 20px rgba(255, 255, 255, 0.03), inset 4px 4px 8px rgba(255, 255, 255, 0.06), inset -4px -4px 8px rgba(0, 0, 0, 0.6);
-    --glass-shadow-high: 24px 24px 48px rgba(0, 0, 0, 0.85), -12px -12px 28px rgba(255, 255, 255, 0.04), inset 6px 6px 12px rgba(255, 255, 255, 0.08), inset -6px -6px 12px rgba(0, 0, 0, 0.7);
-    --glass-radius: 32px;
-    --glass-easing: cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy spring-like easing for tactile feel */
+    /* Glass properties mapped to Linear/Modern */
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 2px 20px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 0, 0, 0.2);
+    --glass-shadow-high: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 80px rgba(94, 106, 210, 0.15);
+    --glass-radius: 16px;
+    --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
     
-    --clay-pressed: inset 6px 6px 12px rgba(0, 0, 0, 0.75), inset -6px -6px 12px rgba(255, 255, 255, 0.04);
-    --clay-button: 10px 10px 20px rgba(0, 0, 0, 0.75), -6px -6px 12px rgba(255, 255, 255, 0.04), inset 3px 3px 6px rgba(255, 255, 255, 0.06), inset -3px -3px 6px rgba(0, 0, 0, 0.6);
-    --clay-button-active: inset 6px 6px 12px rgba(0, 0, 0, 0.7), inset -6px -6px 12px rgba(255, 255, 255, 0.03);
+    /* Linear Inputs & Buttons Variables */
+    --input-bg: #0F0F12;
+    --input-border: 1px solid rgba(255, 255, 255, 0.08);
+    --input-border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    --input-radius: 8px;
+    --input-height: 38px;
+    --input-focus-border: 1px solid #5E6AD2;
+    --input-focus-border-bottom: 1px solid #5E6AD2;
+    
+    --btn-radius: 8px;
+    --btn-height: 38px;
+    --btn-primary-bg: #5E6AD2;
+    --btn-primary-text: #ffffff;
+
+    --clay-pressed: 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --clay-button: 0 0 0 1px rgba(255,255,255,0.1), 0 2px 8px rgba(0,0,0,0.5);
+    --clay-button-active: 0 0 0 1px rgba(255,255,255,0.05), inset 0 2px 4px rgba(0,0,0,0.5);
+}
+
+body.light-mode {
+    --bg-main: #FFFBFE;               /* Warm off-white */
+    --bg-sidebar: #F3EDF7;            /* Surface Container */
+    --bg-card: #F3EDF7;               /* Surface Container */
+    --border-color: rgba(121, 116, 126, 0.2); /* Outline tint */
+    --text-primary: #1C1B1F;          /* Near-black */
+    --text-secondary: #49454F;        /* On Surface Variant */
+    --text-muted: #79747E;            /* Outline */
+    
+    --accent-primary: #6750A4;        /* Rich Purple */
+    --accent-primary-rgb: 103, 80, 164;
+    --accent-blue: #7D5260;           /* Tertiary */
+    --accent-green: #10B981;          /* Emerald Green */
+    --accent-red: #DB2777;            /* Rose/Pink */
+    --accent-yellow: #F59E0B;         /* Amber Yellow */
+    
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    --card-glow: rgba(103, 80, 164, 0.05);
+    --shadow-color: rgba(0,0,0,0.08);
+
+    /* UI Kit Color Tokens */
+    --color-cloud: #E8DEF8;           /* Secondary Container */
+    --color-edge: rgba(121, 116, 126, 0.25);
+    --color-mist: #1D192B;            /* On Secondary Container */
+    --color-ink: #6750A4;             /* Primary */
+
+    /* Glass properties mapped to Material Design 3 */
+    --glass-bg: #F3EDF7;
+    --glass-border: rgba(121, 116, 126, 0.12);
+    --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+    --glass-shadow-high: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.1);
+    --glass-radius: 24px;
+    --glass-easing: cubic-bezier(0.2, 0, 0, 1);
+    
+    /* MD3 Inputs & Buttons Variables */
+    --input-bg: #E7E0EC;
+    --input-border: none;
+    --input-border-bottom: 2px solid #79747E;
+    --input-radius: 12px 12px 0 0;
+    --input-height: 38px;
+    --input-focus-border: none;
+    --input-focus-border-bottom: 2px solid #6750A4;
+    
+    --btn-radius: 9999px;
+    --btn-height: 38px;
+    --btn-primary-bg: #6750A4;
+    --btn-primary-text: #ffffff;
+
+    --clay-pressed: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --clay-button: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+    --clay-button-active: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* ==========================================================================
@@ -448,15 +425,9 @@ body.light-mode .nav-btn.active {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.05);
 }
-.sun-icon, .moon-icon, .black-icon { display: none; }
+.sun-icon, .moon-icon { display: none; }
 body.light-mode .sun-icon { display: block; }
 body.dark-mode .moon-icon { display: block; }
-body.black-mode .black-icon { display: block; }
-
-body.black-mode .blob {
-    opacity: 0.05;
-    mix-blend-mode: screen;
-}
 
 .sync-info {
     font-size: 0.74rem;
@@ -3899,21 +3870,22 @@ input[type="date"],
 input[type="text"],
 .date-picker,
 .search-input {
-    background: transparent !important;
-    border: none !important;
+    background: var(--input-bg) !important;
+    border: var(--input-border) !important;
+    border-bottom: var(--input-border-bottom) !important;
     color: var(--text-primary) !important;
     padding: 8px 14px !important;
-    border-radius: 12px !important;
+    border-radius: var(--input-radius) !important;
     font-size: 0.85rem !important;
     outline: none !important;
-    box-shadow: var(--clay-pressed) !important;
-    transition: border-color 0.2s var(--glass-easing), box-shadow 0.2s var(--glass-easing) !important;
+    box-shadow: none !important;
+    transition: border-color 0.2s var(--glass-easing), box-shadow 0.2s var(--glass-easing), background-color 0.2s var(--glass-easing) !important;
 }
 
 select:focus,
 input:focus {
-    box-shadow: var(--clay-pressed) !important;
-    border: 1px solid var(--accent-primary) !important;
+    border: var(--input-focus-border) !important;
+    border-bottom: var(--input-focus-border-bottom) !important;
 }
 
 /* --- High-fidelity Claymorphic Tabs, Pills and Buttons --- */
@@ -4058,21 +4030,6 @@ input:focus {
     color: #ffffff !important;
 }
 
-body.dark-mode .nav-btn.active,
-body.dark-mode .tab-link.active,
-body.dark-mode .tab-link.current,
-body.dark-mode .sub-tab-pill.active,
-body.dark-mode .preset-btn.active,
-body.dark-mode .pagination-controls button.active,
-body.black-mode .nav-btn.active,
-body.black-mode .tab-link.active,
-body.black-mode .tab-link.current,
-body.black-mode .sub-tab-pill.active,
-body.black-mode .preset-btn.active,
-body.black-mode .pagination-controls button.active {
-    color: #0b090e !important;
-}
-
 /* Active Press / Squish Micro-physics on click */
 .nav-btn:active,
 .tab-link:active,
@@ -4158,10 +4115,6 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
 .dark-mode {
     view-transition-name: root;
 }
-.black-mode {
-    view-transition-name: root;
-}
-
 /* Icon rotation and scaling animation for theme toggle button */
 .theme-toggle .toggle-icon {
     display: inline-block !important;
@@ -4198,11 +4151,12 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
     align-items: center !important;
     justify-content: space-between !important;
     width: 100% !important;
-    height: 38px !important;
+    height: var(--input-height) !important;
     padding: 8px 14px !important;
-    background: rgba(255, 255, 255, 0.04) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
+    background: var(--input-bg) !important;
+    border: var(--input-border) !important;
+    border-bottom: var(--input-border-bottom) !important;
+    border-radius: var(--input-radius) !important;
     color: var(--text-primary) !important;
     font-family: var(--font-heading) !important;
     font-size: 0.85rem !important;
@@ -4210,28 +4164,16 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
     cursor: pointer !important;
     outline: none !important;
     box-shadow: none !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
     transition: border-color 0.2s var(--glass-easing), box-shadow 0.2s var(--glass-easing), background-color 0.2s var(--glass-easing) !important;
-}
-
-body.light-mode .custom-select-trigger {
-    background: rgba(0, 0, 0, 0.02) !important;
 }
 
 .custom-select-trigger:hover,
 .custom-select-trigger.active {
     border-color: var(--accent-primary) !important;
-    background: rgba(255, 255, 255, 0.08) !important;
-}
-
-body.light-mode .custom-select-trigger:hover,
-body.light-mode .custom-select-trigger.active {
-    background: rgba(0, 0, 0, 0.04) !important;
 }
 
 .custom-select-trigger.active {
-    box-shadow: 0 0 10px rgba(31, 122, 224, 0.15) !important;
+    box-shadow: 0 0 0 2px var(--card-glow) !important;
 }
 
 .custom-select-value {
@@ -4256,21 +4198,15 @@ body.light-mode .custom-select-trigger.active {
 .custom-select-panel {
     margin: 0 !important;
     padding: 4px !important;
-    inset: auto !important;
     width: 100%;
     min-width: 180px;
     max-height: 260px;
     overflow-y: auto;
-    background: var(--color-cloud) !important;
-    border: 1px solid var(--color-edge) !important;
-    border-radius: 10px !important;
-    box-shadow: 
-        0 4px 6px -1px rgba(0, 0, 0, 0.05),
-        0 10px 15px -3px rgba(0, 0, 0, 0.1),
-        0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    background: var(--bg-sidebar) !important; /* Tonal container bg */
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--btn-radius) !important; /* Theme-consistent rounding */
+    box-shadow: var(--glass-shadow-high) !important;
     z-index: 99999;
-    backdrop-filter: blur(20px) saturate(140%) !important;
-    -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
     transform-origin: top;
     display: none;
 }
@@ -4319,51 +4255,32 @@ body.light-mode .custom-select-option:hover {
     font-weight: 600 !important;
 }
 
-body.dark-mode .custom-select-option.selected,
-body.black-mode .custom-select-option.selected {
-    color: #0b090e !important;
-}
-
-/* --- iOS Style Date Selector & Apply Button --- */
+/* --- Fluid Date Selector & Apply Button styling --- */
 .date-picker {
     position: relative !important;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif !important;
+    background: var(--input-bg) !important;
+    border: var(--input-border) !important;
+    border-bottom: var(--input-border-bottom) !important;
+    border-radius: var(--input-radius) !important;
+    height: var(--input-height) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-body) !important;
     font-size: 0.85rem !important;
-    font-weight: 500 !important;
-    text-align: center !important;
-    background: rgba(120, 120, 128, 0.12) !important;
-    color: #007aff !important; /* iOS System Blue */
-    border: none !important;
-    border-radius: 8px !important;
-    padding: 6px 10px !important;
-    height: 34px !important;
-    cursor: pointer !important;
-    outline: none !important;
-    width: 125px !important;
+    padding: 8px 12px !important;
     box-sizing: border-box !important;
-    transition: background-color 150ms ease, transform 100ms ease !important;
+    width: 135px !important;
+    outline: none !important;
+    cursor: pointer !important;
+    transition: border-color 0.2s var(--glass-easing), box-shadow 0.2s var(--glass-easing), background-color 0.2s var(--glass-easing) !important;
+    box-shadow: none !important;
 }
 
-body.dark-mode .date-picker,
-body.black-mode .date-picker {
-    background: rgba(120, 120, 128, 0.24) !important;
-    color: #0a84ff !important; /* iOS Dark System Blue */
+.date-picker:focus {
+    border: var(--input-focus-border) !important;
+    border-bottom: var(--input-focus-border-bottom) !important;
 }
 
-.date-picker:hover {
-    background: rgba(120, 120, 128, 0.2) !important;
-}
-
-body.dark-mode .date-picker:hover,
-body.black-mode .date-picker:hover {
-    background: rgba(120, 120, 128, 0.35) !important;
-}
-
-.date-picker:active {
-    transform: scale(0.97) !important;
-}
-
-/* Make entire capsule input clickable for WebKit browsers */
+/* For WebKit date indicator clickability */
 .date-picker::-webkit-calendar-picker-indicator {
     position: absolute !important;
     top: 0 !important;
@@ -4378,46 +4295,34 @@ body.black-mode .date-picker:hover {
 
 .date-separator {
     color: var(--text-secondary) !important;
+    font-family: var(--font-body) !important;
     font-size: 0.85rem !important;
     font-weight: 500 !important;
-    margin: 0 4px !important;
+    margin: 0 8px !important;
 }
 
-/* iOS Style Date Apply button */
 .apply-btn {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    height: 34px !important;
-    padding: 0 16px !important;
-    border-radius: 8px !important;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif !important;
+    height: var(--btn-height) !important;
+    padding: 0 18px !important;
+    border-radius: var(--btn-radius) !important;
+    background: var(--btn-primary-bg) !important;
+    color: var(--btn-primary-text) !important;
+    font-family: var(--font-heading) !important;
     font-size: 0.85rem !important;
     font-weight: 600 !important;
-    background: #007aff !important;
-    color: #ffffff !important;
     border: none !important;
     cursor: pointer !important;
-    transition: background-color 150ms ease, transform 100ms ease !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-}
-
-body.dark-mode .apply-btn,
-body.black-mode .apply-btn {
-    background: #0a84ff !important;
-    color: #ffffff !important;
+    transition: background-color 150ms var(--glass-easing), transform 100ms var(--glass-easing), box-shadow 150ms var(--glass-easing) !important;
 }
 
 .apply-btn:hover {
-    background: #0062cc !important;
-}
-
-body.dark-mode .apply-btn:hover,
-body.black-mode .apply-btn:hover {
-    background: #0070e6 !important;
+    opacity: 0.9 !important;
 }
 
 .apply-btn:active {
-    transform: scale(0.96) !important;
+    transform: scale(0.95) !important;
 }
 
