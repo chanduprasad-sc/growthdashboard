@@ -1,12 +1,12 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=DM+Sans:wght@400;500;700&display=swap");
 
 /* ==========================================================================
    DESIGN SYSTEM - CSS VARIABLES & ROOT
    ========================================================================== */
 :root {
     /* Typography */
-    --font-heading: 'SF Pro Display', -apple-system, 'BlinkMacSystemFont', 'Helvetica Neue', sans-serif;
-    --font-body: 'SF Pro Text', -apple-system, 'BlinkMacSystemFont', sans-serif;
+    --font-heading: 'Nunito', -apple-system, sans-serif;
+    --font-body: 'DM Sans', -apple-system, sans-serif;
     
     /* Animation settings */
     --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -19,120 +19,132 @@
 }
 
 body.dark-mode {
-    --bg-main: #0b090e;               /* Rich deep space black-purple background */
-    --bg-sidebar: rgba(21, 18, 27, 0.5); /* Glassy sidebar */
-    --bg-card: rgba(28, 24, 36, 0.55);   /* Frosted glass container */
-    --border-color: rgba(255, 255, 255, 0.08); /* Semi-transparent outline */
-    --text-primary: #f0f4ff;          /* High-contrast text */
-    --text-secondary: #9ca3af;        /* Slate secondary text */
-    --text-muted: #6b7280;            /* Gray outline */
+    --bg-main: #14121a;               /* Matte dark purple-charcoal canvas */
+    --bg-sidebar: rgba(38, 34, 47, 0.6);
+    --bg-card: #26222F;
+    --border-color: rgba(255, 255, 255, 0.06);
+    --text-primary: #f0f4ff;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
     
-    --accent-primary: #1f7ae0;       /* smallcase Brand Blue */
-    --accent-primary-rgb: 31, 122, 224;
-    --accent-blue: #00d4ff;          /* Vibrant Cyan */
+    --accent-primary: #82b1ff;
+    --accent-primary-rgb: 130, 177, 255;
+    --accent-blue: #00d4ff;
     --accent-blue-rgb: 0, 212, 255;
-    --accent-green: #10b981;         /* Emerald Green */
+    --accent-green: #10b981;
     --accent-green-rgb: 16, 185, 129;
-    --accent-red: #f43f5e;           /* Coral Rose */
+    --accent-red: #f43f5e;
     --accent-red-rgb: 244, 63, 94;
-    --accent-yellow: #fbbf24;        /* Warm Amber */
+    --accent-yellow: #fbbf24;
     --accent-yellow-rgb: 251, 191, 36;
     
-    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
-    --card-glow: rgba(31, 122, 224, 0.15);
-    --shadow-color: rgba(0, 0, 0, 0.4);
+    --card-shadow: 16px 16px 32px rgba(0, 0, 0, 0.4), -8px -8px 20px rgba(255, 255, 255, 0.05);
+    --card-glow: rgba(130, 177, 255, 0.08);
+    --shadow-color: rgba(0, 0, 0, 0.6);
 
     /* UI Kit Color Tokens */
-    --color-cloud: rgba(21, 18, 27, 0.95);
-    --color-edge: rgba(255, 255, 255, 0.12);
+    --color-cloud: #26222F;
+    --color-edge: rgba(255, 255, 255, 0.08);
     --color-mist: #9ca3af;
     --color-ink: #ffffff;
 
-    /* Glassmorphism Tokens */
-    --glass-bg: rgba(21, 18, 27, 0.55);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-    --glass-shadow-high: 0 12px 40px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 0 20px rgba(31, 122, 224, 0.25);
-    --glass-radius: 16px;
-    --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
+    /* Claymorphism Tokens mapped to existing glass properties */
+    --glass-bg: #26222F;
+    --glass-border: rgba(255, 255, 255, 0.05);
+    --glass-shadow: 16px 16px 32px rgba(0, 0, 0, 0.45), -8px -8px 20px rgba(255, 255, 255, 0.05), inset 4px 4px 8px rgba(255, 255, 255, 0.08), inset -4px -4px 8px rgba(0, 0, 0, 0.4);
+    --glass-shadow-high: 24px 24px 48px rgba(0, 0, 0, 0.55), -12px -12px 28px rgba(255, 255, 255, 0.07), inset 6px 6px 12px rgba(255, 255, 255, 0.12), inset -6px -6px 12px rgba(0, 0, 0, 0.5);
+    --glass-radius: 32px;
+    --glass-easing: cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy spring-like easing for tactile feel */
+    
+    --clay-pressed: inset 6px 6px 12px rgba(0, 0, 0, 0.55), inset -6px -6px 12px rgba(255, 255, 255, 0.06);
+    --clay-button: 10px 10px 20px rgba(0, 0, 0, 0.45), -6px -6px 12px rgba(255, 255, 255, 0.06), inset 3px 3px 6px rgba(255, 255, 255, 0.08), inset -3px -3px 6px rgba(0, 0, 0, 0.4);
+    --clay-button-active: inset 6px 6px 12px rgba(0, 0, 0, 0.5), inset -6px -6px 12px rgba(255, 255, 255, 0.05);
 }
 
 body.light-mode {
-    --bg-main: #f3f5fa;               /* Clean grey-blue background */
-    --bg-sidebar: rgba(255, 255, 255, 0.6); /* Glassy sidebar */
-    --bg-card: rgba(255, 255, 255, 0.65);   /* Frosted glass container */
-    --border-color: rgba(0, 0, 0, 0.08);    /* Semi-transparent outline */
-    --text-primary: #0f172a;          /* Slate primary text */
-    --text-secondary: #475569;        /* Slate secondary text */
-    --text-muted: #94a3b8;            /* Slate outline */
+    --bg-main: #F4F1FA;               /* Soft cool lavender-white canvas */
+    --bg-sidebar: rgba(255, 255, 255, 0.7);
+    --bg-card: #ffffff;
+    --border-color: rgba(139, 92, 246, 0.08);
+    --text-primary: #332F3A;          /* Soft Charcoal for high readability */
+    --text-secondary: #635F69;        /* Dark Lavender-Gray */
+    --text-muted: #8e8a94;
     
-    --accent-primary: #1f7ae0;       /* smallcase Brand Blue */
-    --accent-primary-rgb: 31, 122, 224;
-    --accent-blue: #0284c7;          /* Sky Blue */
-    --accent-blue-rgb: 2, 132, 199;
-    --accent-green: #059669;         /* Forest Green */
-    --accent-green-rgb: 5, 150, 105;
-    --accent-red: #e11d48;            /* Rose Red */
-    --accent-red-rgb: 225, 29, 72;
-    --accent-yellow: #d97706;         /* Amber Yellow */
-    --accent-yellow-rgb: 217, 119, 6;
+    --accent-primary: #7C3AED;       /* Vivid Violet */
+    --accent-primary-rgb: 124, 58, 237;
+    --accent-blue: #0EA5E9;          /* Sky Blue */
+    --accent-blue-rgb: 14, 165, 233;
+    --accent-green: #10B981;         /* Emerald Green */
+    --accent-green-rgb: 16, 185, 129;
+    --accent-red: #DB2777;           /* Hot Pink accent */
+    --accent-red-rgb: 219, 39, 119;
+    --accent-yellow: #F59E0B;         /* Amber Yellow */
+    --accent-yellow-rgb: 245, 158, 11;
     
-    --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
-    --card-glow: rgba(31, 122, 224, 0.08);
-    --shadow-color: rgba(31, 38, 135, 0.02);
+    --card-shadow: 16px 16px 32px rgba(160, 150, 180, 0.18), -10px -10px 24px rgba(255, 255, 255, 0.9);
+    --card-glow: rgba(124, 58, 237, 0.05);
+    --shadow-color: rgba(160, 150, 180, 0.15);
 
     /* UI Kit Color Tokens */
     --color-cloud: #ffffff;
-    --color-edge: #e3e8ee;
-    --color-mist: #5b6472;
-    --color-ink: #0e1116;
+    --color-edge: #e5e0f0;
+    --color-mist: #635F69;
+    --color-ink: #7C3AED;
 
-    /* Glassmorphism Tokens */
-    --glass-bg: rgba(255, 255, 255, 0.65);
-    --glass-border: rgba(0, 0, 0, 0.08);
-    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-    --glass-shadow-high: 0 12px 40px 0 rgba(31, 38, 135, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 16px rgba(31, 122, 224, 0.12);
-    --glass-radius: 16px;
-    --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
+    /* Claymorphism Tokens mapped to existing glass properties */
+    --glass-bg: #ffffff;
+    --glass-border: rgba(139, 92, 246, 0.08);
+    --glass-shadow: 16px 16px 32px rgba(160, 150, 180, 0.2), -10px -10px 24px rgba(255, 255, 255, 0.9), inset 6px 6px 12px rgba(139, 92, 246, 0.03), inset -6px -6px 12px rgba(255, 255, 255, 1);
+    --glass-shadow-high: 24px 24px 48px rgba(160, 150, 180, 0.28), -14px -14px 32px rgba(255, 255, 255, 0.95), inset 8px 8px 16px rgba(139, 92, 246, 0.04), inset -8px -8px 16px rgba(255, 255, 255, 1);
+    --glass-radius: 32px;
+    --glass-easing: cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy spring-like easing for tactile feel */
+    
+    --clay-pressed: inset 8px 8px 16px #d9d4e3, inset -8px -8px 16px #ffffff;
+    --clay-button: 10px 10px 20px rgba(124, 58, 237, 0.22), -6px -6px 12px rgba(255, 255, 255, 0.6), inset 3px 3px 6px rgba(255, 255, 255, 0.4), inset -3px -3px 6px rgba(0, 0, 0, 0.08);
+    --clay-button-active: inset 6px 6px 12px rgba(124, 58, 237, 0.25), inset -6px -6px 12px #ffffff;
 }
 
 body.black-mode {
-    --bg-main: #000000;               /* Pure black background */
-    --bg-sidebar: rgba(18, 18, 18, 0.6); /* Glassy sidebar */
-    --bg-card: rgba(26, 26, 26, 0.55);   /* Frosted glass container */
-    --border-color: rgba(255, 255, 255, 0.06);
-    --text-primary: #f8fafc;          /* White primary text */
-    --text-secondary: #94a3b8;        /* Slate secondary text */
-    --text-muted: #475569;            /* Gray outline */
+    --bg-main: #08070a;               /* Pitch-black canvas */
+    --bg-sidebar: rgba(18, 16, 21, 0.6);
+    --bg-card: #121015;
+    --border-color: rgba(255, 255, 255, 0.04);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
     
-    --accent-primary: #82b1ff;       /* Lighter Brand Blue */
+    --accent-primary: #82b1ff;
     --accent-primary-rgb: 130, 177, 255;
-    --accent-blue: #a8c7fa;          /* MD3 dark blue */
+    --accent-blue: #a8c7fa;
     --accent-blue-rgb: 168, 199, 250;
-    --accent-green: #b4dfb4;         /* MD3 dark green */
+    --accent-green: #b4dfb4;
     --accent-green-rgb: 180, 223, 180;
-    --accent-red: #f2b8b5;           /* MD3 dark error */
+    --accent-red: #f2b8b5;
     --accent-red-rgb: 242, 184, 181;
-    --accent-yellow: #efb8c8;        /* MD3 dark tertiary */
+    --accent-yellow: #efb8c8;
     --accent-yellow-rgb: 239, 184, 200;
     
-    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.65);
+    --card-shadow: 16px 16px 32px rgba(0, 0, 0, 0.65), -8px -8px 20px rgba(255, 255, 255, 0.03);
     --card-glow: rgba(130, 177, 255, 0.04);
     --shadow-color: rgba(0, 0, 0, 0.8);
 
     /* UI Kit Color Tokens */
-    --color-cloud: rgba(18, 18, 18, 0.95);
-    --color-edge: rgba(255, 255, 255, 0.1);
+    --color-cloud: #121015;
+    --color-edge: rgba(255, 255, 255, 0.06);
     --color-mist: #94a3b8;
     --color-ink: #ffffff;
 
-    /* Glassmorphism Tokens */
-    --glass-bg: rgba(20, 20, 20, 0.55);
-    --glass-border: rgba(255, 255, 255, 0.06);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --glass-shadow-high: 0 12px 40px 0 rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 0 16px rgba(130, 177, 255, 0.15);
-    --glass-radius: 16px;
-    --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
+    /* Claymorphism Tokens mapped to existing glass properties */
+    --glass-bg: #121015;
+    --glass-border: rgba(255, 255, 255, 0.04);
+    --glass-shadow: 16px 16px 32px rgba(0, 0, 0, 0.7), -8px -8px 20px rgba(255, 255, 255, 0.03), inset 4px 4px 8px rgba(255, 255, 255, 0.06), inset -4px -4px 8px rgba(0, 0, 0, 0.6);
+    --glass-shadow-high: 24px 24px 48px rgba(0, 0, 0, 0.85), -12px -12px 28px rgba(255, 255, 255, 0.04), inset 6px 6px 12px rgba(255, 255, 255, 0.08), inset -6px -6px 12px rgba(0, 0, 0, 0.7);
+    --glass-radius: 32px;
+    --glass-easing: cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy spring-like easing for tactile feel */
+    
+    --clay-pressed: inset 6px 6px 12px rgba(0, 0, 0, 0.75), inset -6px -6px 12px rgba(255, 255, 255, 0.04);
+    --clay-button: 10px 10px 20px rgba(0, 0, 0, 0.75), -6px -6px 12px rgba(255, 255, 255, 0.04), inset 3px 3px 6px rgba(255, 255, 255, 0.06), inset -3px -3px 6px rgba(0, 0, 0, 0.6);
+    --clay-button-active: inset 6px 6px 12px rgba(0, 0, 0, 0.7), inset -6px -6px 12px rgba(255, 255, 255, 0.03);
 }
 
 /* ==========================================================================
@@ -211,9 +223,9 @@ body.light-mode .blob {
     animation-delay: -15s;
 }
 @keyframes float {
-    0% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(8vw, 6vh) scale(1.15); }
-    100% { transform: translate(-6vw, -8vh) scale(0.9); }
+    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    50% { transform: translate(5vw, 3vh) scale(1.08) rotate(3deg); }
+    100% { transform: translate(-3vw, -4vh) scale(0.95) rotate(-3deg); }
 }
 
 /* Faint tactile noise gradient overlay */
@@ -2137,7 +2149,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-heading), sans-serif;
 }
 .sub-tab-pill:hover {
     background: var(--bg-card-hover);
@@ -2245,7 +2257,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: 1px solid var(--border-color);
     background: var(--bg-card);
     color: var(--text-primary);
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-heading), sans-serif;
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -2358,7 +2370,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: 1px solid var(--border-color);
     background: var(--bg-card);
     color: var(--text-primary);
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-heading), sans-serif;
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -2459,7 +2471,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: 1px solid var(--border-color);
     background: var(--bg-card);
     color: var(--text-primary);
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-body), sans-serif;
     font-size: 0.85rem;
     min-width: 250px;
     outline: none;
@@ -2486,7 +2498,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-heading), sans-serif;
 }
 .status-pill:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 .status-pill.active {
@@ -2592,7 +2604,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-heading), sans-serif;
 }
 .pagination-controls button:hover { background: var(--bg-card-hover); }
 .pagination-controls button.active {
@@ -2720,7 +2732,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: none;
     background: linear-gradient(135deg, var(--purple), var(--blue));
     color: #fff;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-heading), sans-serif;
     font-size: 0.9rem;
     font-weight: 700;
     cursor: pointer;
@@ -2855,7 +2867,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: 1px solid var(--border-color);
     background: var(--bg-card);
     color: var(--text-primary);
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-heading), sans-serif;
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
@@ -3429,7 +3441,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     background: var(--bg-card);
     color: var(--text-primary);
     font-size: 0.82rem;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-body), sans-serif;
     outline: none;
     width: 180px;
     transition: border-color 0.2s;
@@ -3445,7 +3457,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-heading), sans-serif;
 }
 .cohort-export-btn:hover { background: var(--purple); color: #fff; border-color: var(--purple); }
 .cohort-modal-close {
@@ -3547,7 +3559,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-heading), sans-serif;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -3609,7 +3621,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     display: flex;
     flex-direction: column;
     gap: 3px;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-body), sans-serif;
 }
 .explorer-item-btn:hover { background: var(--bg-card-hover); }
 .explorer-item-btn.selected { background: rgba(139,92,246,0.12); }
@@ -3858,7 +3870,7 @@ body.light-mode {
     border-color: rgba(31, 122, 224, 0.3) !important;
 }
 
-/* Recessed slots/inner panels */
+/* Recessed slots/inner panels (Concave Clay) */
 .panel-table-wrapper,
 .monthly-table-wrapper,
 .agent-comparison-table-wrapper,
@@ -3874,65 +3886,39 @@ body.light-mode {
 .deepdive-chart-card canvas,
 .ticket-detail-panel,
 .live-feed-viewport {
-    background: rgba(0, 0, 0, 0.2) !important;
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.2) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 12px !important;
-    backdrop-filter: blur(5px) !important;
+    background: transparent !important;
+    box-shadow: var(--clay-pressed) !important;
+    border: none !important;
+    border-radius: 20px !important;
+    backdrop-filter: none !important;
 }
 
-body.light-mode .panel-table-wrapper,
-body.light-mode .monthly-table-wrapper,
-body.light-mode .agent-comparison-table-wrapper,
-body.light-mode .tickets-table-wrapper,
-body.light-mode .repeat-loops-table-wrapper,
-body.light-mode .comments-preview-list,
-body.light-mode .ai-summary-output,
-body.light-mode .hotspots-list,
-body.light-mode .explorer-left-pane,
-body.light-mode .explorer-right-pane,
-body.light-mode .chart-container,
-body.light-mode .ticket-detail-panel,
-body.light-mode .live-feed-viewport {
-    background: rgba(255, 255, 255, 0.45) !important;
-    box-shadow: inset 0 2px 6px rgba(31, 38, 135, 0.03) !important;
-}
-
-/* --- Sleek Translucent Input Fields & Selectors --- */
+/* --- Sleek Recessed Input Fields & Selectors --- */
 select,
 input[type="date"],
 input[type="text"],
 .date-picker,
 .search-input {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid var(--border-color) !important;
+    background: transparent !important;
+    border: none !important;
     color: var(--text-primary) !important;
     padding: 8px 14px !important;
-    border-radius: 8px !important;
+    border-radius: 12px !important;
     font-size: 0.85rem !important;
     outline: none !important;
-    box-shadow: none !important;
-    backdrop-filter: blur(10px) !important;
+    box-shadow: var(--clay-pressed) !important;
     transition: border-color 0.2s var(--glass-easing), box-shadow 0.2s var(--glass-easing) !important;
-}
-
-body.light-mode select,
-body.light-mode input[type="date"],
-body.light-mode input[type="text"],
-body.light-mode .date-picker,
-body.light-mode .search-input {
-    background: rgba(0, 0, 0, 0.02) !important;
 }
 
 select:focus,
 input:focus {
-    border-color: var(--accent-primary) !important;
-    box-shadow: 0 0 10px rgba(31, 122, 224, 0.15) !important;
+    box-shadow: var(--clay-pressed) !important;
+    border: 1px solid var(--accent-primary) !important;
 }
 
-/* --- High-end Tab Links, Pills and Buttons (Uiverse.io astronaut themed) --- */
+/* --- High-fidelity Claymorphic Tabs, Pills and Buttons --- */
 
-/* Tab/Pill Containers */
+/* Tab/Pill Recessed Containers */
 .preset-buttons,
 .sub-tab-pills,
 .status-pills,
@@ -3940,15 +3926,13 @@ input:focus {
 .channel-pills {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 4px !important;
+    gap: 6px !important;
     padding: 6px !important;
-    background: var(--color-cloud) !important;
-    border: 1px solid var(--color-edge) !important;
-    border-radius: 999px !important;
-    box-shadow:
-        0 1px 1px rgba(14, 17, 22, 0.04),
-        0 20px 40px -24px rgba(14, 17, 22, 0.18) !important;
-    font-family: "Inter", system-ui, -apple-system, sans-serif !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 24px !important;
+    box-shadow: var(--clay-pressed) !important;
+    font-family: "Nunito", system-ui, sans-serif !important;
     width: max-content !important;
 }
 
@@ -3974,12 +3958,13 @@ input:focus {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    height: 36px !important;
-    padding: 0 18px !important;
-    border-radius: 999px !important;
+    height: 38px !important;
+    padding: 0 20px !important;
+    border-radius: 18px !important;
+    font-family: "Nunito", sans-serif !important;
     font-size: 14px !important;
-    font-weight: 500 !important;
-    color: var(--color-mist) !important;
+    font-weight: 700 !important;
+    color: var(--text-secondary) !important;
     cursor: pointer !important;
     white-space: nowrap !important;
     background: transparent !important;
@@ -3987,21 +3972,23 @@ input:focus {
     box-shadow: none !important;
     text-shadow: none !important;
     transition:
-        background-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
-        color 220ms cubic-bezier(0.22, 1, 0.36, 1),
-        box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
-        transform 150ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+        background-color 220ms var(--glass-easing),
+        color 220ms var(--glass-easing),
+        box-shadow 220ms var(--glass-easing),
+        transform 180ms var(--glass-easing) !important;
 }
 
-/* Adjust sidebar nav-btn to align left while keeping layout and aesthetics */
+/* Adjust sidebar nav-btn (vertical layout) */
 .nav-btn {
     justify-content: flex-start !important;
-    height: 44px !important; /* Slightly taller for vertical sidebar menu list */
-    padding: 0 20px !important;
+    height: 46px !important;
+    padding: 0 22px !important;
     width: 100% !important;
+    border-radius: 20px !important;
+    font-size: 0.95rem !important;
 }
 
-/* Standalone Buttons - apply background and border since they are not in a .cir-tabs container */
+/* Standalone Buttons - apply raised convex clay styling */
 .screenshot-btn,
 .sidebar-action-btn,
 .export-btn,
@@ -4010,26 +3997,30 @@ input:focus {
 .modal-close-btn,
 .sidebar-collapse-btn {
     background: var(--color-cloud) !important;
-    border: 1px solid var(--color-edge) !important;
-    box-shadow:
-        0 1px 1px rgba(14, 17, 22, 0.04),
-        0 8px 16px -8px rgba(14, 17, 22, 0.1) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 20px !important;
+    box-shadow: var(--clay-button) !important;
+    color: var(--text-primary) !important;
 }
 
-/* Hover States */
+/* Hover States: Float up and increase lighting depth */
 .nav-btn:hover,
 .tab-link:hover,
 .sub-tab-pill:hover,
-.preset-btn:hover,
+.preset-btn:hover {
+    color: var(--accent-primary) !important;
+}
+
 .screenshot-btn:hover,
 .sidebar-action-btn:hover,
 .export-btn:hover,
 .ai-generate-btn:hover,
-.pagination-controls button:hover,
 .theme-toggle:hover,
 .modal-close-btn:hover,
 .sidebar-collapse-btn:hover {
-    color: var(--color-ink) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: var(--glass-shadow-high) !important;
+    color: var(--accent-primary) !important;
 }
 
 /* Standalone Hover border color shift */
@@ -4040,24 +4031,49 @@ input:focus {
 .theme-toggle:hover,
 .modal-close-btn:hover,
 .sidebar-collapse-btn:hover {
-    border-color: var(--color-ink) !important;
+    border-color: var(--accent-primary) !important;
 }
 
-/* Active/Selected states: Maps to the UI kit's checked behavior */
+/* Active/Selected states: Maps to the high-fidelity checked behavior */
 .nav-btn.active,
 .tab-link.active,
 .tab-link.current,
 .sub-tab-pill.active,
 .preset-btn.active,
 .pagination-controls button.active {
-    background: var(--color-ink) !important;
-    color: var(--color-cloud) !important;
-    box-shadow:
-        0 1px 1px rgba(14, 17, 22, 0.06),
-        0 8px 18px -10px rgba(14, 17, 22, 0.5) !important;
+    background: var(--accent-primary) !important;
+    color: #ffffff !important;
+    box-shadow: var(--clay-button) !important;
 }
 
-/* Scaling / Click feedback micro-interaction */
+/* Active Hover state */
+.nav-btn.active:hover,
+.tab-link.active:hover,
+.tab-link.current:hover,
+.sub-tab-pill.active:hover,
+.preset-btn.active:hover,
+.pagination-controls button.active:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: var(--glass-shadow-high) !important;
+    color: #ffffff !important;
+}
+
+body.dark-mode .nav-btn.active,
+body.dark-mode .tab-link.active,
+body.dark-mode .tab-link.current,
+body.dark-mode .sub-tab-pill.active,
+body.dark-mode .preset-btn.active,
+body.dark-mode .pagination-controls button.active,
+body.black-mode .nav-btn.active,
+body.black-mode .tab-link.active,
+body.black-mode .tab-link.current,
+body.black-mode .sub-tab-pill.active,
+body.black-mode .preset-btn.active,
+body.black-mode .pagination-controls button.active {
+    color: #0b090e !important;
+}
+
+/* Active Press / Squish Micro-physics on click */
 .nav-btn:active,
 .tab-link:active,
 .sub-tab-pill:active,
@@ -4070,7 +4086,8 @@ input:focus {
 .theme-toggle:active,
 .modal-close-btn:active,
 .sidebar-collapse-btn:active {
-    transform: scale(0.96) !important;
+    transform: scale(0.92) !important;
+    box-shadow: var(--clay-button-active) !important;
 }
 
 /* Focus indicator */
@@ -4086,7 +4103,7 @@ input:focus {
 .theme-toggle:focus-visible,
 .modal-close-btn:focus-visible,
 .sidebar-collapse-btn:focus-visible {
-    box-shadow: 0 0 0 3px rgba(46, 125, 239, 0.32) !important;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.4) !important;
 }
 
 /* --- Clean Table Header Rows --- */

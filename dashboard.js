@@ -6794,7 +6794,7 @@ function renderIntelligenceDashboard() {
         };
 
         let html = `
-            <div style="font-family: 'Outfit', sans-serif; color: var(--text-primary);">
+            <div style="font-family: var(--font-body), sans-serif; color: var(--text-primary);">
                 <!-- Header row with hour labels -->
                 <div style="display: flex; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
                     <span style="width: 45px; flex-shrink: 0; font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Day</span>
@@ -8024,7 +8024,7 @@ function showFloatingToast(message) {
         toast.style.padding = '12px 24px';
         toast.style.borderRadius = '12px';
         toast.style.boxShadow = '0 8px 30px rgba(139, 92, 246, 0.4)';
-        toast.style.fontFamily = "'Outfit', sans-serif";
+        toast.style.fontFamily = "var(--font-heading), sans-serif";
         toast.style.fontSize = '0.82rem';
         toast.style.fontWeight = '600';
         toast.style.zIndex = '9999';
