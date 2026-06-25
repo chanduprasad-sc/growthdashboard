@@ -96,45 +96,6 @@ body.light-mode {
     --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-body.black-mode {
-    --bg-main: #000000;               /* Pure black background */
-    --bg-sidebar: rgba(18, 18, 18, 0.6); /* Glassy sidebar */
-    --bg-card: rgba(26, 26, 26, 0.55);   /* Frosted glass container */
-    --border-color: rgba(255, 255, 255, 0.06);
-    --text-primary: #f8fafc;          /* White primary text */
-    --text-secondary: #94a3b8;        /* Slate secondary text */
-    --text-muted: #475569;            /* Gray outline */
-    
-    --accent-primary: #82b1ff;       /* Lighter Brand Blue */
-    --accent-primary-rgb: 130, 177, 255;
-    --accent-blue: #a8c7fa;          /* MD3 dark blue */
-    --accent-blue-rgb: 168, 199, 250;
-    --accent-green: #b4dfb4;         /* MD3 dark green */
-    --accent-green-rgb: 180, 223, 180;
-    --accent-red: #f2b8b5;           /* MD3 dark error */
-    --accent-red-rgb: 242, 184, 181;
-    --accent-yellow: #efb8c8;        /* MD3 dark tertiary */
-    --accent-yellow-rgb: 239, 184, 200;
-    
-    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.65);
-    --card-glow: rgba(130, 177, 255, 0.04);
-    --shadow-color: rgba(0, 0, 0, 0.8);
-
-    /* UI Kit Color Tokens */
-    --color-cloud: rgba(18, 18, 18, 0.95);
-    --color-edge: rgba(255, 255, 255, 0.1);
-    --color-mist: #94a3b8;
-    --color-ink: #ffffff;
-
-    /* Glassmorphism Tokens */
-    --glass-bg: rgba(20, 20, 20, 0.55);
-    --glass-border: rgba(255, 255, 255, 0.06);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --glass-shadow-high: 0 12px 40px 0 rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 0 16px rgba(130, 177, 255, 0.15);
-    --glass-radius: 16px;
-    --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
 /* ==========================================================================
    RESET, ANIMATED BG MESH & NOISE OVERLAY
    ========================================================================== */
@@ -436,14 +397,44 @@ body.light-mode .nav-btn.active {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.05);
 }
-.sun-icon, .moon-icon, .black-icon { display: none; }
-body.light-mode .sun-icon { display: block; }
-body.dark-mode .moon-icon { display: block; }
-body.black-mode .black-icon { display: block; }
-
-body.black-mode .blob {
-    opacity: 0.05;
-    mix-blend-mode: screen;
+.theme-toggle-icon-container {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+}
+.theme-toggle .toggle-icon {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    display: inline-block !important;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+body.light-mode .sun-icon {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+    pointer-events: auto;
+}
+body.light-mode .moon-icon {
+    transform: scale(0) rotate(90deg);
+    opacity: 0;
+    pointer-events: none;
+}
+body.dark-mode .sun-icon {
+    transform: scale(0) rotate(-90deg);
+    opacity: 0;
+    pointer-events: none;
+}
+body.dark-mode .moon-icon {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+    pointer-events: auto;
+}
+.theme-toggle:hover .theme-toggle-icon-container {
+    transform: rotate(20deg) scale(1.05);
 }
 
 .sync-info {
@@ -4141,18 +4132,7 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
 .dark-mode {
     view-transition-name: root;
 }
-.black-mode {
-    view-transition-name: root;
-}
 
-/* Icon rotation and scaling animation for theme toggle button */
-.theme-toggle .toggle-icon {
-    display: inline-block !important;
-    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
-}
-.theme-toggle:hover .toggle-icon {
-    transform: rotate(20deg) scale(1.1) !important;
-}
 
 /* --- Custom Popover Select Dropdowns (shadcn/ui inspired) --- */
 .custom-select-wrapper {
@@ -4310,8 +4290,7 @@ body.light-mode .custom-select-option:hover {
     font-weight: 600 !important;
 }
 
-body.dark-mode .custom-select-option.selected,
-body.black-mode .custom-select-option.selected {
+body.dark-mode .custom-select-option.selected {
     color: #0b090e !important;
 }
 
@@ -4362,8 +4341,7 @@ body.black-mode .custom-select-option.selected {
     transform: scale(1.02) !important;
 }
 
-body.dark-mode .date-picker:focus,
-body.black-mode .date-picker:focus {
+body.dark-mode .date-picker:focus {
     box-shadow: 
         0 1px 3px rgba(0,0,0,0.3),
         0 4px 12px rgba(0,0,0,0.4) !important;
@@ -4418,299 +4396,4 @@ body.black-mode .date-picker:focus {
 .apply-btn:active {
     transform: scale(0.95) !important;
 }
-
-/* ==========================================================================
-   ANIMATED SLIDING TAB INDICATORS (ANIMATE-UI STYLE)
-   ========================================================================== */
-.sliding-indicator {
-    position: absolute !important;
-    z-index: 0 !important;
-    pointer-events: none !important;
-    transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
-                width 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
-                height 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
-                opacity 0.2s ease !important;
-}
-
-/* Sidebar Nav Indicators */
-.nav-menu {
-    position: relative !important;
-}
-.nav-menu .sliding-indicator {
-    border-radius: 16px !important;
-    background: rgba(255, 255, 255, 0.11) !important;
-    border: 1px solid rgba(255, 255, 255, 0.22) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2), 0 0 14px rgba(0, 212, 255, 0.2) !important;
-}
-body.light-mode .nav-menu .sliding-indicator {
-    background: rgba(0, 0, 0, 0.05) !important;
-    border: 1px solid rgba(0, 0, 0, 0.12) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 0 14px rgba(139, 92, 246, 0.12) !important;
-}
-
-/* Rounded-pill Indicators (Presets and Channels) */
-.preset-buttons, .channel-pills {
-    position: relative !important;
-}
-.preset-buttons .sliding-indicator,
-.channel-pills .sliding-indicator {
-    border-radius: 100px !important;
-    background-color: var(--accent-blue) !important;
-    box-shadow: 0 4px 14px rgba(0, 212, 255, 0.3) !important;
-}
-body.light-mode .preset-buttons .sliding-indicator,
-body.light-mode .channel-pills .sliding-indicator {
-    background-color: var(--accent-primary) !important;
-    box-shadow: 0 4px 14px rgba(139, 92, 246, 0.25) !important;
-}
-
-/* Disable static active backgrounds so the sliding indicator is visible */
-.nav-btn.active, 
-body.light-mode .nav-btn.active,
-.preset-btn.active, 
-.pill-btn.active,
-body.light-mode .preset-btn.active, 
-body.light-mode .pill-btn.active {
-    background: transparent !important;
-    border-color: transparent !important;
-    box-shadow: none !important;
-}
-
-/* Ensure text/icon colors are correct on active buttons (sliding indicator behind them) */
-.nav-btn.active {
-    color: #ffffff !important;
-}
-body.light-mode .nav-btn.active {
-    color: var(--text-primary) !important;
-}
-
-.preset-btn.active, 
-.pill-btn.active {
-    color: #060a13 !important; /* dark text on cyan indicator in dark mode */
-}
-body.light-mode .preset-btn.active, 
-body.light-mode .pill-btn.active {
-    color: #ffffff !important; /* white text on purple indicator in light mode */
-}
-
-/* ==========================================================================
-   RADIX-STYLE COMPOSABLE SIDEBAR SYSTEM
-   ========================================================================== */
-.sidebar {
-    padding: 0 !important;
-    overflow: hidden !important;
-}
-
-.sidebar-header {
-    padding: 24px 24px 16px !important;
-    border-bottom: 1px solid var(--border-color) !important;
-    display: flex !important;
-    flex-direction: column !important;
-    position: relative !important;
-}
-
-.sidebar-header .brand {
-    margin-bottom: 0 !important;
-}
-
-.sidebar-content {
-    flex: 1 !important;
-    overflow-y: auto !important;
-    padding: 20px 24px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 20px !important;
-}
-
-/* Custom premium scrollbar for sidebar content */
-.sidebar-content::-webkit-scrollbar {
-    width: 4px !important;
-}
-.sidebar-content::-webkit-scrollbar-track {
-    background: transparent !important;
-}
-.sidebar-content::-webkit-scrollbar-thumb {
-    background: var(--border-color) !important;
-    border-radius: 10px !important;
-}
-
-.sidebar-group {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 8px !important;
-}
-
-.sidebar-group-label {
-    font-size: 0.72rem !important;
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 1px !important;
-    color: var(--text-muted) !important;
-    margin-bottom: 6px !important;
-    padding-left: 12px !important;
-}
-
-.sidebar-footer {
-    padding: 16px 24px 24px !important;
-    border-top: 1px solid var(--border-color) !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 16px !important;
-}
-
-/* ==========================================================================
-   3D FLIP BUTTON SWITCHER
-   ========================================================================== */
-.flip-button {
-    position: relative !important;
-    width: 100% !important;
-    height: 38px !important;
-    perspective: 1000px !important;
-    background: transparent !important;
-    border: none !important;
-    cursor: pointer !important;
-    padding: 0 !important;
-    outline: none !important;
-}
-
-.flip-button-inner {
-    position: relative !important;
-    width: 100% !important;
-    height: 100% !important;
-    text-align: center !important;
-    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    transform-style: preserve-3d !important;
-    display: block !important;
-}
-
-.flip-button.flipped .flip-button-inner {
-    transform: rotateX(180deg) !important;
-}
-
-.flip-button-front, .flip-button-back {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    -webkit-backface-visibility: hidden !important;
-    backface-visibility: hidden !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 8px !important;
-    border-radius: 999px !important;
-    font-size: 0.82rem !important;
-    font-weight: 600 !important;
-    font-family: var(--font-heading) !important;
-    border: 1px solid var(--color-edge) !important;
-    background: var(--color-cloud) !important;
-    color: var(--text-secondary) !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
-    transition: background-color 220ms, border-color 220ms, color 220ms !important;
-}
-
-.flip-button-back {
-    transform: rotateX(180deg) !important;
-}
-
-.flip-button:hover .flip-button-front,
-.flip-button:hover .flip-button-back {
-    background: var(--bg-card-hover, rgba(255, 255, 255, 0.05)) !important;
-    color: var(--text-primary) !important;
-    border-color: var(--text-muted) !important;
-}
-
-body.light-mode .flip-button:hover .flip-button-front,
-body.light-mode .flip-button:hover .flip-button-back {
-    background: rgba(0, 0, 0, 0.02) !important;
-}
-
-/* ==========================================================================
-   LIQUID BUTTON HOVER FILL SYSTEM
-   ========================================================================== */
-.liquid-button {
-    position: relative !important;
-    overflow: hidden !important;
-    z-index: 1 !important;
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
-                box-shadow 0.2s ease, 
-                color 0.25s ease !important;
-}
-
-/* Liquid fill element rising from bottom */
-.liquid-button::before {
-    content: '' !important;
-    position: absolute !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: var(--liquid-fill-height, 3px) !important;
-    background: var(--liquid-bg, var(--accent-primary, #1f7ae0)) !important;
-    z-index: -1 !important;
-    opacity: 0.85 !important;
-    transition: height 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
-                opacity 0.25s ease !important;
-}
-
-/* Hover scales up and fills height */
-.liquid-button:hover {
-    transform: scale(var(--liquid-hover-scale, 1.03)) !important;
-    box-shadow: 0 4px 15px rgba(var(--accent-primary-rgb, 31, 122, 224), 0.2) !important;
-}
-
-.liquid-button:hover::before {
-    height: 100% !important;
-    opacity: 1 !important;
-}
-
-.liquid-button:hover {
-    color: var(--liquid-hover-color, #ffffff) !important;
-}
-
-/* Tap scales down */
-.liquid-button:active {
-    transform: scale(var(--liquid-tap-scale, 0.95)) !important;
-}
-
-/* Preserving Specific Default Colors */
-.screenshot-btn.liquid-button {
-    --liquid-bg: linear-gradient(135deg, var(--accent-primary) 0%, #7c3aed 100%) !important;
-    --liquid-hover-color: #ffffff !important;
-}
-
-.apply-btn.liquid-button {
-    --liquid-bg: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-blue) 100%) !important;
-    --liquid-hover-color: #ffffff !important;
-}
-
-.ai-generate-btn.liquid-button {
-    --liquid-bg: linear-gradient(135deg, #7c3aed 0%, var(--accent-blue) 100%) !important;
-    --liquid-hover-color: #ffffff !important;
-}
-
-.reset-btn.liquid-button {
-    --liquid-bg: var(--accent-red, #f43f5e) !important;
-    --liquid-hover-color: #ffffff !important;
-}
-
-.export-btn.liquid-button {
-    --liquid-bg: var(--accent-primary, #1f7ae0) !important;
-    --liquid-hover-color: #ffffff !important;
-}
-
-.cohort-export-btn.liquid-button {
-    --liquid-bg: var(--accent-primary, #1f7ae0) !important;
-    --liquid-hover-color: #ffffff !important;
-}
-
-.sidebar-action-btn.liquid-button {
-    --liquid-bg: var(--border-color) !important;
-    --liquid-hover-color: var(--text-primary) !important;
-}
-
-body.light-mode .sidebar-action-btn.liquid-button {
-    --liquid-hover-color: #0f172a !important;
-}
-
 

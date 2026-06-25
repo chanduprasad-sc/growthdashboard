@@ -189,37 +189,75 @@ function setupEventListeners() {
     });
 
     // Theme Switcher (Light/Dark)
-    document.getElementById('theme-toggle-btn').addEventListener('click', () => {
-        const body = document.body;
-        const btnText = document.querySelector('.theme-text');
+    document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
+        const toggleTheme = () => {
+            const body = document.body;
+            const btnText = document.querySelector('.theme-text');
+            
+            if (body.classList.contains('dark-mode')) {
+                body.classList.remove('dark-mode');
+                body.classList.add('light-mode');
+                if (btnText) btnText.innerText = 'Dark Mode';
+                THEME_COLORS.textPrimary = '#0f172a';
+                THEME_COLORS.textSecondary = '#334155';
+                THEME_COLORS.border = 'rgba(0, 0, 0, 0.12)';
+                THEME_COLORS.blue = '#0284c7';       // Sky Blue
+                THEME_COLORS.purple = '#8b5cf6';     // Bright Violet
+                THEME_COLORS.green = '#059669';      // Forest Green
+                THEME_COLORS.red = '#e11d48';        // Rose Red
+                THEME_COLORS.yellow = '#d97706';     // Amber Yellow
+            } else {
+                body.classList.remove('light-mode');
+                body.classList.add('dark-mode');
+                if (btnText) btnText.innerText = 'Light Mode';
+                THEME_COLORS.textPrimary = '#f0f4ff';
+                THEME_COLORS.textSecondary = '#cbd5e1';
+                THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
+                THEME_COLORS.blue = '#00d4ff';       // Electric Cyan
+                THEME_COLORS.purple = '#a78bfa';     // Soft Violet
+                THEME_COLORS.green = '#10b981';      // Emerald
+                THEME_COLORS.red = '#f43f5e';        // Coral Red
+                THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
+            }
+            
+            buildViewModel();
+        };
+
+        const isAppearanceTransition = document.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         
-        if (body.classList.contains('dark-mode')) {
-            body.classList.remove('dark-mode');
-            body.classList.add('light-mode');
-            btnText.innerText = 'Dark Mode';
-            THEME_COLORS.textPrimary = '#0f172a';
-            THEME_COLORS.textSecondary = '#334155';
-            THEME_COLORS.border = 'rgba(0, 0, 0, 0.12)';
-            THEME_COLORS.blue = '#0284c7';       // Sky Blue
-            THEME_COLORS.purple = '#8b5cf6';     // Bright Violet
-            THEME_COLORS.green = '#059669';      // Forest Green
-            THEME_COLORS.red = '#e11d48';        // Rose Red
-            THEME_COLORS.yellow = '#d97706';     // Amber Yellow
-        } else {
-            body.classList.remove('light-mode');
-            body.classList.add('dark-mode');
-            btnText.innerText = 'Light Mode';
-            THEME_COLORS.textPrimary = '#f0f4ff';
-            THEME_COLORS.textSecondary = '#cbd5e1';
-            THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
-            THEME_COLORS.blue = '#00d4ff';       // Electric Cyan
-            THEME_COLORS.purple = '#a78bfa';     // Soft Violet
-            THEME_COLORS.green = '#10b981';      // Emerald
-            THEME_COLORS.red = '#f43f5e';        // Coral Red
-            THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
+        if (!isAppearanceTransition) {
+            toggleTheme();
+            return;
         }
-        
-        buildViewModel();
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const endRadius = Math.hypot(
+            Math.max(x, window.innerWidth - x),
+            Math.max(y, window.innerHeight - y)
+        );
+
+        const transition = document.startViewTransition(() => {
+            toggleTheme();
+        });
+
+        transition.ready.then(() => {
+            const clipPath = [
+                `circle(0px at ${x}px ${y}px)`,
+                `circle(${endRadius}px at ${x}px ${y}px)`
+            ];
+            document.documentElement.animate(
+                {
+                    clipPath: clipPath
+                },
+                {
+                    duration: 500,
+                    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                    pseudoElement: '::view-transition-new(root)'
+                }
+            );
+        });
     });
 
     // Attribute Explorer tab switches

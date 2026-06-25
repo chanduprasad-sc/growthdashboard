@@ -296,9 +296,45 @@ body.light-mode .nav-btn.active {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.05);
 }
-.sun-icon { display: none; }
-body.light-mode .sun-icon { display: block; }
-body.light-mode .moon-icon { display: none; }
+.theme-toggle-icon-container {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+}
+.theme-toggle .toggle-icon {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    display: inline-block !important;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+body.light-mode .sun-icon {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+    pointer-events: auto;
+}
+body.light-mode .moon-icon {
+    transform: scale(0) rotate(90deg);
+    opacity: 0;
+    pointer-events: none;
+}
+body.dark-mode .sun-icon {
+    transform: scale(0) rotate(-90deg);
+    opacity: 0;
+    pointer-events: none;
+}
+body.dark-mode .moon-icon {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+    pointer-events: auto;
+}
+.theme-toggle:hover .theme-toggle-icon-container {
+    transform: rotate(20deg) scale(1.05);
+}
 
 .sync-info {
     font-size: 0.74rem;

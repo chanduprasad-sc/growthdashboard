@@ -1237,7 +1237,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDashboardData();
     setupEventListeners();
     initCustomDropdowns();
-    initSlidingIndicators();
 });
 
 async function loadDashboardData() {
@@ -1679,30 +1678,17 @@ function setupEventListeners() {
         });
     }
 
-    // Theme Switcher (Light / Dark / Black)
+    // Theme Switcher (Light / Dark)
     document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
         const toggleTheme = () => {
             const body = document.body;
-            const btn = document.getElementById('theme-toggle-btn');
-            const frontLabel = btn.querySelector('.theme-label-front');
-            const backLabel = btn.querySelector('.theme-label-back');
-            const willFlip = !btn.classList.contains('flipped');
+            const btnText = document.querySelector('.theme-text');
 
             if (body.classList.contains('light-mode')) {
                 // Light -> Dark
                 body.classList.remove('light-mode');
                 body.classList.add('dark-mode');
-                
-                if (willFlip) {
-                    backLabel.innerHTML = 'Dark Mode 🌙';
-                    frontLabel.innerHTML = 'Black Mode 🌑';
-                    btn.classList.add('flipped');
-                } else {
-                    frontLabel.innerHTML = 'Dark Mode 🌙';
-                    backLabel.innerHTML = 'Black Mode 🌑';
-                    btn.classList.remove('flipped');
-                }
-
+                if (btnText) btnText.innerText = 'Light Mode';
                 THEME_COLORS.textPrimary = '#f0f4ff';
                 THEME_COLORS.textSecondary = '#cbd5e1';
                 THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
@@ -1711,44 +1697,11 @@ function setupEventListeners() {
                 THEME_COLORS.green = '#10b981';      // Emerald
                 THEME_COLORS.red = '#f43f5e';        // Coral Red
                 THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
-            } else if (body.classList.contains('dark-mode')) {
-                // Dark -> Black
-                body.classList.remove('dark-mode');
-                body.classList.add('black-mode');
-                
-                if (willFlip) {
-                    backLabel.innerHTML = 'Black Mode 🌑';
-                    frontLabel.innerHTML = 'Light Mode ☀️';
-                    btn.classList.add('flipped');
-                } else {
-                    frontLabel.innerHTML = 'Black Mode 🌑';
-                    backLabel.innerHTML = 'Light Mode ☀️';
-                    btn.classList.remove('flipped');
-                }
-
-                THEME_COLORS.textPrimary = '#f8fafc';
-                THEME_COLORS.textSecondary = '#cbd5e1';
-                THEME_COLORS.border = 'rgba(255, 255, 255, 0.1)';
-                THEME_COLORS.blue = '#38bdf8';       // Bright Cyan
-                THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Black mode)
-                THEME_COLORS.green = '#34d399';      // Mint
-                THEME_COLORS.red = '#fb7185';        // Rose
-                THEME_COLORS.yellow = '#fcd34d';     // Amber
             } else {
-                // Black -> Light
-                body.classList.remove('black-mode');
+                // Dark -> Light
+                body.classList.remove('dark-mode');
                 body.classList.add('light-mode');
-                
-                if (willFlip) {
-                    backLabel.innerHTML = 'Light Mode ☀️';
-                    frontLabel.innerHTML = 'Dark Mode 🌙';
-                    btn.classList.add('flipped');
-                } else {
-                    frontLabel.innerHTML = 'Light Mode ☀️';
-                    backLabel.innerHTML = 'Dark Mode 🌙';
-                    btn.classList.remove('flipped');
-                }
-
+                if (btnText) btnText.innerText = 'Dark Mode';
                 THEME_COLORS.textPrimary = '#0f172a';
                 THEME_COLORS.textSecondary = '#334155';
                 THEME_COLORS.border = 'rgba(0, 0, 0, 0.07)';
@@ -9383,81 +9336,6 @@ function initCustomDropdowns() {
                 p.hidePopover();
             }
         });
-    });
-}
-
-function initSlidingIndicators() {
-    const containers = document.querySelectorAll('.nav-menu, .preset-buttons, .channel-pills');
-    
-    function updateIndicator(container) {
-        const activeBtn = container.querySelector('.active');
-        let indicator = container.querySelector('.sliding-indicator');
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.className = 'sliding-indicator';
-            container.insertBefore(indicator, container.firstChild);
-        }
-        
-        if (activeBtn && activeBtn.offsetWidth > 0 && activeBtn.offsetHeight > 0) {
-            indicator.style.width = `${activeBtn.offsetWidth}px`;
-            indicator.style.height = `${activeBtn.offsetHeight}px`;
-            indicator.style.transform = `translate3d(${activeBtn.offsetLeft}px, ${activeBtn.offsetTop}px, 0)`;
-            indicator.style.opacity = '1';
-        } else {
-            indicator.style.opacity = '0';
-        }
-    }
-    
-    function updateAll() {
-        containers.forEach(updateIndicator);
-    }
-    
-    // Initial run
-    updateAll();
-    
-    // Also run after a short delay to ensure fonts/layout are stable
-    setTimeout(updateAll, 100);
-    setTimeout(updateAll, 500);
-    
-    // Handle resize
-    window.addEventListener('resize', updateAll);
-    
-    // Listen to transitions (like sidebar toggle or filters collapsible expanding)
-    document.body.addEventListener('transitionend', (e) => {
-        if (e.propertyName === 'width' || e.propertyName === 'transform' || e.propertyName === 'margin-left') {
-            updateAll();
-        }
-    });
-
-    // Listen to popover/collapsible details toggling
-    document.body.addEventListener('toggle', (e) => {
-        updateAll();
-    }, true);
-    
-    // MutationObserver to watch for class changes on elements (like active class toggles)
-    const observer = new MutationObserver((mutations) => {
-        let shouldUpdate = false;
-        for (let mutation of mutations) {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                shouldUpdate = true;
-                break;
-            }
-        }
-        if (shouldUpdate) {
-            updateAll();
-        }
-    });
-    
-    observer.observe(document.body, {
-        attributes: true,
-        subtree: true,
-        attributeFilter: ['class']
-    });
-    
-    // Fallback click handler on body to catch any dynamic state changes that might not fire mutations immediately
-    document.body.addEventListener('click', () => {
-        updateAll();
-        requestAnimationFrame(updateAll);
     });
 }
 
