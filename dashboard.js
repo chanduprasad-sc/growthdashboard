@@ -1793,15 +1793,21 @@ function setupEventListeners() {
     // Preset Date buttons
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
             const preset = btn.getAttribute('data-preset');
             activeFilters.datePreset = preset;
 
-            // Recalculate date range
-            setDateRangeFromPreset(preset);
-            buildViewModel();
+            if (preset === 'custom') {
+                const trigger = document.getElementById('drp-trigger');
+                if (trigger) {
+                    trigger.click();
+                }
+            } else {
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                // Recalculate date range
+                setDateRangeFromPreset(preset);
+                buildViewModel();
+            }
         });
     });
 
@@ -2554,8 +2560,14 @@ function initDateRangePicker() {
         const elTo   = document.getElementById('filter-date-to');
         if (elFrom) elFrom.value = activeFilters.dateFrom;
         if (elTo)   elTo.value   = activeFilters.dateTo;
-        // deactivate preset pills
-        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        // highlight custom preset pill
+        document.querySelectorAll('.preset-btn').forEach(b => {
+            if (b.getAttribute('data-preset') === 'custom') {
+                b.classList.add('active');
+            } else {
+                b.classList.remove('active');
+            }
+        });
         updateLabel();
         closePopup();
         buildViewModel();
@@ -2564,9 +2576,15 @@ function initDateRangePicker() {
     if (hasPopover) {
         popup.addEventListener('toggle', (event) => {
             if (event.newState === 'open') {
-                // Go to custom preset and deactivate buttons immediately when opened
+                // Go to custom preset and highlight Custom button immediately when opened
                 activeFilters.datePreset = 'custom';
-                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.preset-btn').forEach(b => {
+                    if (b.getAttribute('data-preset') === 'custom') {
+                        b.classList.add('active');
+                    } else {
+                        b.classList.remove('active');
+                    }
+                });
 
                 // Initialize view to include current active range
                 if (activeFilters.dateFrom) {
@@ -2777,8 +2795,13 @@ function buildViewModel() {
     // Guide tab has no dynamic data
     if (currentTab === 'tab-guide') return;
 
-    const fromTs = new Date(activeFilters.dateFrom + 'T00:00:00').getTime();
-    const toTs = new Date(activeFilters.dateTo + 'T23:59:59').getTime();
+    const fromD = safeParseDate(activeFilters.dateFrom);
+    if (fromD) fromD.setHours(0, 0, 0, 0);
+    const fromTs = fromD ? fromD.getTime() : 0;
+
+    const toD = safeParseDate(activeFilters.dateTo);
+    if (toD) toD.setHours(23, 59, 59, 999);
+    const toTs = toD ? toD.getTime() : 0;
 
     // Filter active interactions
     const filteredInteractions = rawData.support_interactions.filter(item => {
@@ -2843,8 +2866,13 @@ function buildViewModel() {
 
     // Get previous comparative period data
     const prevPeriod = getPreviousPeriodDates(activeFilters.dateFrom, activeFilters.dateTo);
-    const prevFromTs = new Date(prevPeriod.from + 'T00:00:00').getTime();
-    const prevToTs = new Date(prevPeriod.to + 'T23:59:59').getTime();
+    const prevFromD = safeParseDate(prevPeriod.from);
+    if (prevFromD) prevFromD.setHours(0, 0, 0, 0);
+    const prevFromTs = prevFromD ? prevFromD.getTime() : 0;
+
+    const prevToD = safeParseDate(prevPeriod.to);
+    if (prevToD) prevToD.setHours(23, 59, 59, 999);
+    const prevToTs = prevToD ? prevToD.getTime() : 0;
 
     const prevInteractions = rawData.support_interactions.filter(item => {
         if (!item.date) return false;
@@ -5323,8 +5351,10 @@ function renderVisualControlDashboard() {
     const branchDataPoints = getScatterDataPoints(data, 'branch');
 
     // Avg/Day: totalInteractions / number of days in selected date range
-    const fromD = new Date(activeFilters.dateFrom + 'T00:00:00');
-    const toD = new Date(activeFilters.dateTo + 'T23:59:59');
+    const fromD = safeParseDate(activeFilters.dateFrom);
+    if (fromD) fromD.setHours(0, 0, 0, 0);
+    const toD = safeParseDate(activeFilters.dateTo);
+    if (toD) toD.setHours(23, 59, 59, 999);
     const diffMs = toD.getTime() - fromD.getTime();
     const numDays = Math.max(1, Math.round(diffMs / (24 * 60 * 60 * 1000)));
     const avgPerDay = Math.round(totalInteractions / numDays);
@@ -7658,8 +7688,10 @@ function renderIssueTrendingChart() {
         .slice(0, 3)
         .map(entry => entry[0]);
 
-    const fromD = new Date(activeFilters.dateFrom + 'T00:00:00');
-    const toD = new Date(activeFilters.dateTo + 'T23:59:59');
+    const fromD = safeParseDate(activeFilters.dateFrom);
+    if (fromD) fromD.setHours(0, 0, 0, 0);
+    const toD = safeParseDate(activeFilters.dateTo);
+    if (toD) toD.setHours(23, 59, 59, 999);
     const datesArray = [];
     let currDate = new Date(fromD.getTime());
     while (currDate <= toD) {
