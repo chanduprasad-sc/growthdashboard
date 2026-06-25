@@ -1814,6 +1814,28 @@ function setupEventListeners() {
     // MUI-style Date Range Picker
     initDateRangePicker();
 
+    // Standard inline Date apply button (fallback for b2b_index.html style layout)
+    const applyDateBtn = document.getElementById('apply-date-btn');
+    if (applyDateBtn) {
+        applyDateBtn.addEventListener('click', () => {
+            const from = document.getElementById('filter-date-from').value;
+            const to = document.getElementById('filter-date-to').value;
+            if (from && to) {
+                activeFilters.datePreset = 'custom';
+                document.querySelectorAll('.preset-btn').forEach(b => {
+                    if (b.getAttribute('data-preset') === 'custom') {
+                        b.classList.add('active');
+                    } else {
+                        b.classList.remove('active');
+                    }
+                });
+                activeFilters.dateFrom = from;
+                activeFilters.dateTo = to;
+                buildViewModel();
+            }
+        });
+    }
+
     // Quick Channel Pills selector (Combined, Call Ticket, WhatsApp)
     document.querySelectorAll('.pill-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -2283,208 +2305,37 @@ function setDefaultDateRange() {
 // MUI-STYLE DATE RANGE PICKER (vanilla JS)
 // =============================================================================
 function initDateRangePicker() {
-    const MONTHS = ['January','February','March','April','May','June',
-                    'July','August','September','October','November','December'];
-    const WDAYS  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-
     const trigger     = document.getElementById('drp-trigger');
     const popup       = document.getElementById('drp-popup');
     const labelEl     = document.getElementById('drp-label');
-    const rangeDisp   = document.getElementById('drp-range-display');
+    const inputFrom   = document.getElementById('drp-input-from');
+    const inputTo     = document.getElementById('drp-input-to');
     const applyBtn    = document.getElementById('drp-apply-btn');
     const cancelBtn   = document.getElementById('drp-cancel-btn');
-    const leftTitle   = document.getElementById('drp-left-title');
-    const rightTitle  = document.getElementById('drp-right-title');
-    const daysLeft    = document.getElementById('drp-days-left');
-    const daysRight   = document.getElementById('drp-days-right');
-    const prevMonthBtn = document.getElementById('drp-prev-month');
-    const nextMonthBtn = document.getElementById('drp-next-month');
 
-    if (!trigger || !popup) return;
+    if (!trigger || !popup || !inputFrom || !inputTo || !applyBtn || !cancelBtn) return;
 
-    // Prevent clicks inside popup from bubbling to prevent browser popover light-dismiss bugs (caused by detaching elements)
+    // Prevent clicks inside popup from bubbling to prevent browser popover light-dismiss bugs
     popup.addEventListener('click', (e) => e.stopPropagation());
     popup.addEventListener('mousedown', (e) => e.stopPropagation());
     popup.addEventListener('pointerdown', (e) => e.stopPropagation());
-
-    // Build weekday headers once
-    document.querySelectorAll('.drp-weekdays').forEach(container => {
-        WDAYS.forEach(d => {
-            const span = document.createElement('span');
-            span.className = 'drp-wday';
-            span.textContent = d;
-            container.appendChild(span);
-        });
-    });
-
-    // State
-    const today    = new Date();
-    today.setHours(0,0,0,0);
-    let viewYear   = today.getFullYear();
-    let viewMonth  = today.getMonth(); // left calendar month
-    let startDate  = null;
-    let endDate    = null;
-    let hoverDate  = null;
-    let selecting  = false; // false = waiting for start, true = waiting for end
-
-    function fmt(d) {
-        if (!d) return '';
-        const y = d.getFullYear();
-        const m = String(d.getMonth()+1).padStart(2,'0');
-        const day = String(d.getDate()).padStart(2,'0');
-        return `${y}-${m}-${day}`;
-    }
-    function fmtDisplay(d) {
-        if (!d) return '';
-        return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`;
-    }
-    function parseDate(str) {
-        if (!str) return null;
-        const [y,m,d] = str.split('-').map(Number);
-        return new Date(y, m-1, d);
-    }
-    function sameDay(a, b) {
-        return a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
-    }
-    function clamp(d, lo, hi) {
-        if (lo && d < lo) return lo;
-        if (hi && d > hi) return hi;
-        return d;
-    }
-
-    function updateLabel() {
-        if (startDate && endDate) {
-            labelEl.textContent = `${fmtDisplay(startDate)}  →  ${fmtDisplay(endDate)}`;
-        } else if (startDate) {
-            labelEl.textContent = `${fmtDisplay(startDate)}  →  …`;
-        } else {
-            labelEl.textContent = 'Select date range';
-        }
-    }
-    function updateRangeDisplay() {
-        if (startDate && endDate) {
-            rangeDisp.textContent = `${fmtDisplay(startDate)}  –  ${fmtDisplay(endDate)}`;
-            rangeDisp.classList.add('drp-has-range');
-            applyBtn.disabled = false;
-        } else if (startDate) {
-            rangeDisp.textContent = `${fmtDisplay(startDate)}  –  pick end date`;
-            rangeDisp.classList.remove('drp-has-range');
-            applyBtn.disabled = true;
-        } else {
-            rangeDisp.textContent = 'No range selected';
-            rangeDisp.classList.remove('drp-has-range');
-            applyBtn.disabled = true;
-        }
-    }
-
-    function renderMonth(container, year, month) {
-        container.innerHTML = '';
-        const firstDay = new Date(year, month, 1).getDay();
-        const daysInMonth = new Date(year, month+1, 0).getDate();
-        const effectiveEnd = endDate || (selecting ? (hoverDate || null) : null);
-
-        for (let i = 0; i < firstDay; i++) {
-            const empty = document.createElement('div');
-            empty.className = 'drp-day drp-day-empty';
-            container.appendChild(empty);
-        }
-
-        const colOfFirst = firstDay;
-
-        for (let d = 1; d <= daysInMonth; d++) {
-            const date = new Date(year, month, d);
-            const el = document.createElement('div');
-            el.className = 'drp-day';
-            el.textContent = d;
-            el.dataset.date = fmt(date);
-
-            if (sameDay(date, today))    el.classList.add('drp-day-today');
-            if (sameDay(date, startDate)) el.classList.add('drp-day-start');
-            if (endDate && sameDay(date, endDate)) el.classList.add('drp-day-end');
-
-            const rangeEnd = effectiveEnd;
-            if (startDate && rangeEnd) {
-                const lo = startDate <= rangeEnd ? startDate : rangeEnd;
-                const hi = startDate <= rangeEnd ? rangeEnd : startDate;
-                if (date > lo && date < hi) {
-                    el.classList.add('drp-day-in-range');
-                    // determine column position (0-6 = Su-Sa)
-                    const col = (colOfFirst + d - 1) % 7;
-                    if (col === 0) el.classList.add('drp-day-range-start-of-row');
-                    if (col === 6) el.classList.add('drp-day-range-end-of-row');
-                } else if (selecting && hoverDate && !endDate) {
-                    // hover preview for second pick
-                    const hlo = startDate <= hoverDate ? startDate : hoverDate;
-                    const hhi = startDate <= hoverDate ? hoverDate : startDate;
-                    if (date > hlo && date < hhi) el.classList.add('drp-day-hover-range');
-                }
-            }
-
-            el.addEventListener('click', () => onDayClick(date));
-            el.addEventListener('mouseenter', () => onDayHover(date));
-            container.appendChild(el);
-        }
-    }
-
-    function renderBothMonths() {
-        // Left: viewYear/viewMonth, Right: next month
-        let ry = viewMonth === 11 ? viewYear+1 : viewYear;
-        let rm = viewMonth === 11 ? 0 : viewMonth+1;
-        leftTitle.textContent  = `${MONTHS[viewMonth]} ${viewYear}`;
-        rightTitle.textContent = `${MONTHS[rm]} ${ry}`;
-        renderMonth(daysLeft,  viewYear, viewMonth);
-        renderMonth(daysRight, ry, rm);
-    }
-
-    function onDayClick(date) {
-        if (!selecting || (startDate && date < startDate)) {
-            // start fresh
-            startDate = date;
-            endDate = null;
-            selecting = true;
-        } else {
-            // set end
-            if (date < startDate) {
-                endDate = startDate;
-                startDate = date;
-            } else {
-                endDate = date;
-            }
-            selecting = false;
-            // Apply range immediately on 2nd date selection
-            applyRange();
-        }
-        setTimeout(() => {
-            renderBothMonths();
-            updateRangeDisplay();
-        }, 50);
-    }
-
-    function onDayHover(date) {
-        if (selecting && startDate && !endDate) {
-            hoverDate = date;
-            renderBothMonths();
-        }
-    }
 
     const hasPopover = typeof popup.showPopover === 'function';
 
     function positionPopup() {
         const trigRect = trigger.getBoundingClientRect();
-        const popupW   = popup.offsetWidth  || 660;
-        const popupH   = popup.offsetHeight || 420;
+        const popupW   = popup.offsetWidth  || 380;
+        const popupH   = popup.offsetHeight || 260;
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         const GAP = 8;
 
-        // Horizontal: align left edge to trigger, but clamp to viewport
         let left = trigRect.left;
         if (left + popupW > vw - GAP) {
             left = trigRect.right - popupW;
         }
         left = Math.max(GAP, left);
 
-        // Vertical: prefer below trigger, flip above if not enough room
         let top;
         const spaceBelow = vh - trigRect.bottom - GAP;
         const spaceAbove = trigRect.top - GAP;
@@ -2503,9 +2354,18 @@ function initDateRangePicker() {
     }
 
     function openPopup() {
-        // Go to custom preset and deactivate buttons immediately
         activeFilters.datePreset = 'custom';
-        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.preset-btn').forEach(b => {
+            if (b.getAttribute('data-preset') === 'custom') {
+                b.classList.add('active');
+            } else {
+                b.classList.remove('active');
+            }
+        });
+
+        // Initialize input fields with active filters
+        inputFrom.value = activeFilters.dateFrom || '';
+        inputTo.value   = activeFilters.dateTo || '';
 
         if (hasPopover) {
             if (!popup.matches(':popover-open')) {
@@ -2518,19 +2378,6 @@ function initDateRangePicker() {
                 popup.showPopover();
             }
         } else {
-            if (activeFilters.dateFrom) {
-                const d = parseDate(activeFilters.dateFrom);
-                startDate = d;
-                viewYear  = d.getFullYear();
-                viewMonth = d.getMonth();
-            }
-            if (activeFilters.dateTo) {
-                endDate = parseDate(activeFilters.dateTo);
-            }
-            selecting = false;
-            renderBothMonths();
-            updateRangeDisplay();
-
             popup.removeAttribute('hidden');
             trigger.classList.add('drp-open');
             trigger.setAttribute('aria-expanded', 'true');
@@ -2550,16 +2397,40 @@ function initDateRangePicker() {
         }
     }
 
+    function updateTriggerLabel(from, to) {
+        if (from && to) {
+            const MONTHS = ['January','February','March','April','May','June',
+                            'July','August','September','October','November','December'];
+            const fmtStr = (str) => {
+                const parts = str.split('-');
+                if (parts.length !== 3) return str;
+                const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`;
+            };
+            labelEl.textContent = `${fmtStr(from)}  →  ${fmtStr(to)}`;
+        } else {
+            labelEl.textContent = 'Select date range';
+        }
+    }
+
     function applyRange() {
-        if (!startDate || !endDate) return;
+        const fromVal = inputFrom.value;
+        const toVal   = inputTo.value;
+        if (!fromVal || !toVal) {
+            alert("Please select both start and end dates.");
+            return;
+        }
+
         activeFilters.datePreset = 'custom';
-        activeFilters.dateFrom = fmt(startDate);
-        activeFilters.dateTo   = fmt(endDate);
+        activeFilters.dateFrom = fromVal;
+        activeFilters.dateTo   = toVal;
+
         // keep hidden inputs in sync
         const elFrom = document.getElementById('filter-date-from');
         const elTo   = document.getElementById('filter-date-to');
         if (elFrom) elFrom.value = activeFilters.dateFrom;
         if (elTo)   elTo.value   = activeFilters.dateTo;
+
         // highlight custom preset pill
         document.querySelectorAll('.preset-btn').forEach(b => {
             if (b.getAttribute('data-preset') === 'custom') {
@@ -2568,7 +2439,8 @@ function initDateRangePicker() {
                 b.classList.remove('active');
             }
         });
-        updateLabel();
+
+        updateTriggerLabel(activeFilters.dateFrom, activeFilters.dateTo);
         closePopup();
         buildViewModel();
     }
@@ -2576,7 +2448,6 @@ function initDateRangePicker() {
     if (hasPopover) {
         popup.addEventListener('toggle', (event) => {
             if (event.newState === 'open') {
-                // Go to custom preset and highlight Custom button immediately when opened
                 activeFilters.datePreset = 'custom';
                 document.querySelectorAll('.preset-btn').forEach(b => {
                     if (b.getAttribute('data-preset') === 'custom') {
@@ -2586,19 +2457,8 @@ function initDateRangePicker() {
                     }
                 });
 
-                // Initialize view to include current active range
-                if (activeFilters.dateFrom) {
-                    const d = parseDate(activeFilters.dateFrom);
-                    startDate = d;
-                    viewYear  = d.getFullYear();
-                    viewMonth = d.getMonth();
-                }
-                if (activeFilters.dateTo) {
-                    endDate = parseDate(activeFilters.dateTo);
-                }
-                selecting = false;
-                renderBothMonths();
-                updateRangeDisplay();
+                inputFrom.value = activeFilters.dateFrom || '';
+                inputTo.value   = activeFilters.dateTo || '';
 
                 positionPopup();
                 trigger.classList.add('drp-open');
@@ -2610,7 +2470,7 @@ function initDateRangePicker() {
         });
     }
 
-    // ── Wire up shortcut chips ──
+    // Wire up shortcut chips inside popup
     document.querySelectorAll('.drp-chip').forEach(chip => {
         chip.addEventListener('click', () => {
             document.querySelectorAll('.drp-chip').forEach(c => c.classList.remove('drp-chip-active'));
@@ -2618,6 +2478,10 @@ function initDateRangePicker() {
             const sc = chip.dataset.shortcut;
             const now = new Date(); now.setHours(0,0,0,0);
             let from = new Date(now), to = new Date(now);
+
+            const pad = (n) => String(n).padStart(2, '0');
+            const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+
             if (sc === 'today') {
                 /* default */
             } else if (sc === 'yesterday') {
@@ -2634,33 +2498,17 @@ function initDateRangePicker() {
                 from = new Date(now.getFullYear(), 0, 1);
                 to   = new Date(now.getFullYear(), 11, 31);
             }
-            startDate = from; endDate = to; selecting = false;
-            viewYear  = from.getFullYear(); viewMonth = from.getMonth();
-            renderBothMonths();
-            updateRangeDisplay();
-            // Apply range immediately when choosing a shortcut inside picker
+
+            inputFrom.value = fmt(from);
+            inputTo.value   = fmt(to);
             applyRange();
         });
     });
 
-    // ── Month navigation ──
-    prevMonthBtn.addEventListener('click', () => {
-        if (viewMonth === 0) { viewYear--; viewMonth = 11; }
-        else viewMonth--;
-        renderBothMonths();
-    });
-    nextMonthBtn.addEventListener('click', () => {
-        if (viewMonth === 11) { viewYear++; viewMonth = 0; }
-        else viewMonth++;
-        renderBothMonths();
-    });
-
-    // ── Apply / Cancel ──
     applyBtn.addEventListener('click', applyRange);
     cancelBtn.addEventListener('click', closePopup);
 
     if (!hasPopover) {
-        // ── Toggle open/close fallback ──
         trigger.addEventListener('click', (e) => {
             e.stopPropagation();
             if (!popup.hasAttribute('hidden')) {
@@ -2685,9 +2533,7 @@ function initDateRangePicker() {
 
     // ── Sync initial label if filters already set ──
     if (activeFilters.dateFrom && activeFilters.dateTo) {
-        startDate = parseDate(activeFilters.dateFrom);
-        endDate   = parseDate(activeFilters.dateTo);
-        updateLabel();
+        updateTriggerLabel(activeFilters.dateFrom, activeFilters.dateTo);
     }
 }
 

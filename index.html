@@ -201,41 +201,22 @@
                                         <button class="drp-chip" data-shortcut="year">This year</button>
                                     </div>
 
-                                    <!-- dual calendars -->
-                                    <div class="drp-calendars">
-                                        <div class="drp-cal" id="drp-cal-left">
-                                            <div class="drp-cal-header">
-                                                <button class="drp-nav-btn" id="drp-prev-month" aria-label="Previous month">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-                                                </button>
-                                                <span class="drp-cal-title" id="drp-left-title"></span>
-                                                <button class="drp-nav-btn drp-nav-mid" id="drp-next-month-left" aria-label="Next month">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                                                </button>
-                                            </div>
-                                            <div class="drp-weekdays"></div>
-                                            <div class="drp-days" id="drp-days-left"></div>
+                                    <!-- inputs container -->
+                                    <div class="drp-inputs-container">
+                                        <div class="drp-input-group">
+                                            <label for="drp-input-from" class="drp-input-label">Start Date</label>
+                                            <input type="date" id="drp-input-from" class="drp-date-field">
                                         </div>
-                                        <div class="drp-cal-divider"></div>
-                                        <div class="drp-cal" id="drp-cal-right">
-                                            <div class="drp-cal-header">
-                                                <button class="drp-nav-btn drp-nav-mid" id="drp-prev-month-right" aria-label="Previous month">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-                                                </button>
-                                                <span class="drp-cal-title" id="drp-right-title"></span>
-                                                <button class="drp-nav-btn" id="drp-next-month" aria-label="Next month">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                                                </button>
-                                            </div>
-                                            <div class="drp-weekdays"></div>
-                                            <div class="drp-days" id="drp-days-right"></div>
+                                        <div class="drp-input-separator">to</div>
+                                        <div class="drp-input-group">
+                                            <label for="drp-input-to" class="drp-input-label">End Date</label>
+                                            <input type="date" id="drp-input-to" class="drp-date-field">
                                         </div>
                                     </div>
 
                                     <!-- footer -->
                                     <div class="drp-footer">
-                                        <div class="drp-selected-range" id="drp-range-display">No range selected</div>
-                                        <div class="drp-footer-actions">
+                                        <div class="drp-footer-actions" style="width: 100%; display: flex; justify-content: flex-end; gap: 8px;">
                                             <button id="drp-cancel-btn" class="drp-btn-cancel">Cancel</button>
                                             <button id="drp-apply-btn" class="drp-btn-apply">Apply Range</button>
                                         </div>
