@@ -205,25 +205,26 @@
                     <!-- Dropdowns and Reset button -->
                     <div class="filter-row-group" style="margin-left: auto;">
                         <div class="filter-group">
-                            <select id="filter-broker" class="dropdown-select" multiple>
+                            <!-- Native select hidden immediately; convertSelectToCustomDropdown() replaces it -->
+                            <select id="filter-broker" class="dropdown-select" multiple style="display:none">
                                 <option value="all">All Broker Families</option>
                                 <!-- Dynamic -->
                             </select>
                         </div>
                         <div class="filter-group">
-                            <select id="filter-poc" class="dropdown-select" multiple>
+                            <select id="filter-poc" class="dropdown-select" multiple style="display:none">
                                 <option value="all">All Assigned POCs</option>
                                 <!-- Dynamic -->
                             </select>
                         </div>
                         <div class="filter-group">
-                            <select id="filter-agent" class="dropdown-select" multiple>
+                            <select id="filter-agent" class="dropdown-select" multiple style="display:none">
                                 <option value="all">All Support Agents</option>
                                 <!-- Dynamic -->
                             </select>
                         </div>
                         <div class="filter-group">
-                            <select id="filter-hide-smallcase-rm" class="dropdown-select" multiple>
+                            <select id="filter-hide-smallcase-rm" class="dropdown-select" multiple style="display:none">
                                 <option value="none">Hide smallcase RMs: None</option>
                                 <!-- Dynamic -->
                             </select>
@@ -250,6 +251,10 @@
                                 <div class="kpi-value" id="pulse-total-interactions">0</div>
                                 <div class="kpi-desc">Chats + Tickets + Emails</div>
                                 <div class="kpi-sub-info" id="pulse-total-sub"></div>
+                                <!-- Channel Mix Mini Bar Chart -->
+                                <div style="margin-top:10px; height:50px;">
+                                    <canvas id="weekly-channel-mix-chart" height="50"></canvas>
+                                </div>
                             </div>
                             <div class="kpi-card" id="card-tickets">
                                 <span class="kpi-title">Call Tickets</span>
@@ -393,28 +398,6 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- RM Contact Mapper Section -->
-                            <div class="cohort-mapper-box" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
-                                <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">🧑‍💼 RM Contact Mapper</h4>
-                                <div class="cohort-mapper-filters" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px;">
-                                    <div>
-                                        <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600;">RM Name</label>
-                                        <select id="mapper-rm-select" class="dropdown-select" style="width: 100%; font-size: 0.78rem; padding: 6px 10px;"></select>
-                                    </div>
-                                    <div>
-                                        <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600;">RM Broker Name</label>
-                                        <select id="mapper-broker-select" class="dropdown-select" style="width: 100%; font-size: 0.78rem; padding: 6px 10px;"></select>
-                                    </div>
-                                    <div>
-                                        <label style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600;">Branch</label>
-                                        <select id="mapper-branch-select" class="dropdown-select" style="width: 100%; font-size: 0.78rem; padding: 6px 10px;"></select>
-                                    </div>
-                                </div>
-                                <div id="mapper-result" class="mapper-result-pane" style="background: rgba(255, 255, 255, 0.02); padding: 12px; border-radius: 8px; border: 1px dashed var(--border-color); font-size: 0.8rem; line-height: 1.5; min-height: 48px; display: flex; flex-direction: column; justify-content: center; color: var(--text-secondary);">
-                                    <span class="text-muted" style="text-align: center;">Select filters above to map contact numbers.</span>
-                                </div>
-                            </div>
                         </div>
                         
                         <!-- 7-Day Repeat Loops list -->
@@ -489,8 +472,16 @@
                             <!-- Left: Options list -->
                             <div class="explorer-left-pane scrollbar-themed">
                                 <div class="explorer-pane-header" id="exp-options-header" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                                    <span>Select Broker Options</span>
-                                    <button id="explorer-reset-btn" class="export-btn" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px; line-height: 1.2;">Reset</button>
+                                    <span>Select Options</span>
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <label style="display:flex;align-items:center;gap:5px;font-size:0.72rem;font-weight:600;color:var(--text-secondary);cursor:pointer;" title="Sticky: allow selecting multiple items">
+                                            <div id="explorer-sticky-toggle" class="sticky-toggle-track" style="position:relative;width:32px;height:18px;border-radius:9px;background:var(--border-color);cursor:pointer;transition:background 0.2s;">
+                                                <div class="sticky-toggle-thumb" style="position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left 0.2s;"></div>
+                                            </div>
+                                            Sticky
+                                        </label>
+                                        <button id="explorer-reset-btn" class="export-btn" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px; line-height: 1.2;">Reset</button>
+                                    </div>
                                 </div>
                                 <div class="explorer-list-group" id="explorer-options-list">
                                     <!-- Dynamic Options list -->
@@ -969,27 +960,27 @@
                                 <div class="qa-badge-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                                     <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
                                         <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Greetings</span>
-                                        <strong id="vc-qa-greetings" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/5</span>
+                                        <strong id="vc-qa-greetings" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/100</span>
                                     </div>
                                     <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
                                         <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Grammar</span>
-                                        <strong id="vc-qa-grammar" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/5</span>
+                                        <strong id="vc-qa-grammar" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/100</span>
                                     </div>
                                     <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
                                         <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Acknowledgment</span>
-                                        <strong id="vc-qa-acknowledgement" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/15</span>
+                                        <strong id="vc-qa-acknowledgement" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/100</span>
                                     </div>
                                     <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
                                         <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Maintaining SLA</span>
-                                        <strong id="vc-qa-sla" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/15</span>
+                                        <strong id="vc-qa-sla" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/100</span>
                                     </div>
                                     <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
                                         <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Assistance</span>
-                                        <strong id="vc-qa-assistance" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/5</span>
+                                        <strong id="vc-qa-assistance" style="font-size: 1.1rem; color: var(--text-primary);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/100</span>
                                     </div>
                                     <div class="qa-badge-card" style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
                                         <span style="display: block; font-size: 0.72rem; color: var(--text-muted);">Overall QA</span>
-                                        <strong id="vc-qa-overall" style="font-size: 1.1rem; color: var(--accent-green);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/45</span>
+                                        <strong id="vc-qa-overall" style="font-size: 1.1rem; color: var(--accent-green);">-</strong> <span style="font-size: 0.7rem; color: var(--text-muted);">/100</span>
                                     </div>
                                 </div>
                             </div>

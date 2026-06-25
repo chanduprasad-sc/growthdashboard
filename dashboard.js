@@ -313,6 +313,57 @@ function destroyVCCharts() {
     });
 }
 
+class AnimatedList {
+    static animate(containerElement) {
+        if (!containerElement) return;
+        const items = containerElement.children;
+        Array.from(items).forEach((item, index) => {
+            item.classList.add('animated-item-reveal');
+            item.style.animationDelay = `${index * 40}ms`;
+        });
+    }
+}
+
+class BorderGlow {
+    static init() {
+        const attachGlow = (card) => {
+            if (card._hasGlow) return;
+            card._hasGlow = true;
+            
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.setProperty('--cursor-x', `${x}px`);
+                card.style.setProperty('--cursor-y', `${y}px`);
+                card.style.setProperty('--edge-proximity', '1');
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                card.style.setProperty('--edge-proximity', '0');
+            });
+        };
+        
+        document.querySelectorAll('.visual-card, .kpi-card, .deepdive-chart-card, .intelligence-panel').forEach(attachGlow);
+        
+        const observer = new MutationObserver(() => {
+            document.querySelectorAll('.visual-card, .kpi-card, .deepdive-chart-card, .intelligence-panel').forEach(attachGlow);
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+}
+
+let explorerStickyMode = false;
+
+function normalizeQAScore(score, max) {
+    if (score === null || score === undefined || isNaN(score)) return null;
+    let s = parseFloat(score);
+    if (s <= max) {
+        return (s / max) * 100;
+    }
+    return s;
+}
+
 function safeParseDate(dStr) {
     if (!dStr) return null;
     let s = String(dStr).trim();
@@ -1491,6 +1542,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDashboardData();
     setupEventListeners();
     initCustomDropdowns();
+    BorderGlow.init();
 });
 
 async function loadDashboardData() {
@@ -2073,6 +2125,30 @@ function setupEventListeners() {
         });
     });
 
+    // Explorer Sticky Toggle
+    const stickyToggle = document.getElementById('explorer-sticky-toggle');
+    if (stickyToggle) {
+        stickyToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            explorerStickyMode = !explorerStickyMode;
+            const thumb = stickyToggle.querySelector('.sticky-toggle-thumb');
+            if (explorerStickyMode) {
+                stickyToggle.style.background = 'var(--purple)';
+                if (thumb) thumb.style.left = '16px';
+            } else {
+                stickyToggle.style.background = 'var(--border-color)';
+                if (thumb) thumb.style.left = '2px';
+                // Switch back to single: keep only first option
+                if (explorerSelectedOptions.size > 1) {
+                    const first = [...explorerSelectedOptions][0];
+                    explorerSelectedOptions.clear();
+                    explorerSelectedOptions.add(first);
+                    renderExplorerWidgetList();
+                }
+            }
+        });
+    }
+
     // AI Summarise button
     document.getElementById('ai-summarise-btn').addEventListener('click', () => {
         generateAISummary();
@@ -2151,8 +2227,7 @@ function setupEventListeners() {
         });
     }
 
-    // RM Contact Mapper – Initialize after data is ready
-    initCohortMapper();
+    // (RM Contact Mapper removed by user request)
 }
 
 function switchTab(tabId) {
@@ -3122,6 +3197,61 @@ function renderKeyMetricsGrid(interactions, calls) {
         ${aqtDeltaHtml}
         <div class="kpi-sub-metric">Prev period: <strong>${formatSeconds(prevAQT)}</strong></div>
     `);
+
+    // Render Weekly Pulse Channel Mix chart (horizontal bar chart)
+    const ctxCanvas = document.getElementById('weekly-channel-mix-chart');
+    if (ctxCanvas) {
+        // Destroy existing chart if it exists to avoid overlaps
+        if (window._weeklyChannelMixChartInstance) {
+            window._weeklyChannelMixChartInstance.destroy();
+        }
+        const ctx = ctxCanvas.getContext('2d');
+        window._weeklyChannelMixChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Calls', 'WA', 'Emails'],
+                datasets: [{
+                    data: [tkt, wa, mail],
+                    backgroundColor: [
+                        'rgba(139, 92, 246, 0.75)',
+                        'rgba(56, 189, 248, 0.75)',
+                        'rgba(249, 115, 22, 0.75)'
+                    ],
+                    borderColor: [
+                        'var(--purple)',
+                        'var(--blue)',
+                        'var(--orange)'
+                    ],
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: true }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { display: false },
+                        border: { display: false }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            color: 'var(--text-muted)',
+                            font: { size: 9, family: 'Outfit' }
+                        },
+                        border: { display: false }
+                    }
+                }
+            }
+        });
+    }
 }
 
 
@@ -3775,10 +3905,12 @@ function openCohortDrilldownModal(type) {
         const rmMap = {};
         data.forEach(item => {
             if (!item.rm_name || item.rm_name === 'NA') return;
-            const key = item.rm_name;
+            const broker = item.broker_family || '—';
+            const branch = item.branch || '—';
+            const key = `${item.rm_name}||${broker}||${branch}`;
             if (!rmMap[key]) {
                 rmMap[key] = {
-                    rm: item.rm_name, broker: item.broker_family || '—', rm_number: item.rm_number || '—', branch: item.branch || '—',
+                    rm: item.rm_name, broker: broker, rm_number: item.rm_number || '—', branch: branch,
                     channels: new Set(), contacts: 0, lastDate: null, issues: {}, poc: item.poc || '—'
                 };
             }
@@ -4198,12 +4330,20 @@ function renderExplorerWidgetList() {
         `;
 
         btn.addEventListener('click', () => {
-            // Toggle selection
-            if (explorerSelectedOptions.has(opt)) {
-                explorerSelectedOptions.delete(opt);
-                btn.classList.remove('selected');
+            if (explorerStickyMode) {
+                // Toggle selection (multi-select)
+                if (explorerSelectedOptions.has(opt)) {
+                    explorerSelectedOptions.delete(opt);
+                    btn.classList.remove('selected');
+                } else {
+                    explorerSelectedOptions.add(opt);
+                    btn.classList.add('selected');
+                }
             } else {
+                // Single-select (replace selection)
+                explorerSelectedOptions.clear();
                 explorerSelectedOptions.add(opt);
+                list.querySelectorAll('.explorer-item-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
             }
             // Show combined dissection for all selected
@@ -4217,6 +4357,9 @@ function renderExplorerWidgetList() {
 
         list.appendChild(btn);
     });
+
+    // Animate list items
+    AnimatedList.animate(list);
 
     // Auto-select first if none selected
     if (explorerSelectedOptions.size === 0 && sorted[0]) {
@@ -4409,45 +4552,12 @@ async function generateAISummary() {
         `5. <h4>💡 Actionable Recommendations</h4> — 4-6 specific, prioritized action items for the support team\n` +
         `Use <ul><li><strong>Label:</strong> Detail</li></ul> for all sections. Quote specific RM comments where relevant.`;
 
-    try {
-        const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${key}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.6,
-                max_tokens: 1200
-            })
-        });
-
-        if (!response.ok) throw new Error("API call failed");
-
-        const res = await response.json();
-        const contentText = res.choices[0].message.content.trim();
-
-        // Clean markdown backticks if returned
-        const cleanedJSON = contentText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
-        const parsed = JSON.parse(cleanedJSON);
-
-        narrativeBlock.innerHTML = parsed.narrative || "Summary parsing returned empty narrative.";
-
-        loadingState.classList.add('hidden');
-        contentState.classList.remove('hidden');
-    } catch (error) {
-        console.warn("NVIDIA AI Call failed/blocked. Running local summarizer fallback...", error);
-
-        // Local Summarizer fallback if API is blocked or key expires
         setTimeout(() => {
             const fallbackHTML = generateLocalFallbackSummary(withComments);
             narrativeBlock.innerHTML = fallbackHTML;
             loadingState.classList.add('hidden');
             contentState.classList.remove('hidden');
-        }, 1200);
-    }
+        }, 800);
 }
 
 function generateLocalFallbackSummary(commentsList) {
@@ -4704,21 +4814,7 @@ async function generateAITabNarrative() {
         `6. <h4>💡 Prioritized Recommendations</h4> — Specific, actionable steps ordered by impact\n` +
         `Return ONLY raw JSON: {"narrative": "...HTML..."}`;
 
-    try {
-        const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', messages: [{ role: 'user', content: prompt }], temperature: 0.6, max_tokens: 2000 })
-        });
-        if (!response.ok) throw new Error('API failed');
-        const res = await response.json();
-        const text = res.choices[0].message.content.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/,'').trim();
-        const parsed = JSON.parse(text);
-        narrativeContent.innerHTML = parsed.narrative || '<p>Narrative parsing returned empty.</p>';
-    } catch (err) {
-        console.warn('AI narrative failed, using local fallback', err);
-        narrativeContent.innerHTML = generateLocalFallbackSummary(withComments);
-    }
+    narrativeContent.innerHTML = generateLocalFallbackSummary(withComments);
 }
 
 // -------------------------------------------------------------
@@ -5811,8 +5907,8 @@ function renderVisualControlDashboard() {
     renderAgentBreaksTab(data, calls);
 }
 
-function renderSankeyFlowCanvas(data) {
-    const canvas = document.getElementById('vc-chart-sankey-flow');
+function renderSankeyFlowCanvas(data, canvasId = 'vc-chart-sankey-flow') {
+    const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
@@ -6126,28 +6222,46 @@ function renderSLAAndQAMatrix(data) {
 
     data.forEach(item => {
         if (item.qa_overall !== null && item.qa_overall !== undefined) {
-            overallSum += item.qa_overall;
-            overallCount++;
+            const normalizedOverall = normalizeQAScore(item.qa_overall, 45);
+            if (normalizedOverall !== null) {
+                overallSum += normalizedOverall;
+                overallCount++;
+            }
 
             if (item.qa_greeting !== null && item.qa_greeting !== undefined) {
-                greetingSum += item.qa_greeting;
-                greetingCount++;
+                const normGreeting = normalizeQAScore(item.qa_greeting, 5);
+                if (normGreeting !== null) {
+                    greetingSum += normGreeting;
+                    greetingCount++;
+                }
             }
             if (item.qa_grammar !== null && item.qa_grammar !== undefined) {
-                grammarSum += item.qa_grammar;
-                grammarCount++;
+                const normGrammar = normalizeQAScore(item.qa_grammar, 5);
+                if (normGrammar !== null) {
+                    grammarSum += normGrammar;
+                    grammarCount++;
+                }
             }
             if (item.qa_acknowledgement !== null && item.qa_acknowledgement !== undefined) {
-                ackSum += item.qa_acknowledgement;
-                ackCount++;
+                const normAck = normalizeQAScore(item.qa_acknowledgement, 15);
+                if (normAck !== null) {
+                    ackSum += normAck;
+                    ackCount++;
+                }
             }
             if (item.qa_sla !== null && item.qa_sla !== undefined) {
-                slaQASum += item.qa_sla;
-                slaQACount++;
+                const normSla = normalizeQAScore(item.qa_sla, 15);
+                if (normSla !== null) {
+                    slaQASum += normSla;
+                    slaQACount++;
+                }
             }
             if (item.qa_assistance !== null && item.qa_assistance !== undefined) {
-                assistanceSum += item.qa_assistance;
-                assistanceCount++;
+                const normAssistance = normalizeQAScore(item.qa_assistance, 5);
+                if (normAssistance !== null) {
+                    assistanceSum += normAssistance;
+                    assistanceCount++;
+                }
             }
 
             // Leaderboard
@@ -6156,25 +6270,28 @@ function renderSLAAndQAMatrix(data) {
                 if (!agentQA[agent]) {
                     agentQA[agent] = { sum: 0, count: 0 };
                 }
-                agentQA[agent].sum += item.qa_overall;
-                agentQA[agent].count++;
+                const normOverall = normalizeQAScore(item.qa_overall, 45);
+                if (normOverall !== null) {
+                    agentQA[agent].sum += normOverall;
+                    agentQA[agent].count++;
+                }
             }
         }
     });
 
-    const setQAVal = (id, avg, max) => {
+    const setQAVal = (id, avg) => {
         const el = document.getElementById(id);
         if (el) {
-            el.innerText = avg !== null ? (Math.round(avg * 10) / 10) : '-';
+            el.innerText = avg !== null ? Math.round(avg) : '-';
         }
     };
 
-    setQAVal('vc-qa-greetings', greetingCount ? greetingSum / greetingCount : null, 5);
-    setQAVal('vc-qa-grammar', grammarCount ? grammarSum / grammarCount : null, 5);
-    setQAVal('vc-qa-acknowledgement', ackCount ? ackSum / ackCount : null, 15);
-    setQAVal('vc-qa-sla', slaQACount ? slaQASum / slaQACount : null, 15);
-    setQAVal('vc-qa-assistance', assistanceCount ? assistanceSum / assistanceCount : null, 5);
-    setQAVal('vc-qa-overall', overallCount ? overallSum / overallCount : null, 45);
+    setQAVal('vc-qa-greetings', greetingCount ? greetingSum / greetingCount : null);
+    setQAVal('vc-qa-grammar', grammarCount ? grammarSum / grammarCount : null);
+    setQAVal('vc-qa-acknowledgement', ackCount ? ackSum / ackCount : null);
+    setQAVal('vc-qa-sla', slaQACount ? slaQASum / slaQACount : null);
+    setQAVal('vc-qa-assistance', assistanceCount ? assistanceSum / assistanceCount : null);
+    setQAVal('vc-qa-overall', overallCount ? overallSum / overallCount : null);
 
     // Render Agent QA Leaderboard
     const qaLeaderboardBody = document.getElementById('vc-qa-leaderboard-body');
@@ -6190,13 +6307,16 @@ function renderSLAAndQAMatrix(data) {
         if (sortedAgents.length === 0) {
             qaLeaderboardBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted" style="padding: 10px;">No QA audits compiled for this period</td></tr>';
         } else {
-            qaLeaderboardBody.innerHTML = sortedAgents.map(a => `
+            qaLeaderboardBody.innerHTML = sortedAgents.map(a => {
+                const pct = Math.round(a.avg);
+                const color = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--orange)' : 'var(--red, #ef4444)';
+                return `
                 <tr>
                     <td><strong>${a.name}</strong></td>
                     <td class="text-right">${a.count}</td>
-                    <td class="text-right text-green"><strong>${Math.round(a.avg * 10) / 10} / 45</strong></td>
-                </tr>
-            `).join('');
+                    <td class="text-right"><strong style="color:${color}">${pct}%</strong></td>
+                </tr>`;
+            }).join('');
         }
     }
 }
@@ -6821,17 +6941,30 @@ function renderMainOverview(data, calls) {
     const sortedDates = Object.keys(dateMap).sort();
     const ctx1 = document.getElementById('md-combined-trend-chart');
     if (ctx1) {
-        mdCharts.combinedTrend = new Chart(ctx1.getContext('2d'), {
+        const c1 = ctx1.getContext('2d');
+        const blueGrad = c1.createLinearGradient(0, 0, 0, 300);
+        blueGrad.addColorStop(0, hexToRgba(THEME_COLORS.blue, 0.25));
+        blueGrad.addColorStop(1, hexToRgba(THEME_COLORS.blue, 0.0));
+        
+        const greenGrad = c1.createLinearGradient(0, 0, 0, 300);
+        greenGrad.addColorStop(0, hexToRgba(THEME_COLORS.green, 0.25));
+        greenGrad.addColorStop(1, hexToRgba(THEME_COLORS.green, 0.0));
+        
+        const orangeGrad = c1.createLinearGradient(0, 0, 0, 300);
+        orangeGrad.addColorStop(0, hexToRgba(THEME_COLORS.orange, 0.25));
+        orangeGrad.addColorStop(1, hexToRgba(THEME_COLORS.orange, 0.0));
+
+        mdCharts.combinedTrend = new Chart(c1, {
             type: 'line',
             data: {
                 labels: sortedDates,
                 datasets: [
-                    { label: 'Call Tickets', data: sortedDates.map(d => dateMap[d].calls), borderColor: THEME_COLORS.blue, backgroundColor: THEME_COLORS.blue + '20', tension: 0.4, fill: true },
-                    { label: 'WhatsApp', data: sortedDates.map(d => dateMap[d].wa), borderColor: THEME_COLORS.green, backgroundColor: THEME_COLORS.green + '20', tension: 0.4, fill: true },
-                    { label: 'Care Emails', data: sortedDates.map(d => dateMap[d].emails), borderColor: THEME_COLORS.orange, backgroundColor: THEME_COLORS.orange + '20', tension: 0.4, fill: true }
+                    { label: 'Call Tickets', data: sortedDates.map(d => dateMap[d].calls), borderColor: THEME_COLORS.blue, backgroundColor: blueGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 },
+                    { label: 'WhatsApp', data: sortedDates.map(d => dateMap[d].wa), borderColor: THEME_COLORS.green, backgroundColor: greenGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 },
+                    { label: 'Care Emails', data: sortedDates.map(d => dateMap[d].emails), borderColor: THEME_COLORS.orange, backgroundColor: orangeGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 }
                 ]
             },
-            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary'), font: { family: 'SF Pro Text', size: 10 } } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15, font: { size: 9 } }, grid: { color: THEME_COLORS.border } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { color: THEME_COLORS.border }, beginAtZero: true } } }
         });
     }
 
@@ -6844,7 +6977,7 @@ function renderMainOverview(data, calls) {
                 labels: ['Call Tickets', 'WhatsApp', 'Care Emails'],
                 datasets: [{ data: [callTickets.length, whatsapp.length, emails.length], backgroundColor: [THEME_COLORS.blue, THEME_COLORS.green, THEME_COLORS.orange], borderWidth: 0 }]
             },
-            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary'), font: { family: 'SF Pro Text', size: 10 } } } }, cutout: '70%' }
         });
     }
 
@@ -6864,7 +6997,7 @@ function renderMainOverview(data, calls) {
                     { label: 'Avg RT (sec)', data: [avgRT(callTickets), avgRT(whatsapp), avgRT(emails)], backgroundColor: [THEME_COLORS.blue, THEME_COLORS.green, THEME_COLORS.orange], borderRadius: 6 }
                 ]
             },
-            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary'), font: { family: 'SF Pro Text', size: 10 } } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { color: THEME_COLORS.border }, beginAtZero: true } } }
         });
     }
 
@@ -7539,7 +7672,7 @@ function renderIntelligenceDashboard() {
     // Sankey Flow
     const sankeyCanvas = document.getElementById('intel-sankey-canvas');
     if (sankeyCanvas && typeof renderSankeyFlowCanvas === 'function') {
-        renderSankeyFlowCanvas(data);
+        renderSankeyFlowCanvas(data, 'intel-sankey-canvas');
     }
 
     // Render Predictive Capacity Planner
@@ -7565,6 +7698,10 @@ function renderIssueTrendingChart() {
         intelCharts.issueTrend = null;
     }
 
+    if (!data || data.length === 0) {
+        return;
+    }
+
     const issueCounts = {};
     data.forEach(item => {
         const issue = item.issue || "General";
@@ -7575,16 +7712,28 @@ function renderIssueTrendingChart() {
         .slice(0, 3)
         .map(entry => entry[0]);
 
+    if (topIssues.length === 0) return;
+
+    // Build date array from actual data range if activeFilters.dateFrom is null
+    let datesArray = [];
     const fromD = safeParseDate(activeFilters.dateFrom);
-    if (fromD) fromD.setHours(0, 0, 0, 0);
     const toD = safeParseDate(activeFilters.dateTo);
-    if (toD) toD.setHours(23, 59, 59, 999);
-    const datesArray = [];
-    let currDate = new Date(fromD.getTime());
-    while (currDate <= toD) {
-        datesArray.push(currDate.toISOString().split('T')[0]);
-        currDate.setDate(currDate.getDate() + 1);
+    if (fromD && toD) {
+        fromD.setHours(0, 0, 0, 0);
+        toD.setHours(23, 59, 59, 999);
+        let currDate = new Date(fromD.getTime());
+        while (currDate <= toD) {
+            datesArray.push(currDate.toISOString().split('T')[0]);
+            currDate.setDate(currDate.getDate() + 1);
+        }
+    } else {
+        // Fallback: use the dates from the actual data
+        const dateCounts = {};
+        data.forEach(d => { if (d.date) dateCounts[d.date.substring(0,10)] = true; });
+        datesArray = Object.keys(dateCounts).sort();
     }
+
+    if (datesArray.length === 0) return;
 
     const trends = {};
     topIssues.forEach(issue => {
@@ -7701,17 +7850,23 @@ function renderMonthlyView() {
     });
     const yearsArr = [...availableYears].sort();
 
-    if (yearSelect && !yearSelect._populated) {
-        yearSelect._populated = true;
+    if (yearSelect) {
         yearSelect.innerHTML = yearsArr.map(y => `<option value="${y}">${y}</option>`).join('');
-        yearSelect.value = yearsArr[yearsArr.length - 1] || new Date().getFullYear();
-        yearSelect.addEventListener('change', () => renderMonthlyView());
+        if (yearsArr.length > 0) {
+            yearSelect.value = yearsArr[yearsArr.length - 1];
+        }
+        if (!yearSelect._listenerSet) {
+            yearSelect._listenerSet = true;
+            yearSelect.addEventListener('change', () => { renderMonthlyView(); });
+        }
     }
-    if (monthSelect && !monthSelect._populated) {
-        monthSelect._populated = true;
+    if (monthSelect) {
         monthSelect.innerHTML = monthNames.map((m, i) => `<option value="${i}">${m}</option>`).join('');
         monthSelect.value = new Date().getMonth();
-        monthSelect.addEventListener('change', () => renderMonthlyView());
+        if (!monthSelect._listenerSet) {
+            monthSelect._listenerSet = true;
+            monthSelect.addEventListener('change', () => { renderMonthlyView(); });
+        }
     }
 
     const selectedYear = parseInt(yearSelect.value);
@@ -8380,7 +8535,22 @@ function renderTicketsChatsView() {
             ticketsState.statusFilter = 'all';
         }
         
-        statusPillsContainer.innerHTML = config.map(opt => {
+        // Count interactions per stage/status for current channelFiltered dataset
+        const stageCounts = {};
+        allData.forEach(item => {
+            const stage = (item.stage || '').toLowerCase().replace(/\s+/g, '_');
+            // Check channel filter match
+            if (activeChan === 'all' || item.type === activeChan) {
+                stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+            }
+        });
+
+        const filteredConfig = config.filter(opt => {
+            if (opt.value === 'all') return true;
+            return (stageCounts[opt.value] || 0) > 0;
+        });
+        
+        statusPillsContainer.innerHTML = filteredConfig.map(opt => {
             const isActive = opt.value === ticketsState.statusFilter ? 'active' : '';
             return `<button class="status-pill ${isActive}" data-status="${opt.value}">${opt.label}</button>`;
         }).join('');
@@ -8796,8 +8966,8 @@ function renderPredictiveCapacityPlanner() {
     }
     
     plannerContainer.innerHTML = `
-        <div class="agent-score-card" style="text-align: left; padding: 20px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px;">
-            <div class="score-label">🔮 Predicted Volume (Next 7d)</div>
+        <div class="visual-card" style="text-align: left; padding: 20px; border-radius: 14px;">
+            <div class="score-label" style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">🔮 Predicted Volume (Next 7d)</div>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 500;">
                     <span>📞 Voice Calls:</span>
@@ -8813,8 +8983,8 @@ function renderPredictiveCapacityPlanner() {
                 </div>
             </div>
         </div>
-        <div class="agent-score-card" style="text-align: left; padding: 20px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px;">
-            <div class="score-label">⚡ Workload Capacity Planner</div>
+        <div class="visual-card" style="text-align: left; padding: 20px; border-radius: 14px;">
+            <div class="score-label" style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">⚡ Workload Capacity Planner</div>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 500;">
                     <span>Required Effort:</span>
@@ -8830,9 +9000,9 @@ function renderPredictiveCapacityPlanner() {
                 </div>
             </div>
         </div>
-        <div class="agent-score-card" style="text-align: left; padding: 20px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div class="visual-card" style="text-align: left; padding: 20px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-                <div class="score-label">📊 Expected Utilization</div>
+                <div class="score-label" style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">📊 Expected Utilization</div>
                 <div class="score-value" style="font-size: 2.2rem; color: var(--purple); margin: 8px 0 4px; font-weight:800;">${utilizationPct}%</div>
             </div>
             <span class="health-score-badge ${statusClass}" style="align-self: flex-start; margin-top: auto; font-size: 0.72rem; padding: 4px 10px; font-weight:700;">${statusText}</span>
@@ -9521,24 +9691,39 @@ function renderAgentQACoaching(selectedAgent) {
 
     audited.forEach(d => {
         if (d.qa_greeting !== null && !isNaN(d.qa_greeting)) {
-            dimensions.greeting.sum += d.qa_greeting;
-            dimensions.greeting.count++;
+            const val = normalizeQAScore(d.qa_greeting, 5);
+            if (val !== null) {
+                dimensions.greeting.sum += val;
+                dimensions.greeting.count++;
+            }
         }
         if (d.qa_grammar !== null && !isNaN(d.qa_grammar)) {
-            dimensions.grammar.sum += d.qa_grammar;
-            dimensions.grammar.count++;
+            const val = normalizeQAScore(d.qa_grammar, 5);
+            if (val !== null) {
+                dimensions.grammar.sum += val;
+                dimensions.grammar.count++;
+            }
         }
         if (d.qa_acknowledgement !== null && !isNaN(d.qa_acknowledgement)) {
-            dimensions.acknowledgement.sum += d.qa_acknowledgement;
-            dimensions.acknowledgement.count++;
+            const val = normalizeQAScore(d.qa_acknowledgement, 15);
+            if (val !== null) {
+                dimensions.acknowledgement.sum += val;
+                dimensions.acknowledgement.count++;
+            }
         }
         if (d.qa_sla !== null && !isNaN(d.qa_sla)) {
-            dimensions.sla.sum += d.qa_sla;
-            dimensions.sla.count++;
+            const val = normalizeQAScore(d.qa_sla, 15);
+            if (val !== null) {
+                dimensions.sla.sum += val;
+                dimensions.sla.count++;
+            }
         }
         if (d.qa_assistance !== null && !isNaN(d.qa_assistance)) {
-            dimensions.assistance.sum += d.qa_assistance;
-            dimensions.assistance.count++;
+            const val = normalizeQAScore(d.qa_assistance, 5);
+            if (val !== null) {
+                dimensions.assistance.sum += val;
+                dimensions.assistance.count++;
+            }
         }
     });
 
@@ -9565,15 +9750,15 @@ function renderAgentQACoaching(selectedAgent) {
 
     let html = '';
     Object.entries(dimensions).forEach(([key, dim]) => {
-        const avg = dim.count > 0 ? (dim.sum / dim.count) : dim.max;
-        const ratio = avg / dim.max;
+        const avg = dim.count > 0 ? (dim.sum / dim.count) : 100;
+        const ratio = avg / 100;
 
         if (ratio < lowestScore) {
             lowestScore = ratio;
             lowestKey = key;
         }
 
-        const pct = Math.round(ratio * 100);
+        const pct = Math.round(avg);
         let progressColor = 'var(--purple)';
         if (pct < 70) progressColor = 'var(--red)';
         else if (pct < 85) progressColor = 'var(--orange)';
@@ -9583,7 +9768,7 @@ function renderAgentQACoaching(selectedAgent) {
             <div class="coaching-bar-group" style="margin-bottom:12px;">
                 <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-weight:600;margin-bottom:4px;">
                     <span style="color:var(--text-primary);">${dim.label}</span>
-                    <span style="color:var(--text-secondary);">${avg.toFixed(1)} / ${dim.max} (${pct}%)</span>
+                    <span style="color:var(--text-secondary);">${pct} / 100</span>
                 </div>
                 <div class="progress-bar-bg" style="background:rgba(255,255,255,0.03);height:8px;border-radius:4px;overflow:hidden;border:1px solid var(--border-color);">
                     <div style="background:${progressColor};height:100%;width:${pct}%;border-radius:4px;transition:width 0.5s ease-out;"></div>
@@ -9609,7 +9794,7 @@ function renderAgentQACoaching(selectedAgent) {
     if (auditedTbody && audited.length > 0) {
         auditedTbody.innerHTML = audited.map(d => {
             const v = Number(d.qa_overall);
-            const qaPct = Math.round(v > 45 ? v : (v / 45) * 100);
+            const qaPct = Math.round(normalizeQAScore(v, 45));
             const csatStars = d.csat ? '★'.repeat(Math.round(d.csat)) + '☆'.repeat(5 - Math.round(d.csat)) : '-';
             const commentsEscaped = (d.comments || '').replace(/"/g, '&quot;');
             return `<tr>
