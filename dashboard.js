@@ -2440,14 +2440,16 @@ function initDateRangePicker() {
                 endDate = date;
             }
             selecting = false;
+            // Apply range immediately on 2nd date selection
+            applyRange();
         }
         renderBothMonths();
         updateRangeDisplay();
     }
 
     function onDayHover(date) {
-        hoverDate = date;
         if (selecting && startDate && !endDate) {
+            hoverDate = date;
             renderBothMonths();
         }
     }
@@ -2488,6 +2490,10 @@ function initDateRangePicker() {
     }
 
     function openPopup() {
+        // Go to custom preset and deactivate buttons immediately
+        activeFilters.datePreset = 'custom';
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+
         if (hasPopover) {
             if (!popup.matches(':popover-open')) {
                 // Close all custom select popovers first
@@ -2551,6 +2557,10 @@ function initDateRangePicker() {
     if (hasPopover) {
         popup.addEventListener('toggle', (event) => {
             if (event.newState === 'open') {
+                // Go to custom preset and deactivate buttons immediately when opened
+                activeFilters.datePreset = 'custom';
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+
                 // Initialize view to include current active range
                 if (activeFilters.dateFrom) {
                     const d = parseDate(activeFilters.dateFrom);
@@ -2603,6 +2613,8 @@ function initDateRangePicker() {
             viewYear  = from.getFullYear(); viewMonth = from.getMonth();
             renderBothMonths();
             updateRangeDisplay();
+            // Apply range immediately when choosing a shortcut inside picker
+            applyRange();
         });
     });
 
