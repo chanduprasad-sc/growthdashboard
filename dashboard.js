@@ -1887,30 +1887,33 @@ function populateFilterDropdowns() {
     const brokerSelect = document.getElementById('filter-broker');
     const currentBroker = brokerSelect ? brokerSelect.value : 'all';
     if (brokerSelect) {
-        brokerSelect.innerHTML = '<option value="all">All Broker Families</option>';
+        let html = '<option value="all">All Broker Families</option>';
         Array.from(brokers).sort().forEach(b => {
-            brokerSelect.innerHTML += `<option value="${b}">${b}</option>`;
+            html += `<option value="${b}">${b}</option>`;
         });
+        brokerSelect.innerHTML = html;
         brokerSelect.value = currentBroker;
     }
 
     const pocSelect = document.getElementById('filter-poc');
     const currentPoc = pocSelect ? pocSelect.value : 'all';
     if (pocSelect) {
-        pocSelect.innerHTML = '<option value="all">All Assigned POCs</option>';
+        let html = '<option value="all">All Assigned POCs</option>';
         Array.from(pocs).sort().forEach(p => {
-            pocSelect.innerHTML += `<option value="${p}">${p}</option>`;
+            html += `<option value="${p}">${p}</option>`;
         });
+        pocSelect.innerHTML = html;
         pocSelect.value = currentPoc;
     }
 
     const agentSelect = document.getElementById('filter-agent');
     const currentAgent = agentSelect ? agentSelect.value : 'all';
     if (agentSelect) {
-        agentSelect.innerHTML = '<option value="all">All Support Agents</option>';
+        let html = '<option value="all">All Support Agents</option>';
         Array.from(agents).sort().forEach(a => {
-            agentSelect.innerHTML += `<option value="${a}">${a}</option>`;
+            html += `<option value="${a}">${a}</option>`;
         });
+        agentSelect.innerHTML = html;
         agentSelect.value = currentAgent;
     }
 }
@@ -4121,9 +4124,10 @@ function openPocDeepDiveModal(pocName) {
     if (sortedBranches.length === 0) {
         branchBody.innerHTML = '<tr><td colspan="3" class="text-muted text-center" style="text-align: center;">No branch data in selected range.</td></tr>';
     } else {
+        let html = '';
         sortedBranches.forEach(([key, count]) => {
             const [branch, broker] = key.split('||');
-            branchBody.innerHTML += `
+            html += `
                 <tr>
                     <td><strong>${branch}</strong></td>
                     <td><span class="badge">${broker}</span></td>
@@ -4131,6 +4135,7 @@ function openPocDeepDiveModal(pocName) {
                 </tr>
             `;
         });
+        branchBody.innerHTML = html;
     }
 
     // Populate RM table
@@ -4148,12 +4153,13 @@ function openPocDeepDiveModal(pocName) {
     if (sortedRMs.length === 0) {
         rmBody.innerHTML = '<tr><td colspan="4" class="text-muted text-center" style="text-align: center;">No RM contacts in selected range.</td></tr>';
     } else {
+        let html = '';
         sortedRMs.forEach(([key, count]) => {
             const [rm, broker] = key.split('||');
             // Check if RM is an outlier in rawData
             const isOutlier = rawData && rawData.outliers && rawData.outliers.some(o => o.rm_name.toLowerCase() === rm.toLowerCase() && o.is_outlier);
             const statusLabel = isOutlier ? '<span class="text-red">⚠️ Outlier</span>' : '<span class="text-green">Normal</span>';
-            rmBody.innerHTML += `
+            html += `
                 <tr>
                     <td><strong>${rm}</strong></td>
                     <td><span class="badge">${broker}</span></td>
@@ -4162,6 +4168,7 @@ function openPocDeepDiveModal(pocName) {
                 </tr>
             `;
         });
+        rmBody.innerHTML = html;
     }
 
     // Populate Interactions table (Raw Audit Trail)
@@ -4172,8 +4179,9 @@ function openPocDeepDiveModal(pocName) {
     if (sortedRecords.length === 0) {
         recordsBody.innerHTML = '<tr><td colspan="9" class="text-muted text-center" style="text-align: center;">No raw interactions found in selected range.</td></tr>';
     } else {
+        let html = '';
         sortedRecords.forEach(item => {
-            recordsBody.innerHTML += `
+            html += `
                 <tr>
                     <td>${item.date || '-'}</td>
                     <td>${getDevRevLinkHTML(item.id, item.type)}</td>
@@ -4187,6 +4195,7 @@ function openPocDeepDiveModal(pocName) {
                 </tr>
             `;
         });
+        recordsBody.innerHTML = html;
     }
 
     // Open Modal
@@ -4316,8 +4325,9 @@ function openMetricDeepDiveModal(type, title) {
         } else {
             // Sort by Date descending
             const sorted = [...entries].sort((a, b) => safeParseDate(b.date).getTime() - safeParseDate(a.date).getTime());
+            let html = '';
             sorted.forEach(item => {
-                tableBody.innerHTML += `
+                html += `
                     <tr>
                         <td>${item.date || '-'}</td>
                         <td>${getDevRevLinkHTML(item.id, item.type)}</td>
@@ -4330,6 +4340,7 @@ function openMetricDeepDiveModal(type, title) {
                     </tr>
                 `;
             });
+            tableBody.innerHTML = html;
         }
     } else {
         // Setup Call log headers
@@ -4354,9 +4365,10 @@ function openMetricDeepDiveModal(type, title) {
         } else {
             // Sort by Date descending
             const sorted = [...entries].sort((a, b) => safeParseDate(b.date).getTime() - safeParseDate(a.date).getTime());
+            let html = '';
             sorted.forEach(call => {
                 const badgeClass = String(call.stage || "").toLowerCase() === 'answered' || String(call.stage || "").toLowerCase() === 'connected' ? 'text-green' : 'text-red';
-                tableBody.innerHTML += `
+                html += `
                     <tr>
                         <td>${call.date || '-'}</td>
                         <td><code>${call.id || '-'}</code></td>
@@ -4372,6 +4384,7 @@ function openMetricDeepDiveModal(type, title) {
                     </tr>
                 `;
             });
+            tableBody.innerHTML = html;
         }
     }
 
