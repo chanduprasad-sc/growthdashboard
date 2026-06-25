@@ -1683,13 +1683,26 @@ function setupEventListeners() {
     document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
         const toggleTheme = () => {
             const body = document.body;
-            const btnText = document.querySelector('.theme-text');
+            const btn = document.getElementById('theme-toggle-btn');
+            const frontLabel = btn.querySelector('.theme-label-front');
+            const backLabel = btn.querySelector('.theme-label-back');
+            const willFlip = !btn.classList.contains('flipped');
 
             if (body.classList.contains('light-mode')) {
                 // Light -> Dark
                 body.classList.remove('light-mode');
                 body.classList.add('dark-mode');
-                btnText.innerText = 'Black Mode';
+                
+                if (willFlip) {
+                    backLabel.innerHTML = 'Dark Mode 🌙';
+                    frontLabel.innerHTML = 'Black Mode 🌑';
+                    btn.classList.add('flipped');
+                } else {
+                    frontLabel.innerHTML = 'Dark Mode 🌙';
+                    backLabel.innerHTML = 'Black Mode 🌑';
+                    btn.classList.remove('flipped');
+                }
+
                 THEME_COLORS.textPrimary = '#f0f4ff';
                 THEME_COLORS.textSecondary = '#cbd5e1';
                 THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
@@ -1702,7 +1715,17 @@ function setupEventListeners() {
                 // Dark -> Black
                 body.classList.remove('dark-mode');
                 body.classList.add('black-mode');
-                btnText.innerText = 'Light Mode';
+                
+                if (willFlip) {
+                    backLabel.innerHTML = 'Black Mode 🌑';
+                    frontLabel.innerHTML = 'Light Mode ☀️';
+                    btn.classList.add('flipped');
+                } else {
+                    frontLabel.innerHTML = 'Black Mode 🌑';
+                    backLabel.innerHTML = 'Light Mode ☀️';
+                    btn.classList.remove('flipped');
+                }
+
                 THEME_COLORS.textPrimary = '#f8fafc';
                 THEME_COLORS.textSecondary = '#cbd5e1';
                 THEME_COLORS.border = 'rgba(255, 255, 255, 0.1)';
@@ -1715,7 +1738,17 @@ function setupEventListeners() {
                 // Black -> Light
                 body.classList.remove('black-mode');
                 body.classList.add('light-mode');
-                btnText.innerText = 'Dark Mode';
+                
+                if (willFlip) {
+                    backLabel.innerHTML = 'Light Mode ☀️';
+                    frontLabel.innerHTML = 'Dark Mode 🌙';
+                    btn.classList.add('flipped');
+                } else {
+                    frontLabel.innerHTML = 'Light Mode ☀️';
+                    backLabel.innerHTML = 'Dark Mode 🌙';
+                    btn.classList.remove('flipped');
+                }
+
                 THEME_COLORS.textPrimary = '#0f172a';
                 THEME_COLORS.textSecondary = '#334155';
                 THEME_COLORS.border = 'rgba(0, 0, 0, 0.07)';

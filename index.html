@@ -30,75 +30,93 @@
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
     </button>
 
-    <div class="dashboard-wrapper">
+    <div class="dashboard-wrapper sidebar-provider">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <button id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Hide Sidebar">◀</button>
-            <div class="brand">
-                <div class="brand-logo">
-                    <svg viewBox="0 0 100 100" width="100%" height="100%">
-                        <rect width="100" height="100" rx="22" fill="#1f7ae0"/>
-                        <g fill="#ffffff">
-                            <!-- Top face ring -->
-                            <path d="M50 18 L77 31.5 L50 45 L23 31.5 Z M50 25.5 L67.5 34 L50 42.5 L32.5 34 Z" fill-rule="evenodd"/>
-                            <!-- Left face with triangle cutout -->
-                            <path d="M23 35 L23 71.5 L50 85 L50 48.5 Z M29 60 L40 47.5 L40 66 Z" fill-rule="evenodd"/>
-                            <!-- Right face with circle/ellipse cutout -->
-                            <path d="M50 48.5 L50 85 L77 71.5 L77 35 Z M63.5 67.5 C68.75 67.5 73 63.25 73 58 C73 52.75 68.75 48.5 63.5 48.5 C58.25 48.5 54 52.75 54 58 C54 63.25 58.25 67.5 63.5 67.5 Z" fill-rule="evenodd"/>
-                        </g>
-                    </svg>
-                </div>
-                <div class="brand-text">
-                    <span class="brand-title">smallcase</span>
-                    <span class="brand-subtitle">B2B growth</span>
+            
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-logo">
+                        <svg viewBox="0 0 100 100" width="100%" height="100%">
+                            <rect width="100" height="100" rx="22" fill="#1f7ae0"/>
+                            <g fill="#ffffff">
+                                <!-- Top face ring -->
+                                <path d="M50 18 L77 31.5 L50 45 L23 31.5 Z M50 25.5 L67.5 34 L50 42.5 L32.5 34 Z" fill-rule="evenodd"/>
+                                <!-- Left face with triangle cutout -->
+                                <path d="M23 35 L23 71.5 L50 85 L50 48.5 Z M29 60 L40 47.5 L40 66 Z" fill-rule="evenodd"/>
+                                <!-- Right face with circle/ellipse cutout -->
+                                <path d="M50 48.5 L50 85 L77 71.5 L77 35 Z M63.5 67.5 C68.75 67.5 73 63.25 73 58 C73 52.75 68.75 48.5 63.5 48.5 C58.25 48.5 54 52.75 54 58 C54 63.25 58.25 67.5 63.5 67.5 Z" fill-rule="evenodd"/>
+                            </g>
+                        </svg>
+                    </div>
+                    <div class="brand-text">
+                        <span class="brand-title">smallcase</span>
+                        <span class="brand-subtitle">B2B growth</span>
+                    </div>
                 </div>
             </div>
             
-            <nav class="nav-menu">
-                <button class="nav-btn active" data-tab="tab-weekly-pulse">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
-                    Weekly Pulse
-                </button>
-                <button class="nav-btn" data-tab="tab-main-dashboard">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 13h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm10 0h6c.55 0 1-.45 1-1v-8c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0-18v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1z"/></svg>
-                    Main Dashboard
-                </button>
-                <button class="nav-btn" data-tab="tab-visual-control">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 16H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h12c.55 0 1 .45 1 1v12c0 .55-.45 1-.45 1zm-3-8h-2V9h2v2zm-4 0H9V9h2v2zm4 4h-2v-2h2v2zm-4 0H9v-2h2v2z"/></svg>
-                    Visual Control
-                </button>
-                <button class="nav-btn" data-tab="tab-intelligence">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.5-9.11 0-12.58 3.51-3.47 9.14-3.47 12.65 0L21 3v7.12z"/></svg>
-                    Intelligence
-                </button>
-                <button class="nav-btn" data-tab="tab-monthly-view">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
-                    Monthly View
-                </button>
-                <button class="nav-btn" data-tab="tab-agent-performance">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                    Agent Performance
-                </button>
-                <button class="nav-btn" data-tab="tab-tickets-chats">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-                    Tickets & Chats
-                </button>
-                <button class="nav-btn" data-tab="tab-ai-summary">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" fill="none" stroke="currentColor" stroke-width="0"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                    AI Summary
-                </button>
-                <button class="nav-btn" data-tab="tab-guide">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/></svg>
-                    Guide
-                </button>
-            </nav>
+            <div class="sidebar-content">
+                <div class="sidebar-group">
+                    <span class="sidebar-group-label">Platform Analytics</span>
+                    <nav class="nav-menu">
+                        <button class="nav-btn active" data-tab="tab-weekly-pulse">
+                            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+                            Weekly Pulse
+                        </button>
+                        <button class="nav-btn" data-tab="tab-main-dashboard">
+                            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 13h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm10 0h6c.55 0 1-.45 1-1v-8c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0-18v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1z"/></svg>
+                            Main Dashboard
+                        </button>
+                        <button class="nav-btn" data-tab="tab-visual-control">
+                            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 16H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h12c.55 0 1 .45 1 1v12c0 .55-.45 1-.45 1zm-3-8h-2V9h2v2zm-4 0H9V9h2v2zm4 4h-2v-2h2v2zm-4 0H9v-2h2v2z"/></svg>
+                            Visual Control
+                        </button>
+                        <button class="nav-btn" data-tab="tab-intelligence">
+                            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.5-9.11 0-12.58 3.51-3.47 9.14-3.47 12.65 0L21 3v7.12z"/></svg>
+                            Intelligence
+                        </button>
+                        <button class="nav-btn" data-tab="tab-monthly-view">
+                            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
+                            Monthly View
+                        </button>
+                        <button class="nav-btn" data-tab="tab-agent-performance">
+                            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                            Agent Performance
+                        </button>
+                        <button class="nav-btn" data-tab="tab-tickets-chats">
+                            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                            Tickets & Chats
+                        </button>
+                        <button class="nav-btn" data-tab="tab-ai-summary">
+                            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" fill="none" stroke="currentColor" stroke-width="0"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                            AI Summary
+                        </button>
+                    </nav>
+                </div>
+                
+                <div class="sidebar-group">
+                    <span class="sidebar-group-label">Resources</span>
+                    <nav class="nav-menu">
+                        <button class="nav-btn" data-tab="tab-guide">
+                            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/></svg>
+                            Guide
+                        </button>
+                    </nav>
+                </div>
+            </div>
 
             <div class="sidebar-footer">
-                <button id="theme-toggle-btn" class="theme-toggle">
-                    <span class="toggle-icon sun-icon">☀️</span>
-                    <span class="toggle-icon moon-icon">🌙</span>
-                    <span class="toggle-icon black-icon">🌑</span>
-                    <span class="toggle-text theme-text">Dark Mode</span>
+                <button id="theme-toggle-btn" class="flip-button">
+                    <span class="flip-button-inner">
+                        <span class="flip-button-front">
+                            <span class="theme-label-front">Light Mode ☀️</span>
+                        </span>
+                        <span class="flip-button-back">
+                            <span class="theme-label-back">Dark Mode 🌙</span>
+                        </span>
+                    </span>
                 </button>
                 <div class="connection-status-panel">
                     <div class="status-indicator-row">
@@ -107,10 +125,10 @@
                     </div>
                     <strong id="data-gen-time" class="data-time-badge">Loading...</strong>
                     <div class="status-action-row">
-                        <button id="sidebar-sync-btn" class="sidebar-action-btn" title="Refresh Live Data">
+                        <button id="sidebar-sync-btn" class="sidebar-action-btn liquid-button" title="Refresh Live Data">
                             🔄 Sync
                         </button>
-                        <button id="sidebar-config-btn" class="sidebar-action-btn" title="Configure Live Google Sheet">
+                        <button id="sidebar-config-btn" class="sidebar-action-btn liquid-button" title="Configure Live Google Sheet">
                             ⚙️ Setup
                         </button>
                     </div>
@@ -129,7 +147,7 @@
                 
                 <!-- Screenshot Trigger & Filters -->
                 <div class="top-utility-bar">
-                    <button id="screenshot-btn" class="screenshot-btn" title="Download Weekly Pulse Dashboard Summary">
+                    <button id="screenshot-btn" class="screenshot-btn liquid-button" title="Download Weekly Pulse Dashboard Summary">
                         <span class="btn-icon">📸</span> Take Dashboard Screenshot
                     </button>
                 </div>
@@ -160,7 +178,7 @@
                             <input type="date" id="filter-date-from" class="date-picker">
                             <span class="date-separator">to</span>
                             <input type="date" id="filter-date-to" class="date-picker">
-                            <button id="apply-date-btn" class="apply-btn">Apply Range</button>
+                            <button id="apply-date-btn" class="apply-btn liquid-button">Apply Range</button>
                         </div>
                     </div>
                 </div>
@@ -212,7 +230,7 @@
                                 <!-- Dynamic -->
                             </select>
                         </div>
-                        <button id="weekly-reset-btn" class="reset-btn flex-center" style="height: 38px; margin-top: auto; margin-left: 8px;">
+                        <button id="weekly-reset-btn" class="reset-btn flex-center liquid-button" style="height: 38px; margin-top: auto; margin-left: 8px;">
                             Reset Filters
                         </button>
                     </div>
@@ -482,7 +500,7 @@
                                 <h3 class="card-title">Comment Intelligence & Resolution Summarizer</h3>
                                 <p class="card-subtitle">Summarise unstructured comment logs inside selected period using NVIDIA AI Nano LLM</p>
                             </div>
-                            <button id="ai-summarise-btn" class="ai-btn">
+                            <button id="ai-summarise-btn" class="ai-btn liquid-button">
                                 <span class="ai-btn-icon">⚡</span> Summarise Comments (AI)
                             </button>
                         </div>
@@ -544,7 +562,7 @@
                         <span class="cohort-modal-count" id="cohort-modal-count">0 records</span>
                         <div class="cohort-modal-actions">
                             <input type="text" class="cohort-modal-search" id="cohort-modal-search" placeholder="Search...">
-                            <button class="cohort-export-btn" id="cohort-export-btn">⬇ Export CSV</button>
+                            <button class="cohort-export-btn liquid-button" id="cohort-export-btn">⬇ Export CSV</button>
                             <button class="cohort-modal-close" id="cohort-modal-close">✕</button>
                         </div>
                     </div>
@@ -1396,7 +1414,7 @@
                         <select id="monthly-year-select">
                             <!-- Populated dynamically -->
                         </select>
-                        <button class="export-btn" id="monthly-export-btn">📥 Export CSV</button>
+                        <button class="export-btn liquid-button" id="monthly-export-btn">📥 Export CSV</button>
                     </div>
                 </div>
                 <div class="monthly-table-wrapper">
@@ -1534,7 +1552,7 @@
                         <button class="status-pill" data-tchannel="Care Email">📧 Emails</button>
                     </div>
                     <input type="text" class="search-input" id="tickets-search" placeholder="🔍 Search by ID, RM, broker, issue...">
-                    <button class="export-btn" id="tickets-export-btn">📥 Export CSV</button>
+                    <button class="export-btn liquid-button" id="tickets-export-btn">📥 Export CSV</button>
                 </div>
                 <div class="tickets-stats-bar" id="tickets-stats-bar">
                     <!-- Dynamic status count badges -->
@@ -1576,8 +1594,8 @@
                         </div>
                         <div class="ai-tab-actions">
                             <span class="ai-tab-period-badge" id="ai-tab-period-badge">Loading...</span>
-                            <button class="ai-generate-btn" id="ai-generate-btn">✨ Generate AI Narrative</button>
-                            <button class="export-btn" id="ai-copy-btn">📋 Copy Report</button>
+                            <button class="ai-generate-btn liquid-button" id="ai-generate-btn">✨ Generate AI Narrative</button>
+                            <button class="export-btn liquid-button" id="ai-copy-btn">📋 Copy Report</button>
                         </div>
                     </div>
 
@@ -1880,10 +1898,10 @@
                     </div>
 
                     <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
-                        <button type="button" id="live-config-test-btn" class="export-btn" style="border-color: var(--blue); color: var(--blue);">
+                        <button type="button" id="live-config-test-btn" class="export-btn liquid-button" style="border-color: var(--blue); color: var(--blue);">
                             ⚡ Test Connection
                         </button>
-                        <button type="submit" class="ai-generate-btn" style="padding: 8px 20px; font-size: 0.85rem; border-radius: 10px;">
+                        <button type="submit" class="ai-generate-btn liquid-button" style="padding: 8px 20px; font-size: 0.85rem; border-radius: 10px;">
                             💾 Save & Refresh
                         </button>
                     </div>

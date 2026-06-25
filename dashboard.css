@@ -4493,3 +4493,224 @@ body.light-mode .pill-btn.active {
     color: #ffffff !important; /* white text on purple indicator in light mode */
 }
 
+/* ==========================================================================
+   RADIX-STYLE COMPOSABLE SIDEBAR SYSTEM
+   ========================================================================== */
+.sidebar {
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+.sidebar-header {
+    padding: 24px 24px 16px !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+}
+
+.sidebar-header .brand {
+    margin-bottom: 0 !important;
+}
+
+.sidebar-content {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 20px 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+}
+
+/* Custom premium scrollbar for sidebar content */
+.sidebar-content::-webkit-scrollbar {
+    width: 4px !important;
+}
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: var(--border-color) !important;
+    border-radius: 10px !important;
+}
+
+.sidebar-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+.sidebar-group-label {
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    color: var(--text-muted) !important;
+    margin-bottom: 6px !important;
+    padding-left: 12px !important;
+}
+
+.sidebar-footer {
+    padding: 16px 24px 24px !important;
+    border-top: 1px solid var(--border-color) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+}
+
+/* ==========================================================================
+   3D FLIP BUTTON SWITCHER
+   ========================================================================== */
+.flip-button {
+    position: relative !important;
+    width: 100% !important;
+    height: 38px !important;
+    perspective: 1000px !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    outline: none !important;
+}
+
+.flip-button-inner {
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+    text-align: center !important;
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transform-style: preserve-3d !important;
+    display: block !important;
+}
+
+.flip-button.flipped .flip-button-inner {
+    transform: rotateX(180deg) !important;
+}
+
+.flip-button-front, .flip-button-back {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    border-radius: 999px !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    font-family: var(--font-heading) !important;
+    border: 1px solid var(--color-edge) !important;
+    background: var(--color-cloud) !important;
+    color: var(--text-secondary) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+    transition: background-color 220ms, border-color 220ms, color 220ms !important;
+}
+
+.flip-button-back {
+    transform: rotateX(180deg) !important;
+}
+
+.flip-button:hover .flip-button-front,
+.flip-button:hover .flip-button-back {
+    background: var(--bg-card-hover, rgba(255, 255, 255, 0.05)) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--text-muted) !important;
+}
+
+body.light-mode .flip-button:hover .flip-button-front,
+body.light-mode .flip-button:hover .flip-button-back {
+    background: rgba(0, 0, 0, 0.02) !important;
+}
+
+/* ==========================================================================
+   LIQUID BUTTON HOVER FILL SYSTEM
+   ========================================================================== */
+.liquid-button {
+    position: relative !important;
+    overflow: hidden !important;
+    z-index: 1 !important;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.2s ease, 
+                color 0.25s ease !important;
+}
+
+/* Liquid fill element rising from bottom */
+.liquid-button::before {
+    content: '' !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: var(--liquid-fill-height, 3px) !important;
+    background: var(--liquid-bg, var(--accent-primary, #1f7ae0)) !important;
+    z-index: -1 !important;
+    opacity: 0.85 !important;
+    transition: height 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
+                opacity 0.25s ease !important;
+}
+
+/* Hover scales up and fills height */
+.liquid-button:hover {
+    transform: scale(var(--liquid-hover-scale, 1.03)) !important;
+    box-shadow: 0 4px 15px rgba(var(--accent-primary-rgb, 31, 122, 224), 0.2) !important;
+}
+
+.liquid-button:hover::before {
+    height: 100% !important;
+    opacity: 1 !important;
+}
+
+.liquid-button:hover {
+    color: var(--liquid-hover-color, #ffffff) !important;
+}
+
+/* Tap scales down */
+.liquid-button:active {
+    transform: scale(var(--liquid-tap-scale, 0.95)) !important;
+}
+
+/* Preserving Specific Default Colors */
+.screenshot-btn.liquid-button {
+    --liquid-bg: linear-gradient(135deg, var(--accent-primary) 0%, #7c3aed 100%) !important;
+    --liquid-hover-color: #ffffff !important;
+}
+
+.apply-btn.liquid-button {
+    --liquid-bg: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-blue) 100%) !important;
+    --liquid-hover-color: #ffffff !important;
+}
+
+.ai-generate-btn.liquid-button {
+    --liquid-bg: linear-gradient(135deg, #7c3aed 0%, var(--accent-blue) 100%) !important;
+    --liquid-hover-color: #ffffff !important;
+}
+
+.reset-btn.liquid-button {
+    --liquid-bg: var(--accent-red, #f43f5e) !important;
+    --liquid-hover-color: #ffffff !important;
+}
+
+.export-btn.liquid-button {
+    --liquid-bg: var(--accent-primary, #1f7ae0) !important;
+    --liquid-hover-color: #ffffff !important;
+}
+
+.cohort-export-btn.liquid-button {
+    --liquid-bg: var(--accent-primary, #1f7ae0) !important;
+    --liquid-hover-color: #ffffff !important;
+}
+
+.sidebar-action-btn.liquid-button {
+    --liquid-bg: var(--border-color) !important;
+    --liquid-hover-color: var(--text-primary) !important;
+}
+
+body.light-mode .sidebar-action-btn.liquid-button {
+    --liquid-hover-color: #0f172a !important;
+}
+
+
