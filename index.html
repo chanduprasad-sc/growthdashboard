@@ -4,10 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>smallcase B2B growth & support analytics dashboard</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- html2canvas for capturing dashboard screenshots -->
@@ -97,7 +93,6 @@
                 <button id="theme-toggle-btn" class="theme-toggle">
                     <span class="toggle-icon sun-icon">☀️</span>
                     <span class="toggle-icon moon-icon">🌙</span>
-                    <span class="toggle-icon black-icon">🌑</span>
                     <span class="toggle-text theme-text">Dark Mode</span>
                 </button>
                 <div class="connection-status-panel">
@@ -189,20 +184,26 @@
                     <!-- Dropdowns and Reset button -->
                     <div class="filter-row-group" style="margin-left: auto;">
                         <div class="filter-group">
-                            <select id="filter-broker" class="dropdown-select">
+                            <select id="filter-broker" class="dropdown-select" multiple>
                                 <option value="all">All Broker Families</option>
                                 <!-- Dynamic -->
                             </select>
                         </div>
                         <div class="filter-group">
-                            <select id="filter-poc" class="dropdown-select">
+                            <select id="filter-poc" class="dropdown-select" multiple>
                                 <option value="all">All Assigned POCs</option>
                                 <!-- Dynamic -->
                             </select>
                         </div>
                         <div class="filter-group">
-                            <select id="filter-agent" class="dropdown-select">
+                            <select id="filter-agent" class="dropdown-select" multiple>
                                 <option value="all">All Support Agents</option>
+                                <!-- Dynamic -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <select id="filter-hide-smallcase-rm" class="dropdown-select" multiple>
+                                <option value="none">Hide smallcase RMs: None</option>
                                 <!-- Dynamic -->
                             </select>
                         </div>
@@ -1668,7 +1669,7 @@
                     <div class="guide-section">
                         <div class="guide-title">🎨 Themes & Accessibility</div>
                         <div class="guide-card">
-                            <strong>Three Themes:</strong> Toggle between <strong>Light Mode</strong> (bright white), <strong>Dark Mode</strong> (space navy), and <strong>Black Mode</strong> (OLED-friendly pitch black) using the theme button in the sidebar footer.<br><br>
+                            <strong>Two Themes:</strong> Toggle between <strong>Light Mode</strong> (bright white) and <strong>Dark Mode</strong> (space navy) using the theme button in the sidebar footer.<br><br>
                             <strong>Sidebar:</strong> Click the ◀ button to collapse the sidebar for more workspace. A floating ▶ button will appear to restore it.<br><br>
                             <strong>Screenshots:</strong> Use the 📸 button to capture the current dashboard view as a PNG image.
                         </div>
