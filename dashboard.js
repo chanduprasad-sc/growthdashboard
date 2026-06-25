@@ -260,7 +260,7 @@ function addChartExportButtons() {
 let rawData = null;
 let currentTab = 'tab-weekly-pulse';
 let activeFilters = {
-    datePreset: '30d', // default is Last 30 Days to match screenshot data
+    datePreset: 'week', // default is Current Week (Monday to Sunday)
     dateFrom: '',
     dateTo: '',
     channel: 'all', // Combined, Call Ticket, WhatsApp Chat
@@ -2260,7 +2260,7 @@ function populateFilterDropdowns() {
 }
 
 function setDefaultDateRange() {
-    const defaultPreset = '30d';
+    const defaultPreset = 'week';
     setDateRangeFromPreset(defaultPreset);
     activeFilters.datePreset = defaultPreset;
 
@@ -2295,6 +2295,11 @@ function initDateRangePicker() {
     const nextMonthBtn = document.getElementById('drp-next-month');
 
     if (!trigger || !popup) return;
+
+    // Prevent clicks inside popup from bubbling to prevent browser popover light-dismiss bugs (caused by detaching elements)
+    popup.addEventListener('click', (e) => e.stopPropagation());
+    popup.addEventListener('mousedown', (e) => e.stopPropagation());
+    popup.addEventListener('pointerdown', (e) => e.stopPropagation());
 
     // Build weekday headers once
     document.querySelectorAll('.drp-weekdays').forEach(container => {
