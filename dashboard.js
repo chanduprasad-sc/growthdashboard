@@ -1797,9 +1797,19 @@ function setupEventListeners() {
             activeFilters.datePreset = preset;
 
             if (preset === 'custom') {
-                const trigger = document.getElementById('drp-trigger');
-                if (trigger) {
-                    trigger.click();
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const fromEl = document.getElementById('filter-date-from');
+                if (fromEl) {
+                    if (typeof fromEl.showPicker === 'function') {
+                        try {
+                            fromEl.showPicker();
+                        } catch (e) {
+                            fromEl.focus();
+                        }
+                    } else {
+                        fromEl.focus();
+                    }
                 }
             } else {
                 document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
@@ -1820,19 +1830,21 @@ function setupEventListeners() {
         applyDateBtn.addEventListener('click', () => {
             const from = document.getElementById('filter-date-from').value;
             const to = document.getElementById('filter-date-to').value;
-            if (from && to) {
-                activeFilters.datePreset = 'custom';
-                document.querySelectorAll('.preset-btn').forEach(b => {
-                    if (b.getAttribute('data-preset') === 'custom') {
-                        b.classList.add('active');
-                    } else {
-                        b.classList.remove('active');
-                    }
-                });
-                activeFilters.dateFrom = from;
-                activeFilters.dateTo = to;
-                buildViewModel();
+            if (!from || !to) {
+                alert("Please select both start and end dates.");
+                return;
             }
+            activeFilters.datePreset = 'custom';
+            document.querySelectorAll('.preset-btn').forEach(b => {
+                if (b.getAttribute('data-preset') === 'custom') {
+                    b.classList.add('active');
+                } else {
+                    b.classList.remove('active');
+                }
+            });
+            activeFilters.dateFrom = from;
+            activeFilters.dateTo = to;
+            buildViewModel();
         });
     }
 

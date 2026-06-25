@@ -4900,4 +4900,81 @@ body.dark-mode .chart-export-btn:hover {
     margin-bottom: 10px;
 }
 
+/* Redesigned Direct Date Inputs */
+.date-input-field {
+    display: inline-flex !important;
+    align-items: center !important;
+    height: 38px !important;
+    padding: 8px 14px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-heading) !important;
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    outline: none !important;
+    box-sizing: border-box !important;
+    cursor: pointer !important;
+    width: 145px !important;
+    transition: border-color 0.2s var(--glass-easing), box-shadow 0.2s var(--glass-easing), background-color 0.2s var(--glass-easing) !important;
+}
+
+body.light-mode .date-input-field {
+    background: rgba(0, 0, 0, 0.02) !important;
+}
+
+.date-input-field:hover {
+    border-color: var(--purple) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.light-mode .date-input-field:hover {
+    background: rgba(0, 0, 0, 0.04) !important;
+}
+
+.date-input-field:focus {
+    border-color: var(--purple) !important;
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2) !important;
+}
+
+.date-input-field::-webkit-calendar-picker-indicator {
+    cursor: pointer !important;
+    opacity: 0.6 !important;
+    transition: opacity 0.2s !important;
+    filter: invert(var(--calendar-indicator-invert, 0));
+}
+
+.date-input-field::-webkit-calendar-picker-indicator:hover {
+    opacity: 1 !important;
+}
+
+body.dark-mode {
+    --calendar-indicator-invert: 1;
+}
+
+.apply-date-btn-direct {
+    height: 38px !important;
+    padding: 8px 20px !important;
+    border: none !important;
+    border-radius: 8px !important;
+    background: linear-gradient(135deg, var(--purple), var(--blue)) !important;
+    color: #ffffff !important;
+    font-family: var(--font-heading) !important;
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: transform 0.2s, box-shadow 0.2s !important;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2) !important;
+}
+
+.apply-date-btn-direct:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.3) !important;
+}
+
+.apply-date-btn-direct:active {
+    transform: translateY(0) !important;
+}
+
 

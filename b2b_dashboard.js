@@ -361,15 +361,31 @@ function setupEventListeners() {
     // Preset Date buttons
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            
             const preset = btn.getAttribute('data-preset');
             activeFilters.datePreset = preset;
             
-            // Recalculate date range
-            setDateRangeFromPreset(preset);
-            buildViewModel();
+            if (preset === 'custom') {
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const fromEl = document.getElementById('filter-date-from');
+                if (fromEl) {
+                    if (typeof fromEl.showPicker === 'function') {
+                        try {
+                            fromEl.showPicker();
+                        } catch (e) {
+                            fromEl.focus();
+                        }
+                    } else {
+                        fromEl.focus();
+                    }
+                }
+            } else {
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                // Recalculate date range
+                setDateRangeFromPreset(preset);
+                buildViewModel();
+            }
         });
     });
 
@@ -377,13 +393,15 @@ function setupEventListeners() {
     document.getElementById('apply-date-btn').addEventListener('click', () => {
         const from = document.getElementById('filter-date-from').value;
         const to = document.getElementById('filter-date-to').value;
-        if (from && to) {
-            activeFilters.datePreset = 'custom';
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-            activeFilters.dateFrom = from;
-            activeFilters.dateTo = to;
-            buildViewModel();
+        if (!from || !to) {
+            alert("Please select both start and end dates.");
+            return;
         }
+        activeFilters.datePreset = 'custom';
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        activeFilters.dateFrom = from;
+        activeFilters.dateTo = to;
+        buildViewModel();
     });
 
     // Quick Channel Pills selector (Combined, Call Ticket, WhatsApp)
