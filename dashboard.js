@@ -6,7 +6,7 @@
 let rawData = null;
 let currentTab = 'tab-weekly-pulse';
 let activeFilters = {
-    datePreset: '30d',
+    datePreset: '30d', // default is Last 30 Days to match screenshot data
     dateFrom: '',
     dateTo: '',
     channel: 'all', // Combined, Call Ticket, WhatsApp Chat
@@ -14,7 +14,6 @@ let activeFilters = {
     poc: 'all',
     agent: 'all',
     branch: 'all',
-    hideSmallcaseRm: 'none',
     searchQuery: '',
     includeCareEmails: false
 };
@@ -1611,7 +1610,6 @@ function setupEventListeners() {
             poc: 'all',
             agent: 'all',
             branch: 'all',
-            hideSmallcaseRm: 'none',
             searchQuery: '',
             includeCareEmails: false
         };
@@ -1638,8 +1636,6 @@ function setupEventListeners() {
         document.getElementById('filter-broker').value = 'all';
         document.getElementById('filter-poc').value = 'all';
         document.getElementById('filter-agent').value = 'all';
-        const hideRmSelect = document.getElementById('filter-hide-smallcase-rm');
-        if (hideRmSelect) hideRmSelect.value = 'none';
 
         setDefaultDateRange();
         buildViewModel();
@@ -1658,13 +1654,6 @@ function setupEventListeners() {
         activeFilters.agent = e.target.value;
         buildViewModel();
     });
-    const hideRmSelect = document.getElementById('filter-hide-smallcase-rm');
-    if (hideRmSelect) {
-        hideRmSelect.addEventListener('change', (e) => {
-            activeFilters.hideSmallcaseRm = e.target.value;
-            buildViewModel();
-        });
-    }
 
     // Theme Switcher (Light / Dark / Black)
     document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
@@ -1917,7 +1906,6 @@ function populateFilterDropdowns() {
     const brokers = new Set();
     const pocs = new Set();
     const agents = new Set();
-    const smallcaseRMs = new Set();
 
     const allowedBrokers = new Set([
         'Axis', 'Axis MTF', 'HDFC', 'HDFC MTF', 'SBI', 'SBI MTF', 'HDFCsky',
@@ -1933,11 +1921,6 @@ function populateFilterDropdowns() {
         }
         if (item.poc && item.poc !== 'Not shared' && item.poc !== 'No POC') pocs.add(item.poc);
         if (item.agent && item.agent !== 'Unassigned' && item.agent !== 'System') agents.add(item.agent);
-        if (item.branch === 'smallcase' && item.rm_name && item.rm_name !== 'NA') smallcaseRMs.add(item.rm_name);
-    });
-
-    rawData.calls.forEach(call => {
-        if (call.branch === 'smallcase' && call.rm_name && call.rm_name !== 'Unknown') smallcaseRMs.add(call.rm_name);
     });
 
     const brokerSelect = document.getElementById('filter-broker');
@@ -1971,17 +1954,6 @@ function populateFilterDropdowns() {
         });
         agentSelect.innerHTML = html;
         agentSelect.value = currentAgent;
-    }
-
-    const hideSmallcaseRmSelect = document.getElementById('filter-hide-smallcase-rm');
-    const currentHideRm = hideSmallcaseRmSelect ? hideSmallcaseRmSelect.value : 'none';
-    if (hideSmallcaseRmSelect) {
-        let html = '<option value="none">Hide smallcase RMs: None</option>';
-        Array.from(smallcaseRMs).sort().forEach(rm => {
-            html += `<option value="${rm}">Hide RM: ${rm}</option>`;
-        });
-        hideSmallcaseRmSelect.innerHTML = html;
-        hideSmallcaseRmSelect.value = currentHideRm;
     }
 }
 
@@ -2112,12 +2084,6 @@ function buildViewModel() {
         if (activeFilters.agent !== 'all' && item.agent !== activeFilters.agent) return false;
         if (activeFilters.branch && activeFilters.branch !== 'all' && item.branch !== activeFilters.branch) return false;
 
-        if (activeFilters.hideSmallcaseRm && activeFilters.hideSmallcaseRm !== 'none') {
-            if (item.branch === 'smallcase' && item.rm_name === activeFilters.hideSmallcaseRm) {
-                return false;
-            }
-        }
-
         return true;
     });
 
@@ -2133,12 +2099,6 @@ function buildViewModel() {
         if (activeFilters.poc !== 'all' && call.poc !== activeFilters.poc) return false;
         if (activeFilters.agent !== 'all' && call.agent !== activeFilters.agent) return false;
         if (activeFilters.branch && activeFilters.branch !== 'all' && call.branch !== activeFilters.branch) return false;
-
-        if (activeFilters.hideSmallcaseRm && activeFilters.hideSmallcaseRm !== 'none') {
-            if (call.branch === 'smallcase' && call.rm_name === activeFilters.hideSmallcaseRm) {
-                return false;
-            }
-        }
 
         return true;
     });
@@ -2161,13 +2121,6 @@ function buildViewModel() {
         if (activeFilters.broker !== 'all' && item.broker_family !== activeFilters.broker) return false;
         if (activeFilters.poc !== 'all' && item.poc !== activeFilters.poc) return false;
         if (activeFilters.agent !== 'all' && item.agent !== activeFilters.agent) return false;
-        if (activeFilters.branch && activeFilters.branch !== 'all' && item.branch !== activeFilters.branch) return false;
-
-        if (activeFilters.hideSmallcaseRm && activeFilters.hideSmallcaseRm !== 'none') {
-            if (item.branch === 'smallcase' && item.rm_name === activeFilters.hideSmallcaseRm) {
-                return false;
-            }
-        }
 
         return true;
     });
@@ -6841,7 +6794,7 @@ function renderIntelligenceDashboard() {
         };
 
         let html = `
-            <div style="font-family: var(--font-body), sans-serif; color: var(--text-primary);">
+            <div style="font-family: 'Outfit', sans-serif; color: var(--text-primary);">
                 <!-- Header row with hour labels -->
                 <div style="display: flex; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
                     <span style="width: 45px; flex-shrink: 0; font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Day</span>
@@ -8071,7 +8024,7 @@ function showFloatingToast(message) {
         toast.style.padding = '12px 24px';
         toast.style.borderRadius = '12px';
         toast.style.boxShadow = '0 8px 30px rgba(139, 92, 246, 0.4)';
-        toast.style.fontFamily = "var(--font-heading), sans-serif";
+        toast.style.fontFamily = "'Outfit', sans-serif";
         toast.style.fontSize = '0.82rem';
         toast.style.fontWeight = '600';
         toast.style.zIndex = '9999';
@@ -9119,8 +9072,8 @@ function convertSelectToCustomDropdown(select) {
             if (isShowing) {
                 panel.hidePopover();
             } else {
-                panel.showPopover();
                 positionPanel();
+                panel.showPopover();
             }
         } else {
             const isShowing = panel.classList.contains('show');
@@ -9177,7 +9130,6 @@ function initCustomDropdowns() {
         '#filter-broker',
         '#filter-poc',
         '#filter-agent',
-        '#filter-hide-smallcase-rm',
         '#monthly-month-select',
         '#monthly-year-select',
         '#agent-perf-select'

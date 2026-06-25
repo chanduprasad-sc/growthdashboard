@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap");
+
 /* ==========================================================================
    DESIGN SYSTEM - CSS VARIABLES & ROOT
    ========================================================================== */
@@ -5,157 +7,132 @@
     /* Typography */
     --font-heading: 'SF Pro Display', -apple-system, 'BlinkMacSystemFont', 'Helvetica Neue', sans-serif;
     --font-body: 'SF Pro Text', -apple-system, 'BlinkMacSystemFont', sans-serif;
-    --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, 'DejaVu Sans Mono', monospace;
     
     /* Animation settings */
     --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     
     /* Glass blur baseline */
     --glass-blur: blur(24px) saturate(180%);
+
+    /* Unified Theme Colors mappings */
+    --orange: #f97316;
 }
 
 body.dark-mode {
-    --bg-main: #0a0e1a;
-    --bg-sidebar: rgba(10, 14, 26, 0.4);
-    --bg-card: rgba(255, 255, 255, 0.06);
-    --border-color: rgba(255, 255, 255, 0.16);
-    --text-primary: #f0f4ff;
-    --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
+    --bg-main: #0b090e;               /* Rich deep space black-purple background */
+    --bg-sidebar: rgba(21, 18, 27, 0.5); /* Glassy sidebar */
+    --bg-card: rgba(28, 24, 36, 0.55);   /* Frosted glass container */
+    --border-color: rgba(255, 255, 255, 0.08); /* Semi-transparent outline */
+    --text-primary: #f0f4ff;          /* High-contrast text */
+    --text-secondary: #9ca3af;        /* Slate secondary text */
+    --text-muted: #6b7280;            /* Gray outline */
     
-    --accent-primary: #82b1ff;     /* Bright Blue Accent */
-    --accent-primary-rgb: 130, 177, 255;
-    --accent-secondary: #60a5fa;
-    --accent-gradient: linear-gradient(135deg, #82b1ff, #60a5fa);
-    --accent-blue: #00d4ff;        /* Electric Cyan */
+    --accent-primary: #1f7ae0;       /* smallcase Brand Blue */
+    --accent-primary-rgb: 31, 122, 224;
+    --accent-blue: #00d4ff;          /* Vibrant Cyan */
     --accent-blue-rgb: 0, 212, 255;
-    --accent-green: #10b981;       /* Emerald */
+    --accent-green: #10b981;         /* Emerald Green */
     --accent-green-rgb: 16, 185, 129;
-    --accent-red: #f43f5e;         /* Coral Red */
+    --accent-red: #f43f5e;           /* Coral Rose */
     --accent-red-rgb: 244, 63, 94;
-    --accent-yellow: #fbbf24;      /* Warm Amber */
+    --accent-yellow: #fbbf24;        /* Warm Amber */
     --accent-yellow-rgb: 251, 191, 36;
     
-    --card-shadow: rgba(0, 0, 0, 0.25);
-    --card-glow: rgba(130, 177, 255, 0.12);
+    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+    --card-glow: rgba(31, 122, 224, 0.15);
     --shadow-color: rgba(0, 0, 0, 0.4);
 
     /* UI Kit Color Tokens */
-    --color-cloud: rgba(255, 255, 255, 0.06);
-    --color-edge: rgba(255, 255, 255, 0.16);
-    --color-mist: #cbd5e1;
-    --color-ink: #82b1ff;
+    --color-cloud: rgba(21, 18, 27, 0.95);
+    --color-edge: rgba(255, 255, 255, 0.12);
+    --color-mist: #9ca3af;
+    --color-ink: #ffffff;
 
-    /* Theme Mappings */
-    --glass-bg: rgba(255, 255, 255, 0.06);
-    --glass-border: rgba(255, 255, 255, 0.16);
-    --glass-shadow: rgba(0, 0, 0, 0.25);
-    --glass-shadow-high: rgba(0, 0, 0, 0.4);
+    /* Glassmorphism Tokens */
+    --glass-bg: rgba(21, 18, 27, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --glass-shadow-high: 0 12px 40px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 0 20px rgba(31, 122, 224, 0.25);
     --glass-radius: 16px;
     --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
-    
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.15);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.2);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,0.25);
-    --shadow-xl: 0 20px 25px rgba(0,0,0,0.3);
-    --shadow-accent: 0 4px 14px rgba(130, 177, 255, 0.25);
-    --shadow-accent-lg: 0 8px 24px rgba(130, 177, 255, 0.35);
 }
 
 body.light-mode {
-    --bg-main: #fcfcff;
-    --bg-sidebar: rgba(255, 255, 255, 0.55);
-    --bg-card: rgba(255, 255, 255, 0.7);
-    --border-color: rgba(0, 0, 0, 0.07);
-    --text-primary: #0f172a;
-    --text-secondary: #334155;
-    --text-muted: #94a3b8;
+    --bg-main: #f3f5fa;               /* Clean grey-blue background */
+    --bg-sidebar: rgba(255, 255, 255, 0.6); /* Glassy sidebar */
+    --bg-card: rgba(255, 255, 255, 0.65);   /* Frosted glass container */
+    --border-color: rgba(0, 0, 0, 0.08);    /* Semi-transparent outline */
+    --text-primary: #0f172a;          /* Slate primary text */
+    --text-secondary: #475569;        /* Slate secondary text */
+    --text-muted: #94a3b8;            /* Slate outline */
     
-    --accent-primary: #1f7ae0;     /* smallcase brand blue */
+    --accent-primary: #1f7ae0;       /* smallcase Brand Blue */
     --accent-primary-rgb: 31, 122, 224;
-    --accent-secondary: #4ea3f7;
-    --accent-gradient: linear-gradient(135deg, #1f7ae0, #4ea3f7);
-    --accent-blue: #0284c7;        /* Sky Blue */
+    --accent-blue: #0284c7;          /* Sky Blue */
     --accent-blue-rgb: 2, 132, 199;
-    --accent-green: #059669;       /* Forest Green */
+    --accent-green: #059669;         /* Forest Green */
     --accent-green-rgb: 5, 150, 105;
-    --accent-red: #e11d48;         /* Rose Red */
+    --accent-red: #e11d48;            /* Rose Red */
     --accent-red-rgb: 225, 29, 72;
-    --accent-yellow: #d97706;      /* Amber Yellow */
+    --accent-yellow: #d97706;         /* Amber Yellow */
     --accent-yellow-rgb: 217, 119, 6;
     
-    --card-shadow: rgba(15, 23, 42, 0.04);
-    --card-glow: rgba(31, 122, 224, 0.03);
-    --shadow-color: rgba(15, 23, 42, 0.01);
+    --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
+    --card-glow: rgba(31, 122, 224, 0.08);
+    --shadow-color: rgba(31, 38, 135, 0.02);
 
     /* UI Kit Color Tokens */
-    --color-cloud: rgba(255, 255, 255, 0.7);
-    --color-edge: rgba(0, 0, 0, 0.07);
-    --color-mist: #334155;
-    --color-ink: #1f7ae0;
+    --color-cloud: #ffffff;
+    --color-edge: #e3e8ee;
+    --color-mist: #5b6472;
+    --color-ink: #0e1116;
 
-    /* Theme Mappings */
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(0, 0, 0, 0.07);
-    --glass-shadow: rgba(15, 23, 42, 0.04);
-    --glass-shadow-high: rgba(15, 23, 42, 0.08);
+    /* Glassmorphism Tokens */
+    --glass-bg: rgba(255, 255, 255, 0.65);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    --glass-shadow-high: 0 12px 40px 0 rgba(31, 38, 135, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 0 16px rgba(31, 122, 224, 0.12);
     --glass-radius: 16px;
     --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
-    
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.03);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.04);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,0.05);
-    --shadow-xl: 0 20px 25px rgba(0,0,0,0.07);
-    --shadow-accent: 0 4px 14px rgba(31, 122, 224, 0.15);
-    --shadow-accent-lg: 0 8px 24px rgba(31, 122, 224, 0.25);
 }
 
 body.black-mode {
-    --bg-main: #000000;
-    --bg-sidebar: rgba(0, 0, 0, 0.65);
-    --bg-card: rgba(20, 20, 20, 0.35);
-    --border-color: rgba(255, 255, 255, 0.10);
-    --text-primary: #f8fafc;
-    --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
+    --bg-main: #000000;               /* Pure black background */
+    --bg-sidebar: rgba(18, 18, 18, 0.6); /* Glassy sidebar */
+    --bg-card: rgba(26, 26, 26, 0.55);   /* Frosted glass container */
+    --border-color: rgba(255, 255, 255, 0.06);
+    --text-primary: #f8fafc;          /* White primary text */
+    --text-secondary: #94a3b8;        /* Slate secondary text */
+    --text-muted: #475569;            /* Gray outline */
     
-    --accent-primary: #c084fc;     /* Brighter Violet */
-    --accent-primary-rgb: 192, 132, 252;
-    --accent-secondary: #d8b4fe;
-    --accent-gradient: linear-gradient(135deg, #c084fc, #d8b4fe);
-    --accent-blue: #38bdf8;        /* Brighter Cyan */
-    --accent-blue-rgb: 56, 189, 248;
-    --accent-green: #34d399;       /* Brighter Emerald */
-    --accent-green-rgb: 52, 211, 153;
-    --accent-red: #fb7185;         /* Brighter Coral */
-    --accent-red-rgb: 251, 113, 133;
-    --accent-yellow: #fcd34d;      /* Brighter Yellow */
-    --accent-yellow-rgb: 252, 211, 77;
+    --accent-primary: #82b1ff;       /* Lighter Brand Blue */
+    --accent-primary-rgb: 130, 177, 255;
+    --accent-blue: #a8c7fa;          /* MD3 dark blue */
+    --accent-blue-rgb: 168, 199, 250;
+    --accent-green: #b4dfb4;         /* MD3 dark green */
+    --accent-green-rgb: 180, 223, 180;
+    --accent-red: #f2b8b5;           /* MD3 dark error */
+    --accent-red-rgb: 242, 184, 181;
+    --accent-yellow: #efb8c8;        /* MD3 dark tertiary */
+    --accent-yellow-rgb: 239, 184, 200;
     
-    --card-shadow: rgba(0, 0, 0, 0.85);
-    --card-glow: rgba(56, 189, 248, 0.05);
-    --shadow-color: rgba(0, 0, 0, 0.95);
+    --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.65);
+    --card-glow: rgba(130, 177, 255, 0.04);
+    --shadow-color: rgba(0, 0, 0, 0.8);
 
     /* UI Kit Color Tokens */
-    --color-cloud: rgba(20, 20, 20, 0.35);
-    --color-edge: rgba(255, 255, 255, 0.10);
-    --color-mist: #cbd5e1;
-    --color-ink: #c084fc;
+    --color-cloud: rgba(18, 18, 18, 0.95);
+    --color-edge: rgba(255, 255, 255, 0.1);
+    --color-mist: #94a3b8;
+    --color-ink: #ffffff;
 
-    /* Theme Mappings */
-    --glass-bg: rgba(20, 20, 20, 0.35);
-    --glass-border: rgba(255, 255, 255, 0.10);
-    --glass-shadow: rgba(0, 0, 0, 0.85);
-    --glass-shadow-high: rgba(0, 0, 0, 0.95);
+    /* Glassmorphism Tokens */
+    --glass-bg: rgba(20, 20, 20, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --glass-shadow-high: 0 12px 40px 0 rgba(0, 0, 0, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 0 16px rgba(130, 177, 255, 0.15);
     --glass-radius: 16px;
     --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
-    
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.6);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.6);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,0.7);
-    --shadow-xl: 0 20px 25px rgba(0,0,0,0.8);
-    --shadow-accent: 0 4px 14px rgba(192, 132, 252, 0.15);
-    --shadow-accent-lg: 0 8px 24px rgba(192, 132, 252, 0.25);
 }
 
 /* ==========================================================================
@@ -234,9 +211,9 @@ body.light-mode .blob {
     animation-delay: -15s;
 }
 @keyframes float {
-    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    50% { transform: translate(5vw, 3vh) scale(1.08) rotate(3deg); }
-    100% { transform: translate(-3vw, -4vh) scale(0.95) rotate(-3deg); }
+    0% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(8vw, 6vh) scale(1.15); }
+    100% { transform: translate(-6vw, -8vh) scale(0.9); }
 }
 
 /* Faint tactile noise gradient overlay */
@@ -2160,7 +2137,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    font-family: var(--font-heading), sans-serif;
+    font-family: 'Outfit', sans-serif;
 }
 .sub-tab-pill:hover {
     background: var(--bg-card-hover);
@@ -2268,7 +2245,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: 1px solid var(--border-color);
     background: var(--bg-card);
     color: var(--text-primary);
-    font-family: var(--font-heading), sans-serif;
+    font-family: 'Outfit', sans-serif;
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -2381,7 +2358,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: 1px solid var(--border-color);
     background: var(--bg-card);
     color: var(--text-primary);
-    font-family: var(--font-heading), sans-serif;
+    font-family: 'Outfit', sans-serif;
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -2482,7 +2459,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: 1px solid var(--border-color);
     background: var(--bg-card);
     color: var(--text-primary);
-    font-family: var(--font-body), sans-serif;
+    font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 0.85rem;
     min-width: 250px;
     outline: none;
@@ -2509,7 +2486,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-family: var(--font-heading), sans-serif;
+    font-family: 'Outfit', sans-serif;
 }
 .status-pill:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 .status-pill.active {
@@ -2615,7 +2592,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    font-family: var(--font-heading), sans-serif;
+    font-family: 'Outfit', sans-serif;
 }
 .pagination-controls button:hover { background: var(--bg-card-hover); }
 .pagination-controls button.active {
@@ -2743,7 +2720,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: none;
     background: linear-gradient(135deg, var(--purple), var(--blue));
     color: #fff;
-    font-family: var(--font-heading), sans-serif;
+    font-family: 'Outfit', sans-serif;
     font-size: 0.9rem;
     font-weight: 700;
     cursor: pointer;
@@ -2878,7 +2855,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     border: 1px solid var(--border-color);
     background: var(--bg-card);
     color: var(--text-primary);
-    font-family: var(--font-heading), sans-serif;
+    font-family: 'Outfit', sans-serif;
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
@@ -3452,7 +3429,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     background: var(--bg-card);
     color: var(--text-primary);
     font-size: 0.82rem;
-    font-family: var(--font-body), sans-serif;
+    font-family: 'Outfit', sans-serif;
     outline: none;
     width: 180px;
     transition: border-color 0.2s;
@@ -3468,7 +3445,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-family: var(--font-heading), sans-serif;
+    font-family: 'Outfit', sans-serif;
 }
 .cohort-export-btn:hover { background: var(--purple); color: #fff; border-color: var(--purple); }
 .cohort-modal-close {
@@ -3570,7 +3547,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-family: var(--font-heading), sans-serif;
+    font-family: 'Outfit', sans-serif;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -3632,7 +3609,7 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     display: flex;
     flex-direction: column;
     gap: 3px;
-    font-family: var(--font-body), sans-serif;
+    font-family: 'Outfit', sans-serif;
 }
 .explorer-item-btn:hover { background: var(--bg-card-hover); }
 .explorer-item-btn.selected { background: rgba(139,92,246,0.12); }
@@ -3881,7 +3858,7 @@ body.light-mode {
     border-color: rgba(31, 122, 224, 0.3) !important;
 }
 
-/* Clean standard panel/table/chart containers (Minimalist Modern Card style) */
+/* Recessed slots/inner panels */
 .panel-table-wrapper,
 .monthly-table-wrapper,
 .agent-comparison-table-wrapper,
@@ -3897,37 +3874,63 @@ body.light-mode {
 .deepdive-chart-card canvas,
 .ticket-detail-panel,
 .live-feed-viewport {
-    background: var(--bg-card) !important;
-    box-shadow: var(--shadow-sm) !important;
+    background: rgba(0, 0, 0, 0.2) !important;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.2) !important;
     border: 1px solid var(--border-color) !important;
-    border-radius: var(--glass-radius) !important;
-    backdrop-filter: none !important;
+    border-radius: 12px !important;
+    backdrop-filter: blur(5px) !important;
 }
 
-/* --- Sleek Input Fields & Selectors --- */
+body.light-mode .panel-table-wrapper,
+body.light-mode .monthly-table-wrapper,
+body.light-mode .agent-comparison-table-wrapper,
+body.light-mode .tickets-table-wrapper,
+body.light-mode .repeat-loops-table-wrapper,
+body.light-mode .comments-preview-list,
+body.light-mode .ai-summary-output,
+body.light-mode .hotspots-list,
+body.light-mode .explorer-left-pane,
+body.light-mode .explorer-right-pane,
+body.light-mode .chart-container,
+body.light-mode .ticket-detail-panel,
+body.light-mode .live-feed-viewport {
+    background: rgba(255, 255, 255, 0.45) !important;
+    box-shadow: inset 0 2px 6px rgba(31, 38, 135, 0.03) !important;
+}
+
+/* --- Sleek Translucent Input Fields & Selectors --- */
 select,
 input[type="date"],
 input[type="text"],
 .date-picker,
 .search-input {
-    background: var(--bg-card) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
     border: 1px solid var(--border-color) !important;
     color: var(--text-primary) !important;
     padding: 8px 14px !important;
     border-radius: 8px !important;
     font-size: 0.85rem !important;
     outline: none !important;
-    box-shadow: var(--shadow-sm) !important;
-    transition: var(--transition-fast) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(10px) !important;
+    transition: border-color 0.2s var(--glass-easing), box-shadow 0.2s var(--glass-easing) !important;
+}
+
+body.light-mode select,
+body.light-mode input[type="date"],
+body.light-mode input[type="text"],
+body.light-mode .date-picker,
+body.light-mode .search-input {
+    background: rgba(0, 0, 0, 0.02) !important;
 }
 
 select:focus,
 input:focus {
     border-color: var(--accent-primary) !important;
-    box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.15) !important;
+    box-shadow: 0 0 10px rgba(31, 122, 224, 0.15) !important;
 }
 
-/* --- Minimalist Modern Tabs, Pills and Buttons --- */
+/* --- High-end Tab Links, Pills and Buttons (Uiverse.io astronaut themed) --- */
 
 /* Tab/Pill Containers */
 .preset-buttons,
@@ -3937,14 +3940,16 @@ input:focus {
 .channel-pills {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 6px !important;
-    padding: 4px !important;
-    background: var(--muted) !important;
-    border: 1px solid var(--border-color) !important;
+    gap: 4px !important;
+    padding: 6px !important;
+    background: var(--color-cloud) !important;
+    border: 1px solid var(--color-edge) !important;
     border-radius: 999px !important;
-    font-family: var(--font-body) !important;
+    box-shadow:
+        0 1px 1px rgba(14, 17, 22, 0.04),
+        0 20px 40px -24px rgba(14, 17, 22, 0.18) !important;
+    font-family: "Inter", system-ui, -apple-system, sans-serif !important;
     width: max-content !important;
-    box-shadow: none !important;
 }
 
 /* Ensure pagination centers properly */
@@ -3969,32 +3974,34 @@ input:focus {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    height: 34px !important;
-    padding: 0 16px !important;
+    height: 36px !important;
+    padding: 0 18px !important;
     border-radius: 999px !important;
-    font-family: var(--font-body) !important;
-    font-size: 13px !important;
+    font-size: 14px !important;
     font-weight: 500 !important;
-    color: var(--text-secondary) !important;
+    color: var(--color-mist) !important;
     cursor: pointer !important;
     white-space: nowrap !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    transition: var(--transition-smooth) !important;
+    text-shadow: none !important;
+    transition:
+        background-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform 150ms cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
-/* Adjust sidebar nav-btn (vertical layout) */
+/* Adjust sidebar nav-btn to align left while keeping layout and aesthetics */
 .nav-btn {
     justify-content: flex-start !important;
-    height: 44px !important;
+    height: 44px !important; /* Slightly taller for vertical sidebar menu list */
     padding: 0 20px !important;
     width: 100% !important;
-    border-radius: 8px !important;
-    font-size: 0.9rem !important;
 }
 
-/* Standalone Buttons - Outline Style with clean shadow */
+/* Standalone Buttons - apply background and border since they are not in a .cir-tabs container */
 .screenshot-btn,
 .sidebar-action-btn,
 .export-btn,
@@ -4002,83 +4009,55 @@ input:focus {
 .theme-toggle,
 .modal-close-btn,
 .sidebar-collapse-btn {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    box-shadow: var(--shadow-sm) !important;
-    color: var(--text-primary) !important;
-    font-weight: 600 !important;
+    background: var(--color-cloud) !important;
+    border: 1px solid var(--color-edge) !important;
+    box-shadow:
+        0 1px 1px rgba(14, 17, 22, 0.04),
+        0 8px 16px -8px rgba(14, 17, 22, 0.1) !important;
 }
 
-/* Hover States: Float up and increase lighting depth */
+/* Hover States */
 .nav-btn:hover,
 .tab-link:hover,
 .sub-tab-pill:hover,
-.preset-btn:hover {
-    color: var(--text-primary) !important;
-    background: rgba(15, 23, 42, 0.05) !important;
-}
-body.dark-mode .nav-btn:hover,
-body.dark-mode .tab-link:hover,
-body.dark-mode .sub-tab-pill:hover,
-body.dark-mode .preset-btn:hover,
-body.black-mode .nav-btn:hover,
-body.black-mode .tab-link:hover,
-body.black-mode .sub-tab-pill:hover,
-body.black-mode .preset-btn:hover {
-    background: rgba(255, 255, 255, 0.05) !important;
-    color: var(--text-primary) !important;
-}
-
+.preset-btn:hover,
 .screenshot-btn:hover,
 .sidebar-action-btn:hover,
 .export-btn:hover,
+.ai-generate-btn:hover,
+.pagination-controls button:hover,
 .theme-toggle:hover,
 .modal-close-btn:hover,
 .sidebar-collapse-btn:hover {
-    transform: translateY(-0.5px) !important;
-    border-color: var(--accent-primary) !important;
-    box-shadow: var(--shadow-md) !important;
-    color: var(--accent-primary) !important;
+    color: var(--color-ink) !important;
 }
 
-/* Active/Selected states: Maps to the high-fidelity checked behavior */
+/* Standalone Hover border color shift */
+.screenshot-btn:hover,
+.sidebar-action-btn:hover,
+.export-btn:hover,
+.ai-generate-btn:hover,
+.theme-toggle:hover,
+.modal-close-btn:hover,
+.sidebar-collapse-btn:hover {
+    border-color: var(--color-ink) !important;
+}
+
+/* Active/Selected states: Maps to the UI kit's checked behavior */
 .nav-btn.active,
 .tab-link.active,
 .tab-link.current,
 .sub-tab-pill.active,
 .preset-btn.active,
 .pagination-controls button.active {
-    background: var(--accent-gradient) !important;
-    color: #ffffff !important;
-    font-weight: 600 !important;
-    box-shadow: var(--shadow-accent) !important;
+    background: var(--color-ink) !important;
+    color: var(--color-cloud) !important;
+    box-shadow:
+        0 1px 1px rgba(14, 17, 22, 0.06),
+        0 8px 18px -10px rgba(14, 17, 22, 0.5) !important;
 }
 
-/* Active Hover state */
-.nav-btn.active:hover,
-.tab-link.active:hover,
-.tab-link.current:hover,
-.sub-tab-pill.active:hover,
-.preset-btn.active:hover,
-.pagination-controls button.active:hover {
-    transform: translateY(-0.5px) !important;
-    box-shadow: var(--shadow-accent-lg) !important;
-}
-
-/* AI Generate Button - Signature Gradient Styling */
-.ai-generate-btn {
-    background: var(--accent-gradient) !important;
-    border: none !important;
-    box-shadow: var(--shadow-accent) !important;
-    color: #ffffff !important;
-}
-.ai-generate-btn:hover {
-    transform: translateY(-0.5px) !important;
-    box-shadow: var(--shadow-accent-lg) !important;
-}
-
-/* Active Press / Squish Micro-physics on click */
+/* Scaling / Click feedback micro-interaction */
 .nav-btn:active,
 .tab-link:active,
 .sub-tab-pill:active,
@@ -4091,7 +4070,7 @@ body.black-mode .preset-btn:hover {
 .theme-toggle:active,
 .modal-close-btn:active,
 .sidebar-collapse-btn:active {
-    transform: translateY(0) scale(0.98) !important;
+    transform: scale(0.96) !important;
 }
 
 /* Focus indicator */
@@ -4107,54 +4086,7 @@ body.black-mode .preset-btn:hover {
 .theme-toggle:focus-visible,
 .modal-close-btn:focus-visible,
 .sidebar-collapse-btn:focus-visible {
-    box-shadow: 0 0 0 2px var(--accent-primary) !important;
-}
-
-/* Sidebar Specific Contrast Override */
-.sidebar {
-    background: #0F172A !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3) !important;
-    position: relative !important;
-}
-body.dark-mode .sidebar,
-body.black-mode .sidebar {
-    background: #020617 !important;
-    border: 1px solid rgba(255, 255, 255, 0.05) !important;
-}
-.sidebar::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 27px;
-    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-    background-size: 24px 24px;
-    pointer-events: none;
-    z-index: 0;
-}
-.sidebar > * {
-    position: relative;
-    z-index: 2;
-}
-.sidebar .nav-btn {
-    color: #94A3B8 !important;
-}
-.sidebar .nav-btn:hover {
-    color: #FFFFFF !important;
-    background: rgba(255, 255, 255, 0.06) !important;
-}
-.sidebar .nav-btn.active {
-    background: var(--accent-gradient) !important;
-    color: #FFFFFF !important;
-}
-.sidebar .brand-title {
-    color: #FFFFFF !important;
-}
-.sidebar .brand-subtitle {
-    color: #94A3B8 !important;
-}
-.sidebar-collapse-btn {
-    border-radius: 50% !important;
+    box-shadow: 0 0 0 3px rgba(46, 125, 239, 0.32) !important;
 }
 
 /* --- Clean Table Header Rows --- */
@@ -4184,7 +4116,7 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.08) !important;
 }
 .scrollbar-themed::-webkit-scrollbar-thumb:hover {
-    background: rgba(var(--accent-primary-rgb), 0.3) !important;
+    background: rgba(31, 122, 224, 0.3) !important;
 }
 
 /* ==========================================================================
@@ -4251,27 +4183,38 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
     width: 100% !important;
     height: 38px !important;
     padding: 8px 14px !important;
-    background: var(--bg-card) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
     border: 1px solid var(--border-color) !important;
     border-radius: 8px !important;
     color: var(--text-primary) !important;
-    font-family: var(--font-body) !important;
+    font-family: var(--font-heading) !important;
     font-size: 0.85rem !important;
     font-weight: 500 !important;
     cursor: pointer !important;
     outline: none !important;
-    box-shadow: var(--shadow-sm) !important;
-    transition: var(--transition-fast) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    transition: border-color 0.2s var(--glass-easing), box-shadow 0.2s var(--glass-easing), background-color 0.2s var(--glass-easing) !important;
+}
+
+body.light-mode .custom-select-trigger {
+    background: rgba(0, 0, 0, 0.02) !important;
 }
 
 .custom-select-trigger:hover,
 .custom-select-trigger.active {
     border-color: var(--accent-primary) !important;
-    background: var(--bg-card) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.light-mode .custom-select-trigger:hover,
+body.light-mode .custom-select-trigger.active {
+    background: rgba(0, 0, 0, 0.04) !important;
 }
 
 .custom-select-trigger.active {
-    box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.15) !important;
+    box-shadow: 0 0 10px rgba(31, 122, 224, 0.15) !important;
 }
 
 .custom-select-value {
@@ -4296,17 +4239,21 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
 .custom-select-panel {
     margin: 0 !important;
     padding: 4px !important;
-    right: auto !important;
-    bottom: auto !important;
+    inset: auto !important;
     width: 100%;
     min-width: 180px;
     max-height: 260px;
     overflow-y: auto;
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    box-shadow: var(--shadow-xl) !important;
+    background: var(--color-cloud) !important;
+    border: 1px solid var(--color-edge) !important;
+    border-radius: 10px !important;
+    box-shadow: 
+        0 4px 6px -1px rgba(0, 0, 0, 0.05),
+        0 10px 15px -3px rgba(0, 0, 0, 0.1),
+        0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
     z-index: 99999;
+    backdrop-filter: blur(20px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
     transform-origin: top;
     display: none;
 }
@@ -4341,8 +4288,12 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
 }
 
 .custom-select-option:hover {
-    background: rgba(var(--accent-primary-rgb), 0.08) !important;
+    background: rgba(31, 122, 224, 0.1) !important;
     color: var(--text-primary) !important;
+}
+
+body.light-mode .custom-select-option:hover {
+    background: rgba(31, 122, 224, 0.06) !important;
 }
 
 .custom-select-option.selected {
@@ -4351,56 +4302,51 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
     font-weight: 600 !important;
 }
 
-/* --- Liquid UI Date inputs capsule container --- */
-.date-inputs {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    padding: 4px 10px !important;
-    background: var(--muted) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 999px !important;
-    transition: var(--transition-smooth) !important;
-    position: relative !important;
+body.dark-mode .custom-select-option.selected,
+body.black-mode .custom-select-option.selected {
+    color: #0b090e !important;
 }
 
-/* Liquid morphing input elements */
+/* --- iOS Style Date Selector & Apply Button --- */
 .date-picker {
     position: relative !important;
-    font-family: var(--font-body) !important;
-    font-size: 0.82rem !important;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif !important;
+    font-size: 0.85rem !important;
     font-weight: 500 !important;
     text-align: center !important;
-    background: transparent !important;
-    color: var(--text-primary) !important;
+    background: rgba(120, 120, 128, 0.12) !important;
+    color: #007aff !important; /* iOS System Blue */
     border: none !important;
-    border-radius: 999px !important;
-    padding: 6px 12px !important;
-    height: 30px !important;
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    height: 34px !important;
     cursor: pointer !important;
     outline: none !important;
-    width: 110px !important;
+    width: 125px !important;
     box-sizing: border-box !important;
-    transition: var(--transition-smooth) !important;
+    transition: background-color 150ms ease, transform 100ms ease !important;
 }
 
-/* Hover morph */
-.date-picker:hover {
-    background: rgba(15, 23, 42, 0.05) !important;
+body.dark-mode .date-picker,
+body.black-mode .date-picker {
+    background: rgba(120, 120, 128, 0.24) !important;
+    color: #0a84ff !important; /* iOS Dark System Blue */
 }
+
+.date-picker:hover {
+    background: rgba(120, 120, 128, 0.2) !important;
+}
+
 body.dark-mode .date-picker:hover,
 body.black-mode .date-picker:hover {
-    background: rgba(255, 255, 255, 0.05) !important;
+    background: rgba(120, 120, 128, 0.35) !important;
 }
 
-/* Focus: smooth elevation morph */
-.date-picker:focus {
-    background: var(--bg-card) !important;
-    box-shadow: var(--shadow-md) !important;
-    transform: scale(1.02) !important;
+.date-picker:active {
+    transform: scale(0.97) !important;
 }
 
-/* Custom WebKit calendar indicator cover */
+/* Make entire capsule input clickable for WebKit browsers */
 .date-picker::-webkit-calendar-picker-indicator {
     position: absolute !important;
     top: 0 !important;
@@ -4415,38 +4361,46 @@ body.black-mode .date-picker:hover {
 
 .date-separator {
     color: var(--text-secondary) !important;
-    font-family: var(--font-mono) !important;
-    font-size: 0.75rem !important;
+    font-size: 0.85rem !important;
     font-weight: 500 !important;
     margin: 0 4px !important;
-    text-transform: uppercase;
 }
 
-/* Smooth Liquid Apply Button */
+/* iOS Style Date Apply button */
 .apply-btn {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    height: 30px !important;
-    padding: 0 14px !important;
-    border-radius: 999px !important;
-    font-family: var(--font-body) !important;
-    font-size: 0.8rem !important;
-    font-weight: 700 !important;
-    background: var(--accent-gradient) !important;
+    height: 34px !important;
+    padding: 0 16px !important;
+    border-radius: 8px !important;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    background: #007aff !important;
     color: #ffffff !important;
     border: none !important;
     cursor: pointer !important;
-    box-shadow: var(--shadow-sm) !important;
-    transition: var(--transition-smooth) !important;
+    transition: background-color 150ms ease, transform 100ms ease !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.dark-mode .apply-btn,
+body.black-mode .apply-btn {
+    background: #0a84ff !important;
+    color: #ffffff !important;
 }
 
 .apply-btn:hover {
-    box-shadow: var(--shadow-accent) !important;
-    transform: translateY(-0.5px) !important;
+    background: #0062cc !important;
+}
+
+body.dark-mode .apply-btn:hover,
+body.black-mode .apply-btn:hover {
+    background: #0070e6 !important;
 }
 
 .apply-btn:active {
-    transform: scale(0.95) !important;
+    transform: scale(0.96) !important;
 }
 
