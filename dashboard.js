@@ -8983,6 +8983,30 @@ function convertSelectToCustomDropdown(select) {
     panel.className = 'custom-select-panel';
     wrapper.appendChild(panel);
 
+    // Setup native popover support if available
+    const hasPopover = typeof panel.showPopover === 'function';
+    if (hasPopover) {
+        panel.setAttribute('popover', 'auto');
+        
+        // Listen to toggle events to sync trigger active class
+        panel.addEventListener('toggle', (event) => {
+            if (event.newState === 'open') {
+                trigger.classList.add('active');
+            } else {
+                trigger.classList.remove('active');
+            }
+        });
+    }
+
+    // Position panel relative to the trigger
+    function positionPanel() {
+        const rect = trigger.getBoundingClientRect();
+        panel.style.position = 'fixed';
+        panel.style.left = `${rect.left}px`;
+        panel.style.top = `${rect.bottom + 6}px`;
+        panel.style.width = `${rect.width}px`;
+    }
+
     // Sync selected value text and highlight option
     function syncValue() {
         const selectedOption = select.options[select.selectedIndex];
@@ -9015,8 +9039,13 @@ function convertSelectToCustomDropdown(select) {
                 e.stopPropagation();
                 select.value = option.value;
                 syncValue();
-                panel.classList.remove('show');
-                trigger.classList.remove('active');
+                
+                if (hasPopover) {
+                    panel.hidePopover();
+                } else {
+                    panel.classList.remove('show');
+                    trigger.classList.remove('active');
+                }
                 
                 // Dispatch change event to trigger filters
                 const event = new Event('change', { bubbles: true });
@@ -9031,23 +9060,48 @@ function convertSelectToCustomDropdown(select) {
     trigger.addEventListener('click', (e) => {
         e.stopPropagation();
         
-        // Close all other dropdown panels
-        document.querySelectorAll('.custom-select-panel.show').forEach(p => {
-            if (p !== panel) {
-                p.classList.remove('show');
-                p.previousElementSibling.classList.remove('active');
+        if (hasPopover) {
+            const isShowing = panel.matches(':popover-open');
+            // Close all other popovers
+            document.querySelectorAll('.custom-select-panel').forEach(p => {
+                if (p !== panel && typeof p.hidePopover === 'function' && p.matches(':popover-open')) {
+                    p.hidePopover();
+                }
+            });
+            
+            if (isShowing) {
+                panel.hidePopover();
+            } else {
+                positionPanel();
+                panel.showPopover();
             }
-        });
-        
-        panel.classList.toggle('show');
-        trigger.classList.toggle('active');
+        } else {
+            const isShowing = panel.classList.contains('show');
+            // Close all other custom dropdown panels
+            document.querySelectorAll('.custom-select-panel.show').forEach(p => {
+                if (p !== panel) {
+                    p.classList.remove('show');
+                    p.previousElementSibling.classList.remove('active');
+                }
+            });
+            
+            if (isShowing) {
+                panel.classList.remove('show');
+                trigger.classList.remove('active');
+            } else {
+                panel.classList.add('show');
+                trigger.classList.add('active');
+            }
+        }
     });
 
-    // Close when clicking elsewhere
-    document.addEventListener('click', () => {
-        panel.classList.remove('show');
-        trigger.classList.remove('active');
-    });
+    if (!hasPopover) {
+        // Fallback close when clicking elsewhere
+        document.addEventListener('click', () => {
+            panel.classList.remove('show');
+            trigger.classList.remove('active');
+        });
+    }
 
     // Build the initial set of options
     rebuildOptions();
@@ -9085,6 +9139,23 @@ function initCustomDropdowns() {
         if (select) {
             convertSelectToCustomDropdown(select);
         }
+    });
+
+    // Globally close popover dropdown panels on scroll/resize to prevent drifting
+    window.addEventListener('scroll', () => {
+        document.querySelectorAll('.custom-select-panel').forEach(p => {
+            if (typeof p.hidePopover === 'function' && p.matches(':popover-open')) {
+                p.hidePopover();
+            }
+        });
+    }, { passive: true });
+
+    window.addEventListener('resize', () => {
+        document.querySelectorAll('.custom-select-panel').forEach(p => {
+            if (typeof p.hidePopover === 'function' && p.matches(':popover-open')) {
+                p.hidePopover();
+            }
+        });
     });
 }
 
