@@ -2448,8 +2448,10 @@ function initDateRangePicker() {
             // Apply range immediately on 2nd date selection
             applyRange();
         }
-        renderBothMonths();
-        updateRangeDisplay();
+        setTimeout(() => {
+            renderBothMonths();
+            updateRangeDisplay();
+        }, 50);
     }
 
     function onDayHover(date) {
