@@ -142,20 +142,15 @@
 
                     <!-- Custom date range selector row -->
                     <div class="filter-row-sub">
-                        <!-- Start & End Date Inputs -->
-                        <div class="filter-group">
-                            <label class="filter-label">Start Date</label>
-                            <input type="date" id="filter-date-from" class="date-input-field">
-                        </div>
-                        <div class="filter-group" style="align-self: flex-end; padding-bottom: 8px; margin: 0 4px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 500;">
-                            to
-                        </div>
-                        <div class="filter-group">
-                            <label class="filter-label">End Date</label>
-                            <input type="date" id="filter-date-to" class="date-input-field">
-                        </div>
-                        <div class="filter-group align-end">
-                            <button id="apply-date-btn" class="apply-date-btn-direct">Apply Range</button>
+                        <!-- Custom Range (Direct Inputs Grouped) -->
+                        <div class="filter-group" id="drp-filter-group">
+                            <label class="filter-label">Custom Range</label>
+                            <div class="date-inputs-wrapper" style="display: flex; align-items: center; gap: 8px;">
+                                <input type="date" id="filter-date-from" class="date-input-field" placeholder="Start Date">
+                                <span style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; margin: 0 2px;">to</span>
+                                <input type="date" id="filter-date-to" class="date-input-field" placeholder="End Date">
+                                <button id="apply-date-btn" class="apply-date-btn-direct">Apply Range</button>
+                            </div>
                         </div>
 
                         <!-- Select Filters -->

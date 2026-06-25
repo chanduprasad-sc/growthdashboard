@@ -940,10 +940,7 @@ body.light-mode #card-interactions .kpi-value {
     width: 100%;
 }
 
-/* Make trend chart span full width of dashboard */
-.chart-row-2:has(#chart-pulse-trend) {
-    grid-template-columns: 1fr;
-}
+
 
 /* ==========================================================================
    TABLES & METRICS DISPLAY
@@ -4977,4 +4974,32 @@ body.dark-mode {
     transform: translateY(0) !important;
 }
 
+
+
+/* ================================================================
+   UTILITY: Text color indicators
+   ================================================================ */
+.text-green { color: #22c55e !important; }
+.text-red { color: #ef4444 !important; }
+.text-orange { color: #f97316 !important; }
+
+/* Explorer multi-select: slightly muted unselected items */
+#explorer-options-list button.explorer-item-btn { opacity: 0.75; transition: opacity 0.15s; }
+#explorer-options-list button.explorer-item-btn.selected,
+#explorer-options-list button.explorer-item-btn:hover { opacity: 1; }
+
+/* Intel loops/outliers expand toggle */
+.intel-expand-toggle {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 6px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+}
+.intel-expand-toggle:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 

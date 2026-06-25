@@ -275,7 +275,7 @@ let activeFilters = {
 
 // Explorer Widget State
 let explorerActiveTab = 'broker_family';
-let explorerSelectedOption = null;
+let explorerSelectedOptions = new Set();
 
 // Global chart references (for destroy/update lifecycle)
 let charts = {
@@ -2068,7 +2068,7 @@ function setupEventListeners() {
             document.querySelectorAll('.exp-tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             explorerActiveTab = btn.getAttribute('data-attr');
-            explorerSelectedOption = null;
+            explorerSelectedOptions.clear();
             renderExplorerWidgetList();
         });
     });
@@ -2139,6 +2139,20 @@ function setupEventListeners() {
             });
         }
     });
+
+    // Explorer Reset button
+    const explorerResetBtn = document.getElementById('explorer-reset-btn');
+    if (explorerResetBtn) {
+        explorerResetBtn.addEventListener('click', () => {
+            explorerSelectedOptions.clear();
+            document.querySelectorAll('#explorer-options-list button').forEach(b => b.classList.remove('selected'));
+            document.getElementById('explorer-dissect-empty').classList.remove('hidden');
+            document.getElementById('explorer-dissect-content').classList.add('hidden');
+        });
+    }
+
+    // RM Contact Mapper – Initialize after data is ready
+    initCohortMapper();
 }
 
 function switchTab(tabId) {
@@ -4170,7 +4184,7 @@ function renderExplorerWidgetList() {
     sorted.forEach(([opt, count]) => {
         const btn = document.createElement('button');
         btn.className = 'explorer-item-btn';
-        if (explorerSelectedOption === opt) btn.classList.add('selected');
+        if (explorerSelectedOptions.has(opt)) btn.classList.add('selected');
         const barPct = maxCount > 0 ? Math.round(count / maxCount * 100) : 0;
 
         btn.innerHTML = `
@@ -4184,36 +4198,50 @@ function renderExplorerWidgetList() {
         `;
 
         btn.addEventListener('click', () => {
-            document.querySelectorAll('#explorer-options-list button').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            explorerSelectedOption = opt;
-            showExplorerDissection(opt, count);
+            // Toggle selection
+            if (explorerSelectedOptions.has(opt)) {
+                explorerSelectedOptions.delete(opt);
+                btn.classList.remove('selected');
+            } else {
+                explorerSelectedOptions.add(opt);
+                btn.classList.add('selected');
+            }
+            // Show combined dissection for all selected
+            if (explorerSelectedOptions.size > 0) {
+                showExplorerDissection([...explorerSelectedOptions].join(' + '), null);
+            } else {
+                document.getElementById('explorer-dissect-empty').classList.remove('hidden');
+                document.getElementById('explorer-dissect-content').classList.add('hidden');
+            }
         });
 
         list.appendChild(btn);
     });
 
     // Auto-select first if none selected
-    if (!explorerSelectedOption && sorted[0]) {
-        explorerSelectedOption = sorted[0][0];
+    if (explorerSelectedOptions.size === 0 && sorted[0]) {
+        explorerSelectedOptions.add(sorted[0][0]);
         const firstBtn = list.children[0];
-        firstBtn.classList.add('selected');
-        showExplorerDissection(sorted[0][0], sorted[0][1]);
+        if (firstBtn) firstBtn.classList.add('selected');
+        showExplorerDissection([sorted[0][0]], null);
+    } else if (explorerSelectedOptions.size > 0) {
+        showExplorerDissection([...explorerSelectedOptions].join(' + '), null);
     }
 }
 
-function showExplorerDissection(optionName, totalCount) {
+function showExplorerDissection(label, _unused) {
     document.getElementById('explorer-dissect-empty').classList.add('hidden');
 
     const content = document.getElementById('explorer-dissect-content');
     content.classList.remove('hidden');
 
-    document.getElementById('dissect-target-title').innerText = optionName;
-    document.getElementById('dissect-target-count').innerText = `${totalCount} issues`;
+    const selectedOpts = [...explorerSelectedOptions];
+    document.getElementById('dissect-target-title').innerText = selectedOpts.join(' + ');
 
     const data = window.viewModel.interactions;
-    // Filter records matching the selected explorer option
-    const filtered = data.filter(item => item[explorerActiveTab] === optionName);
+    // Filter records matching ANY of the selected explorer options
+    const filtered = data.filter(item => selectedOpts.includes(item[explorerActiveTab]));
+    document.getElementById('dissect-target-count').innerText = `${filtered.length} issues`;
 
     // Group by all other dimensions
     const dims = {
@@ -4250,6 +4278,7 @@ function showExplorerDissection(optionName, totalCount) {
         sub_issue: 'Sub-issue Categories'
     };
 
+    const totalCount = filtered.length;
     Object.entries(dims).forEach(([dim, counts]) => {
         if (dim === explorerActiveTab) return;
 
@@ -4284,7 +4313,6 @@ function showExplorerDissection(optionName, totalCount) {
         card.appendChild(listDiv);
         dissectGrid.appendChild(card);
     });
-
 }
 
 // -------------------------------------------------------------
@@ -5490,7 +5518,7 @@ function renderVisualControlDashboard() {
     };
 
     // Check toggle selection for Care Emails Top RMs/Brokers chart
-    let careEmailToggle = 'reporters';
+    let careEmailToggle = 'broker'; // default: show Broker Name
     const toggleInput = document.querySelector('input[name="vc-email-rm-toggle"]:checked');
     if (toggleInput) {
         careEmailToggle = toggleInput.value;
@@ -7018,6 +7046,9 @@ function renderCallsDeepDive(data, calls) {
     
     // Render new Hourly Abandonment Chart
     renderHourlyAbandonmentTrend(calls);
+
+    // Ozonetel Extended KPIs + Hold/ASA Trend
+    renderCallsOzonetelExtended(calls);
 }
 
 function renderWhatsAppDeepDive(data) {
@@ -7087,6 +7118,9 @@ function renderWhatsAppDeepDive(data) {
             options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
         });
     }
+
+    // SLA Table
+    renderWASLATable(wa);
 }
 
 function renderEmailsDeepDive(data) {
@@ -7162,6 +7196,9 @@ function renderEmailsDeepDive(data) {
             options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
         });
     }
+
+    // SLA Table
+    renderEmailSLATable(emails);
 }
 
 // ----- INTELLIGENCE DASHBOARD -----
@@ -7367,19 +7404,11 @@ function renderIntelligenceDashboard() {
         smartInsightsDiv.innerHTML = generateSmartInsights(data, calls);
     }
 
-    // Repeat Loops list
-    const loopsDiv = document.getElementById('intel-repeat-loops');
-    if (loopsDiv) {
-        const filteredLoops = dynamicLoops.filter(l => l.repeat_count >= 2).slice(0, 15);
-        loopsDiv.innerHTML = filteredLoops.length ? `<table class="dashboard-table" style="font-size:0.82rem;"><thead><tr><th>RM</th><th>Broker</th><th>Branch</th><th>Issue</th><th style="text-align:right">Repeats</th></tr></thead><tbody>${filteredLoops.map(l => `<tr><td>${l.rm_name}</td><td>${l.broker_family}</td><td>${l.branch}</td><td>${l.issue}</td><td style="text-align:right"><span class="freq-badge high">${l.repeat_count}</span></td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--text-muted);text-align:center;padding:20px;">No repeat loops detected in this period.</p>';
-    }
+    // Repeat Loops list – show 5 with expand/collapse
+    renderIntelLoopsSquished(dynamicLoops);
 
-    // Outlier Detection list
-    const outliersDiv = document.getElementById('intel-outliers');
-    if (outliersDiv) {
-        const outliers = dynamicOutliers.filter(o => o.is_outlier).slice(0, 15);
-        outliersDiv.innerHTML = outliers.length ? `<table class="dashboard-table" style="font-size:0.82rem;"><thead><tr><th>RM</th><th>Broker</th><th>Branch</th><th style="text-align:right">Contacts</th><th style="text-align:right">Per Day</th></tr></thead><tbody>${outliers.map(o => `<tr><td>${o.rm_name}</td><td>${o.broker_family}</td><td>${o.branch}</td><td style="text-align:right">${o.contacts}</td><td style="text-align:right"><span class="freq-badge high">${o.contacts_per_day.toFixed(1)}</span></td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--text-muted);text-align:center;padding:20px;">No outliers detected.</p>';
-    }
+    // Outlier Detection list – show 5 with expand/collapse
+    renderIntelOutliersSquished(dynamicOutliers);
 
     // Broker Health Scores
     const healthDiv = document.getElementById('intel-broker-health');
@@ -7713,13 +7742,14 @@ function renderMonthlyView() {
         const dateStr = `${selectedYear}-${String(selectedMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         const dayInteractions = allInteractions.filter(d => {
             if (!d.date) return false;
-            const parsed = safeParseDate(d.date);
-            return parsed && parsed.getFullYear() === selectedYear && parsed.getMonth() === selectedMonth && parsed.getDate() === day;
+            // Use string comparison to avoid timezone shifts
+            const dStr = typeof d.date === 'string' ? d.date.substring(0, 10) : (safeParseDate(d.date) || {}).toISOString?.().substring(0, 10) || '';
+            return dStr === dateStr;
         });
         const dayCalls = allCalls.filter(c => {
             if (!c.date) return false;
-            const parsed = safeParseDate(c.date);
-            return parsed && parsed.getFullYear() === selectedYear && parsed.getMonth() === selectedMonth && parsed.getDate() === day;
+            const dStr = typeof c.date === 'string' ? c.date.substring(0, 10) : (safeParseDate(c.date) || {}).toISOString?.().substring(0, 10) || '';
+            return dStr === dateStr;
         });
 
         // Case-insensitive call_type matching
@@ -8234,7 +8264,7 @@ function renderAgentPerformance() {
         });
     });
 
-    // Agent Activity Timeline
+    // Agent Activity Timeline (gradient area line)
     const chartAgent = selectedAgent !== 'all' ? selectedAgent : null;
     const dateMap = {};
     const filteredData = chartAgent ? data.filter(d => d.agent === chartAgent) : data;
@@ -8242,11 +8272,20 @@ function renderAgentPerformance() {
     const dates = Object.keys(dateMap).sort();
     const ctx = document.getElementById('agent-activity-chart');
     if (ctx) {
-        agentPerfCharts.activity = new Chart(ctx.getContext('2d'), {
-            type: 'bar', data: { labels: dates, datasets: [{ label: chartAgent ? `${chartAgent} — Daily Volume` : 'All Agents — Daily Volume', data: dates.map(d => dateMap[d]), backgroundColor: THEME_COLORS.purple + '70', borderRadius: 4 }] },
-            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 20 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+        if (agentPerfCharts.activity) { agentPerfCharts.activity.destroy(); agentPerfCharts.activity = null; }
+        const actCtx = ctx.getContext('2d');
+        const actGrad = actCtx.createLinearGradient(0, 0, 0, 280);
+        actGrad.addColorStop(0, 'rgba(139,92,246,0.4)');
+        actGrad.addColorStop(1, 'rgba(139,92,246,0.01)');
+        agentPerfCharts.activity = new Chart(actCtx, {
+            type: 'line',
+            data: { labels: dates, datasets: [{ label: chartAgent ? `${chartAgent} — Daily Volume` : 'All Agents — Daily Volume', data: dates.map(d => dateMap[d]), borderColor: THEME_COLORS.purple, backgroundColor: actGrad, tension: 0.35, fill: true, pointRadius: 3, borderWidth: 2 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 20 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
         });
     }
+
+    // Agent Channel Mix Donut
+    renderAgentVolumeMixChart(selectedAgent, data);
 
     // Render new Agent Breaks Gantt Timeline
     renderAgentBreaksTimeline();
