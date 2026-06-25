@@ -1655,7 +1655,7 @@ function setupEventListeners() {
         buildViewModel();
     });
 
-    // Theme Switcher (Light / Dark)
+    // Theme Switcher (Light / Dark / Black)
     document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
         const toggleTheme = () => {
             const body = document.body;
@@ -1665,7 +1665,7 @@ function setupEventListeners() {
                 // Light -> Dark
                 body.classList.remove('light-mode');
                 body.classList.add('dark-mode');
-                btnText.innerText = 'Light Mode';
+                btnText.innerText = 'Black Mode';
                 THEME_COLORS.textPrimary = '#f0f4ff';
                 THEME_COLORS.textSecondary = '#cbd5e1';
                 THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
@@ -1674,9 +1674,22 @@ function setupEventListeners() {
                 THEME_COLORS.green = '#10b981';      // Emerald
                 THEME_COLORS.red = '#f43f5e';        // Coral Red
                 THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
-            } else {
-                // Dark -> Light
+            } else if (body.classList.contains('dark-mode')) {
+                // Dark -> Black
                 body.classList.remove('dark-mode');
+                body.classList.add('black-mode');
+                btnText.innerText = 'Light Mode';
+                THEME_COLORS.textPrimary = '#f8fafc';
+                THEME_COLORS.textSecondary = '#cbd5e1';
+                THEME_COLORS.border = 'rgba(255, 255, 255, 0.1)';
+                THEME_COLORS.blue = '#38bdf8';       // Bright Cyan
+                THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Black mode)
+                THEME_COLORS.green = '#34d399';      // Mint
+                THEME_COLORS.red = '#fb7185';        // Rose
+                THEME_COLORS.yellow = '#fcd34d';     // Amber
+            } else {
+                // Black -> Light
+                body.classList.remove('black-mode');
                 body.classList.add('light-mode');
                 btnText.innerText = 'Dark Mode';
                 THEME_COLORS.textPrimary = '#0f172a';
