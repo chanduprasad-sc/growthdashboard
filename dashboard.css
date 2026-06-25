@@ -4114,17 +4114,22 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
    VIEW TRANSITION & THEME TOGGLER ANIMATIONS
    ========================================================================== */
 
-/* Smooth View Transition Overrides for gradual theme toggler circular wipe */
+/* Suppress default cross-fade so our clip-path animation is the only thing */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-    animation: none;
-    mix-blend-mode: normal;
+    animation: none !important;
+    mix-blend-mode: normal !important;
 }
+/* Old snapshot stays underneath */
 ::view-transition-old(root) {
-    z-index: 1;
+    z-index: 1 !important;
+    /* Keep old frame fully opaque — no fading */
+    opacity: 1 !important;
 }
+/* New snapshot clips in from the top */
 ::view-transition-new(root) {
-    z-index: 9999;
+    z-index: 9999 !important;
+    opacity: 1 !important;
 }
 .light-mode {
     view-transition-name: root;
@@ -4455,21 +4460,25 @@ body.dark-mode .date-picker:focus {
 
 /* ── Popup Panel ── */
 .drp-popup {
-    position: absolute;
-    top: calc(100% + 8px);
+    /* Fixed so it always escapes any stacking context / overflow:hidden parent */
+    position: fixed;
+    /* top/left are set dynamically by JS — these are just fallbacks */
+    top: 0;
     left: 0;
-    z-index: 9999;
+    z-index: 999999;
     background: var(--color-cloud);
     border: 1px solid var(--color-edge);
     border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.12);
     opacity: 0;
-    transform: translateY(-8px) scale(0.97);
+    transform: translateY(-6px) scale(0.98);
     transform-origin: top left;
-    transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-                transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
     min-width: 660px;
+    /* Ensure the popup itself doesn't go off-screen on small viewports */
+    max-width: calc(100vw - 24px);
 }
 body.dark-mode .drp-popup {
     box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);

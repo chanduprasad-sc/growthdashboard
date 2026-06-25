@@ -1670,7 +1670,11 @@ function setupEventListeners() {
 
     // Theme Switcher (Light / Dark)
     document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
-        const toggleTheme = () => {
+        // Separate theme-class toggle from heavy chart re-render.
+        // We only swap CSS classes inside the transition so the snapshot is
+        // just a CSS repaint. Then buildViewModel() fires AFTER the wipe
+        // completes, preventing chart DOM ops from polluting the snapshot.
+        const applyThemeColors = () => {
             const body = document.body;
             const btnText = document.querySelector('.theme-text');
 
@@ -1682,11 +1686,11 @@ function setupEventListeners() {
                 THEME_COLORS.textPrimary = '#f0f4ff';
                 THEME_COLORS.textSecondary = '#cbd5e1';
                 THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
-                THEME_COLORS.blue = '#00d4ff';       // Electric Cyan
-                THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Dark mode)
-                THEME_COLORS.green = '#10b981';      // Emerald
-                THEME_COLORS.red = '#f43f5e';        // Coral Red
-                THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
+                THEME_COLORS.blue = '#00d4ff';
+                THEME_COLORS.purple = '#82b1ff';
+                THEME_COLORS.green = '#10b981';
+                THEME_COLORS.red = '#f43f5e';
+                THEME_COLORS.yellow = '#fbbf24';
             } else {
                 // Dark -> Light
                 body.classList.remove('dark-mode');
@@ -1695,50 +1699,58 @@ function setupEventListeners() {
                 THEME_COLORS.textPrimary = '#0f172a';
                 THEME_COLORS.textSecondary = '#334155';
                 THEME_COLORS.border = 'rgba(0, 0, 0, 0.07)';
-                THEME_COLORS.blue = '#0284c7';       // Sky Blue
-                THEME_COLORS.purple = '#1f7ae0';     // smallcase Brand Blue (Light mode)
-                THEME_COLORS.green = '#059669';      // Forest Green
-                THEME_COLORS.red = '#e11d48';        // Rose Red
-                THEME_COLORS.yellow = '#d97706';     // Amber Yellow
+                THEME_COLORS.blue = '#0284c7';
+                THEME_COLORS.purple = '#1f7ae0';
+                THEME_COLORS.green = '#059669';
+                THEME_COLORS.red = '#e11d48';
+                THEME_COLORS.yellow = '#d97706';
             }
-
-            buildViewModel();
+            // NOTE: buildViewModel() is intentionally NOT called here —
+            // we call it after the transition finishes to avoid snapshot flicker.
         };
 
-        const isAppearanceTransition = document.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        
+        const isAppearanceTransition = document.startViewTransition &&
+            !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
         if (!isAppearanceTransition) {
-            toggleTheme();
+            applyThemeColors();
+            buildViewModel();
             return;
         }
 
         const rect = e.currentTarget.getBoundingClientRect();
         const x = rect.left + rect.width / 2;
-        const y = rect.top + rect.height / 2;
+        const y = rect.top  + rect.height / 2;
         const endRadius = Math.hypot(
-            Math.max(x, window.innerWidth - x),
+            Math.max(x, window.innerWidth  - x),
             Math.max(y, window.innerHeight - y)
         );
 
+        // Only swap CSS classes inside the transition callback (very fast).
         const transition = document.startViewTransition(() => {
-            toggleTheme();
+            applyThemeColors();
         });
 
+        // Start the clip-path wipe once both snapshots are ready.
         transition.ready.then(() => {
-            const clipPath = [
-                `circle(0px at ${x}px ${y}px)`,
-                `circle(${endRadius}px at ${x}px ${y}px)`
-            ];
             document.documentElement.animate(
                 {
-                    clipPath: clipPath
+                    clipPath: [
+                        `circle(0px at ${x}px ${y}px)`,
+                        `circle(${endRadius}px at ${x}px ${y}px)`
+                    ]
                 },
                 {
-                    duration: 500,
-                    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                    duration: 600,
+                    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
                     pseudoElement: '::view-transition-new(root)'
                 }
             );
+        });
+
+        // Re-render charts AFTER the wipe is fully done — no flicker.
+        transition.finished.then(() => {
+            buildViewModel();
         });
     });
 
@@ -2200,28 +2212,47 @@ function initDateRangePicker() {
         selecting = false;
         renderBothMonths();
         updateRangeDisplay();
+
+        // Show and position the popup using fixed coords from the trigger rect.
+        // Because the popup is position:fixed it escapes all stacking contexts.
         popup.removeAttribute('hidden');
         trigger.classList.add('drp-open');
         trigger.setAttribute('aria-expanded', 'true');
-        // Flip if out of viewport
+
         requestAnimationFrame(() => {
-            const rect = popup.getBoundingClientRect();
-            if (rect.right > window.innerWidth - 8) {
-                popup.style.left = 'auto';
-                popup.style.right = '0';
-            } else {
-                popup.style.left = '0';
-                popup.style.right = 'auto';
+            const trigRect = trigger.getBoundingClientRect();
+            const popupW   = popup.offsetWidth  || 660;
+            const popupH   = popup.offsetHeight || 420;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const GAP = 8;
+
+            // Horizontal: align left edge to trigger, but clamp to viewport
+            let left = trigRect.left;
+            if (left + popupW > vw - GAP) {
+                // Try right-aligning to trigger right edge
+                left = trigRect.right - popupW;
             }
-            if (rect.bottom > window.innerHeight - 8) {
-                popup.style.top = 'auto';
-                popup.style.bottom = 'calc(100% + 8px)';
+            left = Math.max(GAP, left);
+
+            // Vertical: prefer below trigger, flip above if not enough room
+            let top;
+            const spaceBelow = vh - trigRect.bottom - GAP;
+            const spaceAbove = trigRect.top - GAP;
+            if (spaceBelow >= popupH || spaceBelow >= spaceAbove) {
+                top = trigRect.bottom + GAP;
             } else {
-                popup.style.top = 'calc(100% + 8px)';
-                popup.style.bottom = 'auto';
+                top = trigRect.top - GAP - popupH;
             }
+            top = Math.max(GAP, top);
+
+            popup.style.left   = `${left}px`;
+            popup.style.top    = `${top}px`;
+            popup.style.right  = 'auto';
+            popup.style.bottom = 'auto';
         });
     }
+
 
     function closePopup() {
         popup.setAttribute('hidden', '');
