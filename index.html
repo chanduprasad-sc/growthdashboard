@@ -189,20 +189,26 @@
                     <!-- Dropdowns and Reset button -->
                     <div class="filter-row-group" style="margin-left: auto;">
                         <div class="filter-group">
-                            <select id="filter-broker" class="dropdown-select">
+                            <select id="filter-broker" class="dropdown-select" multiple>
                                 <option value="all">All Broker Families</option>
                                 <!-- Dynamic -->
                             </select>
                         </div>
                         <div class="filter-group">
-                            <select id="filter-poc" class="dropdown-select">
+                            <select id="filter-poc" class="dropdown-select" multiple>
                                 <option value="all">All Assigned POCs</option>
                                 <!-- Dynamic -->
                             </select>
                         </div>
                         <div class="filter-group">
-                            <select id="filter-agent" class="dropdown-select">
+                            <select id="filter-agent" class="dropdown-select" multiple>
                                 <option value="all">All Support Agents</option>
+                                <!-- Dynamic -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <select id="filter-hide-smallcase-rm" class="dropdown-select" multiple>
+                                <option value="none">Hide smallcase RMs: None</option>
                                 <!-- Dynamic -->
                             </select>
                         </div>

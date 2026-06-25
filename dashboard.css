@@ -4239,7 +4239,8 @@ body.light-mode .custom-select-trigger.active {
 .custom-select-panel {
     margin: 0 !important;
     padding: 4px !important;
-    inset: auto !important;
+    right: auto !important;
+    bottom: auto !important;
     width: 100%;
     min-width: 180px;
     max-height: 260px;
@@ -4256,6 +4257,13 @@ body.light-mode .custom-select-trigger.active {
     -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
     transform-origin: top;
     display: none;
+}
+
+.custom-select-check {
+    color: var(--accent-primary) !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    transition: opacity 150ms ease !important;
 }
 
 .custom-select-panel:is(:popover-open, .show) {
@@ -4307,46 +4315,61 @@ body.black-mode .custom-select-option.selected {
     color: #0b090e !important;
 }
 
-/* --- iOS Style Date Selector & Apply Button --- */
+/* --- Liquid UI Date inputs capsule container --- */
+.date-inputs {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 4px 10px !important;
+    background: var(--color-cloud) !important;
+    border: 1px solid var(--color-edge) !important;
+    border-radius: 999px !important;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    position: relative !important;
+}
+
+/* Liquid morphing input elements */
 .date-picker {
     position: relative !important;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif !important;
-    font-size: 0.85rem !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.82rem !important;
     font-weight: 500 !important;
     text-align: center !important;
-    background: rgba(120, 120, 128, 0.12) !important;
-    color: #007aff !important; /* iOS System Blue */
+    background: transparent !important;
+    color: var(--text-primary) !important;
     border: none !important;
-    border-radius: 8px !important;
-    padding: 6px 10px !important;
-    height: 34px !important;
+    border-radius: 999px !important;
+    padding: 6px 12px !important;
+    height: 30px !important;
     cursor: pointer !important;
     outline: none !important;
-    width: 125px !important;
+    width: 115px !important;
     box-sizing: border-box !important;
-    transition: background-color 150ms ease, transform 100ms ease !important;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
-body.dark-mode .date-picker,
-body.black-mode .date-picker {
-    background: rgba(120, 120, 128, 0.24) !important;
-    color: #0a84ff !important; /* iOS Dark System Blue */
-}
-
+/* Hover morph */
 .date-picker:hover {
-    background: rgba(120, 120, 128, 0.2) !important;
+    background: rgba(120, 120, 128, 0.08) !important;
 }
 
-body.dark-mode .date-picker:hover,
-body.black-mode .date-picker:hover {
-    background: rgba(120, 120, 128, 0.35) !important;
+/* Focus: smooth elevation morph */
+.date-picker:focus {
+    background: var(--bg-card) !important;
+    box-shadow: 
+        0 1px 3px rgba(0,0,0,0.05),
+        0 4px 12px rgba(0,0,0,0.06) !important;
+    transform: scale(1.02) !important;
 }
 
-.date-picker:active {
-    transform: scale(0.97) !important;
+body.dark-mode .date-picker:focus,
+body.black-mode .date-picker:focus {
+    box-shadow: 
+        0 1px 3px rgba(0,0,0,0.3),
+        0 4px 12px rgba(0,0,0,0.4) !important;
 }
 
-/* Make entire capsule input clickable for WebKit browsers */
+/* Custom WebKit calendar indicator cover */
 .date-picker::-webkit-calendar-picker-indicator {
     position: absolute !important;
     top: 0 !important;
@@ -4361,46 +4384,38 @@ body.black-mode .date-picker:hover {
 
 .date-separator {
     color: var(--text-secondary) !important;
-    font-size: 0.85rem !important;
+    font-family: var(--font-mono) !important;
+    font-size: 0.75rem !important;
     font-weight: 500 !important;
     margin: 0 4px !important;
+    text-transform: uppercase;
 }
 
-/* iOS Style Date Apply button */
+/* Smooth Liquid Apply Button */
 .apply-btn {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    height: 34px !important;
-    padding: 0 16px !important;
-    border-radius: 8px !important;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
-    background: #007aff !important;
+    height: 30px !important;
+    padding: 0 14px !important;
+    border-radius: 999px !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    background: var(--accent-gradient) !important;
     color: #ffffff !important;
     border: none !important;
     cursor: pointer !important;
-    transition: background-color 150ms ease, transform 100ms ease !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-}
-
-body.dark-mode .apply-btn,
-body.black-mode .apply-btn {
-    background: #0a84ff !important;
-    color: #ffffff !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .apply-btn:hover {
-    background: #0062cc !important;
-}
-
-body.dark-mode .apply-btn:hover,
-body.black-mode .apply-btn:hover {
-    background: #0070e6 !important;
+    box-shadow: 0 4px 12px rgba(var(--accent-primary-rgb, 0, 82, 255), 0.25) !important;
+    transform: translateY(-0.5px) !important;
 }
 
 .apply-btn:active {
-    transform: scale(0.96) !important;
+    transform: scale(0.95) !important;
 }
 

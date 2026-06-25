@@ -10,9 +10,10 @@ let activeFilters = {
     dateFrom: '',
     dateTo: '',
     channel: 'all', // Combined, Call Ticket, WhatsApp Chat
-    broker: 'all',
-    poc: 'all',
-    agent: 'all',
+    broker: ['all'],
+    poc: ['all'],
+    agent: ['all'],
+    hideSmallcaseRm: ['none'],
     branch: 'all',
     searchQuery: '',
     includeCareEmails: false
@@ -1633,27 +1634,49 @@ function setupEventListeners() {
             if (b.getAttribute('data-channel') === 'all') b.classList.add('active');
         });
 
-        document.getElementById('filter-broker').value = 'all';
-        document.getElementById('filter-poc').value = 'all';
-        document.getElementById('filter-agent').value = 'all';
+        function resetSelectMultiple(selectId, defaultValue) {
+            const select = document.getElementById(selectId);
+            if (!select) return;
+            Array.from(select.options).forEach(opt => {
+                opt.selected = (opt.value === defaultValue);
+            });
+            const event = new Event('change', { bubbles: true });
+            select.dispatchEvent(event);
+        }
+
+        resetSelectMultiple('filter-broker', 'all');
+        resetSelectMultiple('filter-poc', 'all');
+        resetSelectMultiple('filter-agent', 'all');
+        resetSelectMultiple('filter-hide-smallcase-rm', 'none');
 
         setDefaultDateRange();
         buildViewModel();
     });
 
+    function getSelectValues(select) {
+        return Array.from(select.selectedOptions).map(opt => opt.value);
+    }
+
     // Dropdown filters
     document.getElementById('filter-broker').addEventListener('change', (e) => {
-        activeFilters.broker = e.target.value;
+        activeFilters.broker = getSelectValues(e.target);
         buildViewModel();
     });
     document.getElementById('filter-poc').addEventListener('change', (e) => {
-        activeFilters.poc = e.target.value;
+        activeFilters.poc = getSelectValues(e.target);
         buildViewModel();
     });
     document.getElementById('filter-agent').addEventListener('change', (e) => {
-        activeFilters.agent = e.target.value;
+        activeFilters.agent = getSelectValues(e.target);
         buildViewModel();
     });
+    const hideSmallcaseRmSelect = document.getElementById('filter-hide-smallcase-rm');
+    if (hideSmallcaseRmSelect) {
+        hideSmallcaseRmSelect.addEventListener('change', (e) => {
+            activeFilters.hideSmallcaseRm = getSelectValues(e.target);
+            buildViewModel();
+        });
+    }
 
     // Theme Switcher (Light / Dark / Black)
     document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
@@ -1906,6 +1929,7 @@ function populateFilterDropdowns() {
     const brokers = new Set();
     const pocs = new Set();
     const agents = new Set();
+    const smallcaseRms = new Set();
 
     const allowedBrokers = new Set([
         'Axis', 'Axis MTF', 'HDFC', 'HDFC MTF', 'SBI', 'SBI MTF', 'HDFCsky',
@@ -1921,39 +1945,74 @@ function populateFilterDropdowns() {
         }
         if (item.poc && item.poc !== 'Not shared' && item.poc !== 'No POC') pocs.add(item.poc);
         if (item.agent && item.agent !== 'Unassigned' && item.agent !== 'System') agents.add(item.agent);
+        
+        if (cleanStr(item.branch).toLowerCase() === 'smallcase') {
+            const rm = cleanStr(item.rm_name || item.RM_Name || item.rm);
+            if (rm && rm !== 'NA' && rm !== 'Unknown') {
+                smallcaseRms.add(rm);
+            }
+        }
+    });
+
+    rawData.calls.forEach(call => {
+        if (cleanStr(call.branch).toLowerCase() === 'smallcase') {
+            const rm = cleanStr(call.rm_name || call.RM_Name || call.rm || call.agent);
+            if (rm && rm !== 'NA' && rm !== 'Unknown' && rm !== 'System') {
+                smallcaseRms.add(rm);
+            }
+        }
     });
 
     const brokerSelect = document.getElementById('filter-broker');
-    const currentBroker = brokerSelect ? brokerSelect.value : 'all';
+    const currentBroker = brokerSelect ? Array.from(brokerSelect.selectedOptions).map(o => o.value) : ['all'];
     if (brokerSelect) {
         let html = '<option value="all">All Broker Families</option>';
         Array.from(brokers).sort().forEach(b => {
             html += `<option value="${b}">${b}</option>`;
         });
         brokerSelect.innerHTML = html;
-        brokerSelect.value = currentBroker;
+        Array.from(brokerSelect.options).forEach(opt => {
+            opt.selected = currentBroker.includes(opt.value);
+        });
     }
 
     const pocSelect = document.getElementById('filter-poc');
-    const currentPoc = pocSelect ? pocSelect.value : 'all';
+    const currentPoc = pocSelect ? Array.from(pocSelect.selectedOptions).map(o => o.value) : ['all'];
     if (pocSelect) {
         let html = '<option value="all">All Assigned POCs</option>';
         Array.from(pocs).sort().forEach(p => {
             html += `<option value="${p}">${p}</option>`;
         });
         pocSelect.innerHTML = html;
-        pocSelect.value = currentPoc;
+        Array.from(pocSelect.options).forEach(opt => {
+            opt.selected = currentPoc.includes(opt.value);
+        });
     }
 
     const agentSelect = document.getElementById('filter-agent');
-    const currentAgent = agentSelect ? agentSelect.value : 'all';
+    const currentAgent = agentSelect ? Array.from(agentSelect.selectedOptions).map(o => o.value) : ['all'];
     if (agentSelect) {
         let html = '<option value="all">All Support Agents</option>';
         Array.from(agents).sort().forEach(a => {
             html += `<option value="${a}">${a}</option>`;
         });
         agentSelect.innerHTML = html;
-        agentSelect.value = currentAgent;
+        Array.from(agentSelect.options).forEach(opt => {
+            opt.selected = currentAgent.includes(opt.value);
+        });
+    }
+
+    const smallcaseRmSelect = document.getElementById('filter-hide-smallcase-rm');
+    const currentSmallcaseRm = smallcaseRmSelect ? Array.from(smallcaseRmSelect.selectedOptions).map(o => o.value) : ['none'];
+    if (smallcaseRmSelect) {
+        let html = '<option value="none">Hide smallcase RMs: None</option>';
+        Array.from(smallcaseRms).sort().forEach(r => {
+            html += `<option value="${r}">${r}</option>`;
+        });
+        smallcaseRmSelect.innerHTML = html;
+        Array.from(smallcaseRmSelect.options).forEach(opt => {
+            opt.selected = currentSmallcaseRm.includes(opt.value);
+        });
     }
 }
 
@@ -2079,10 +2138,23 @@ function buildViewModel() {
         if (item.type === 'Care Email' && !activeFilters.includeCareEmails) return false;
 
         if (activeFilters.channel !== 'all' && item.type !== activeFilters.channel) return false;
-        if (activeFilters.broker !== 'all' && item.broker_family !== activeFilters.broker) return false;
-        if (activeFilters.poc !== 'all' && item.poc !== activeFilters.poc) return false;
-        if (activeFilters.agent !== 'all' && item.agent !== activeFilters.agent) return false;
+        if (activeFilters.broker && !activeFilters.broker.includes('all')) {
+            if (!activeFilters.broker.includes(item.broker_family)) return false;
+        }
+        if (activeFilters.poc && !activeFilters.poc.includes('all')) {
+            if (!activeFilters.poc.includes(item.poc)) return false;
+        }
+        if (activeFilters.agent && !activeFilters.agent.includes('all')) {
+            if (!activeFilters.agent.includes(item.agent)) return false;
+        }
         if (activeFilters.branch && activeFilters.branch !== 'all' && item.branch !== activeFilters.branch) return false;
+
+        // smallcase RM hiding filter
+        if (activeFilters.hideSmallcaseRm && !activeFilters.hideSmallcaseRm.includes('none')) {
+            const itemRm = cleanStr(item.rm_name || item.RM_Name || item.rm).trim().toLowerCase();
+            const matchesHide = activeFilters.hideSmallcaseRm.some(rm => rm.trim().toLowerCase() === itemRm);
+            if (cleanStr(item.branch).toLowerCase() === 'smallcase' && matchesHide) return false;
+        }
 
         return true;
     });
@@ -2095,10 +2167,23 @@ function buildViewModel() {
         if (callTs < fromTs || callTs > toTs) return false;
 
         if (activeFilters.channel !== 'all' && activeFilters.channel !== 'Call Ticket' && activeFilters.channel !== 'Voice Call') return false;
-        if (activeFilters.broker !== 'all' && call.broker_family !== activeFilters.broker) return false;
-        if (activeFilters.poc !== 'all' && call.poc !== activeFilters.poc) return false;
-        if (activeFilters.agent !== 'all' && call.agent !== activeFilters.agent) return false;
+        if (activeFilters.broker && !activeFilters.broker.includes('all')) {
+            if (!activeFilters.broker.includes(call.broker_family)) return false;
+        }
+        if (activeFilters.poc && !activeFilters.poc.includes('all')) {
+            if (!activeFilters.poc.includes(call.poc)) return false;
+        }
+        if (activeFilters.agent && !activeFilters.agent.includes('all')) {
+            if (!activeFilters.agent.includes(call.agent)) return false;
+        }
         if (activeFilters.branch && activeFilters.branch !== 'all' && call.branch !== activeFilters.branch) return false;
+
+        // smallcase RM hiding filter
+        if (activeFilters.hideSmallcaseRm && !activeFilters.hideSmallcaseRm.includes('none')) {
+            const callRm = cleanStr(call.rm_name || call.RM_Name || call.rm || call.agent).trim().toLowerCase();
+            const matchesHide = activeFilters.hideSmallcaseRm.some(rm => rm.trim().toLowerCase() === callRm);
+            if (cleanStr(call.branch).toLowerCase() === 'smallcase' && matchesHide) return false;
+        }
 
         return true;
     });
@@ -2118,9 +2203,22 @@ function buildViewModel() {
         if (item.type === 'Care Email' && !activeFilters.includeCareEmails) return false;
 
         if (activeFilters.channel !== 'all' && item.type !== activeFilters.channel) return false;
-        if (activeFilters.broker !== 'all' && item.broker_family !== activeFilters.broker) return false;
-        if (activeFilters.poc !== 'all' && item.poc !== activeFilters.poc) return false;
-        if (activeFilters.agent !== 'all' && item.agent !== activeFilters.agent) return false;
+        if (activeFilters.broker && !activeFilters.broker.includes('all')) {
+            if (!activeFilters.broker.includes(item.broker_family)) return false;
+        }
+        if (activeFilters.poc && !activeFilters.poc.includes('all')) {
+            if (!activeFilters.poc.includes(item.poc)) return false;
+        }
+        if (activeFilters.agent && !activeFilters.agent.includes('all')) {
+            if (!activeFilters.agent.includes(item.agent)) return false;
+        }
+
+        // smallcase RM hiding filter
+        if (activeFilters.hideSmallcaseRm && !activeFilters.hideSmallcaseRm.includes('none')) {
+            const itemRm = cleanStr(item.rm_name || item.RM_Name || item.rm).trim().toLowerCase();
+            const matchesHide = activeFilters.hideSmallcaseRm.some(rm => rm.trim().toLowerCase() === itemRm);
+            if (cleanStr(item.branch).toLowerCase() === 'smallcase' && matchesHide) return false;
+        }
 
         return true;
     });
@@ -2132,7 +2230,9 @@ function buildViewModel() {
         if (isNaN(breakTs)) return false;
         if (breakTs < fromTs || breakTs > toTs) return false;
 
-        if (activeFilters.agent !== 'all' && b.agent_name !== activeFilters.agent) return false;
+        if (activeFilters.agent && !activeFilters.agent.includes('all')) {
+            if (!activeFilters.agent.includes(b.agent_name)) return false;
+        }
 
         return true;
     });
@@ -8950,6 +9050,8 @@ function convertSelectToCustomDropdown(select) {
     if (select.dataset.customDropdownInitialized) return;
     select.dataset.customDropdownInitialized = 'true';
 
+    const isMultiple = select.multiple;
+
     // Hide native select
     select.style.display = 'none';
 
@@ -9007,19 +9109,53 @@ function convertSelectToCustomDropdown(select) {
         panel.style.width = `${rect.width}px`;
     }
 
-    // Sync selected value text and highlight option
+    // Sync selected value text and highlight options
     function syncValue() {
-        const selectedOption = select.options[select.selectedIndex];
-        valueSpan.textContent = selectedOption ? selectedOption.textContent : '';
+        const selectedOptions = Array.from(select.options).filter(opt => opt.selected);
         
-        const val = select.value;
-        panel.querySelectorAll('.custom-select-option').forEach(opt => {
-            if (opt.dataset.value === val) {
-                opt.classList.add('selected');
+        if (isMultiple) {
+            // Highlight selected options in custom options panel
+            panel.querySelectorAll('.custom-select-option').forEach(opt => {
+                const isSel = selectedOptions.some(o => o.value === opt.dataset.value);
+                const chk = opt.querySelector('.custom-select-check');
+                if (isSel) {
+                    opt.classList.add('selected');
+                    if (chk) chk.style.opacity = '1';
+                } else {
+                    opt.classList.remove('selected');
+                    if (chk) chk.style.opacity = '0';
+                }
+            });
+
+            // Update trigger text
+            if (selectedOptions.length === 0) {
+                valueSpan.textContent = select.options[0] ? select.options[0].textContent : '';
             } else {
-                opt.classList.remove('selected');
+                const hasAll = selectedOptions.some(o => o.value === 'all' || o.value === 'none');
+                if (hasAll) {
+                    const allOpt = selectedOptions.find(o => o.value === 'all' || o.value === 'none');
+                    valueSpan.textContent = allOpt.textContent;
+                } else {
+                    if (selectedOptions.length <= 2) {
+                        valueSpan.textContent = selectedOptions.map(o => o.textContent).join(', ');
+                    } else {
+                        valueSpan.textContent = `${selectedOptions.length} Selected`;
+                    }
+                }
             }
-        });
+        } else {
+            const selectedOption = select.options[select.selectedIndex];
+            valueSpan.textContent = selectedOption ? selectedOption.textContent : '';
+            
+            const val = select.value;
+            panel.querySelectorAll('.custom-select-option').forEach(opt => {
+                if (opt.dataset.value === val) {
+                    opt.classList.add('selected');
+                } else {
+                    opt.classList.remove('selected');
+                }
+            });
+        }
     }
 
     // Rebuild option list
@@ -9031,25 +9167,78 @@ function convertSelectToCustomDropdown(select) {
             optDiv.textContent = option.textContent;
             optDiv.dataset.value = option.value;
             
-            if (option.value === select.value) {
-                optDiv.classList.add('selected');
+            if (isMultiple) {
+                optDiv.style.display = 'flex';
+                optDiv.style.alignItems = 'center';
+                optDiv.style.justifyContent = 'space-between';
+                
+                const checkIcon = document.createElement('span');
+                checkIcon.className = 'custom-select-check';
+                checkIcon.innerHTML = '✓';
+                checkIcon.style.marginLeft = '8px';
+                checkIcon.style.opacity = option.selected ? '1' : '0';
+                optDiv.appendChild(checkIcon);
+                
+                if (option.selected) {
+                    optDiv.classList.add('selected');
+                }
+            } else {
+                if (option.value === select.value) {
+                    optDiv.classList.add('selected');
+                }
             }
             
             optDiv.addEventListener('click', (e) => {
                 e.stopPropagation();
-                select.value = option.value;
-                syncValue();
                 
-                if (hasPopover) {
-                    panel.hidePopover();
+                if (isMultiple) {
+                    const clickedVal = option.value;
+                    const isAllOrNone = clickedVal === 'all' || clickedVal === 'none';
+                    
+                    if (isAllOrNone) {
+                        // Deselect everything else, select this
+                        Array.from(select.options).forEach(opt => {
+                            opt.selected = (opt.value === clickedVal);
+                        });
+                    } else {
+                        // Toggle this option
+                        option.selected = !option.selected;
+                        
+                        // Deselect 'all' or 'none' if it was selected
+                        Array.from(select.options).forEach(opt => {
+                            if (opt.value === 'all' || opt.value === 'none') {
+                                opt.selected = false;
+                            }
+                        });
+                        
+                        // If nothing remains selected, select 'all' or 'none' default option
+                        const anySelected = Array.from(select.options).some(opt => opt.selected);
+                        if (!anySelected) {
+                            const defaultOpt = Array.from(select.options).find(opt => opt.value === 'all' || opt.value === 'none');
+                            if (defaultOpt) defaultOpt.selected = true;
+                        }
+                    }
+                    
+                    syncValue();
+                    
+                    // Dispatch change event to trigger filters
+                    const event = new Event('change', { bubbles: true });
+                    select.dispatchEvent(event);
                 } else {
-                    panel.classList.remove('show');
-                    trigger.classList.remove('active');
+                    select.value = option.value;
+                    syncValue();
+                    
+                    if (hasPopover) {
+                        panel.hidePopover();
+                    } else {
+                        panel.classList.remove('show');
+                        trigger.classList.remove('active');
+                    }
+                    
+                    // Dispatch change event to trigger filters
+                    const event = new Event('change', { bubbles: true });
+                    select.dispatchEvent(event);
                 }
-                
-                // Dispatch change event to trigger filters
-                const event = new Event('change', { bubbles: true });
-                select.dispatchEvent(event);
             });
             panel.appendChild(optDiv);
         });
@@ -9072,8 +9261,8 @@ function convertSelectToCustomDropdown(select) {
             if (isShowing) {
                 panel.hidePopover();
             } else {
-                positionPanel();
                 panel.showPopover();
+                positionPanel(); // Position AFTER showing popover!
             }
         } else {
             const isShowing = panel.classList.contains('show');
@@ -9091,6 +9280,7 @@ function convertSelectToCustomDropdown(select) {
             } else {
                 panel.classList.add('show');
                 trigger.classList.add('active');
+                positionPanel();
             }
         }
     });
@@ -9112,17 +9302,19 @@ function convertSelectToCustomDropdown(select) {
     });
     observer.observe(select, { childList: true });
 
-    // Intercept select.value assignments to keep custom UI in sync
-    const originalDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
-    Object.defineProperty(select, 'value', {
-        get() {
-            return originalDescriptor.get.call(this);
-        },
-        set(val) {
-            originalDescriptor.set.call(this, val);
-            syncValue();
-        }
-    });
+    // Intercept select.value assignments to keep custom UI in sync (for single select)
+    if (!isMultiple) {
+        const originalDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+        Object.defineProperty(select, 'value', {
+            get() {
+                return originalDescriptor.get.call(this);
+            },
+            set(val) {
+                originalDescriptor.set.call(this, val);
+                syncValue();
+            }
+        });
+    }
 }
 
 function initCustomDropdowns() {
@@ -9130,6 +9322,7 @@ function initCustomDropdowns() {
         '#filter-broker',
         '#filter-poc',
         '#filter-agent',
+        '#filter-hide-smallcase-rm',
         '#monthly-month-select',
         '#monthly-year-select',
         '#agent-perf-select'
