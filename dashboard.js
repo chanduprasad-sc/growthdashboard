@@ -147,7 +147,7 @@ function getDevRevLinkHTML(id, type) {
 
 // Colors Matching CSS variables (Light Mode default)
 const THEME_COLORS = {
-    purple: '#8b5cf6',     // Bright Violet
+    purple: '#1f7ae0',     // smallcase Brand Blue
     blue: '#0284c7',       // Sky Blue
     green: '#059669',      // Forest Green
     red: '#e11d48',        // Rose Red
@@ -1668,7 +1668,7 @@ function setupEventListeners() {
             THEME_COLORS.textSecondary = '#cbd5e1';
             THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
             THEME_COLORS.blue = '#00d4ff';       // Electric Cyan
-            THEME_COLORS.purple = '#a78bfa';     // Soft Violet
+            THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Dark mode)
             THEME_COLORS.green = '#10b981';      // Emerald
             THEME_COLORS.red = '#f43f5e';        // Coral Red
             THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
@@ -1681,7 +1681,7 @@ function setupEventListeners() {
             THEME_COLORS.textSecondary = '#cbd5e1';
             THEME_COLORS.border = 'rgba(255, 255, 255, 0.1)';
             THEME_COLORS.blue = '#38bdf8';       // Bright Cyan
-            THEME_COLORS.purple = '#c084fc';     // Light Violet
+            THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Black mode)
             THEME_COLORS.green = '#34d399';      // Mint
             THEME_COLORS.red = '#fb7185';        // Rose
             THEME_COLORS.yellow = '#fcd34d';     // Amber
@@ -1694,7 +1694,7 @@ function setupEventListeners() {
             THEME_COLORS.textSecondary = '#334155';
             THEME_COLORS.border = 'rgba(0, 0, 0, 0.07)';
             THEME_COLORS.blue = '#0284c7';       // Sky Blue
-            THEME_COLORS.purple = '#8b5cf6';     // Bright Violet
+            THEME_COLORS.purple = '#1f7ae0';     // smallcase Brand Blue (Light mode)
             THEME_COLORS.green = '#059669';      // Forest Green
             THEME_COLORS.red = '#e11d48';        // Rose Red
             THEME_COLORS.yellow = '#d97706';     // Amber Yellow

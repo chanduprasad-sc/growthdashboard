@@ -25,8 +25,8 @@ body.dark-mode {
     --text-secondary: #cac4d0;        /* MD3 dark on-surface-variant */
     --text-muted: #938f99;           /* MD3 dark outline */
     
-    --accent-primary: #d0bcff;       /* MD3 dark primary */
-    --accent-primary-rgb: 208, 188, 255;
+    --accent-primary: #82b1ff;       /* Lighter Brand Blue */
+    --accent-primary-rgb: 130, 177, 255;
     --accent-blue: #a8c7fa;          /* MD3 dark blue */
     --accent-blue-rgb: 168, 199, 250;
     --accent-green: #b4dfb4;         /* MD3 dark green */
@@ -37,7 +37,7 @@ body.dark-mode {
     --accent-yellow-rgb: 239, 184, 200;
     
     --card-shadow: rgba(0, 0, 0, 0.4);
-    --card-glow: rgba(208, 188, 255, 0.08);
+    --card-glow: rgba(130, 177, 255, 0.08);
     --shadow-color: rgba(0, 0, 0, 0.5);
 
     /* MD3 Dark Mode Tokens */
@@ -45,12 +45,12 @@ body.dark-mode {
     --md3-surface: #1d1b20;
     --md3-surface-container: #211f26;
     --md3-surface-container-high: #2b2930;
-    --md3-primary: #d0bcff;
-    --md3-on-primary: #381e72;
-    --md3-primary-container: #4f378b;
-    --md3-on-primary-container: #e8def8;
-    --md3-secondary-container: #4a4458;
-    --md3-on-secondary-container: #e8def8;
+    --md3-primary: #82b1ff;
+    --md3-on-primary: #002f6c;
+    --md3-primary-container: #00459e;
+    --md3-on-primary-container: #d6e4ff;
+    --md3-secondary-container: #3b475b;
+    --md3-on-secondary-container: #d6e4ff;
     --md3-tertiary: #efb8c8;
     --md3-outline: #938f99;
     --md3-on-surface: #e6e1e5;
@@ -71,8 +71,8 @@ body.light-mode {
     --text-secondary: #49454f;        /* MD3 light on-surface-variant */
     --text-muted: #79747e;           /* MD3 light outline */
     
-    --accent-primary: #6750a4;       /* MD3 light primary */
-    --accent-primary-rgb: 103, 80, 164;
+    --accent-primary: #1f7ae0;       /* smallcase Brand Blue */
+    --accent-primary-rgb: 31, 122, 224;
     --accent-blue: #0b57d0;          /* MD3 light blue */
     --accent-blue-rgb: 11, 87, 208;
     --accent-green: #137333;         /* MD3 light green */
@@ -83,7 +83,7 @@ body.light-mode {
     --accent-yellow-rgb: 125, 82, 96;
     
     --card-shadow: rgba(0, 0, 0, 0.05);
-    --card-glow: rgba(103, 80, 164, 0.03);
+    --card-glow: rgba(31, 122, 224, 0.03);
     --shadow-color: rgba(0, 0, 0, 0.02);
 
     /* MD3 Light Mode Tokens */
@@ -91,12 +91,12 @@ body.light-mode {
     --md3-surface: #ffffff;
     --md3-surface-container: #f3edf7;
     --md3-surface-container-high: #e8def8;
-    --md3-primary: #6750a4;
+    --md3-primary: #1f7ae0;
     --md3-on-primary: #ffffff;
-    --md3-primary-container: #e8def8;
-    --md3-on-primary-container: #21005d;
-    --md3-secondary-container: #e8def8;
-    --md3-on-secondary-container: #1d192b;
+    --md3-primary-container: #d6e4ff;
+    --md3-on-primary-container: #001a41;
+    --md3-secondary-container: #e0ebff;
+    --md3-on-secondary-container: #001a41;
     --md3-tertiary: #7d5260;
     --md3-outline: #79747e;
     --md3-on-surface: #1c1b1f;
@@ -117,8 +117,8 @@ body.black-mode {
     --text-secondary: #cccccc;        /* MD3 black on-surface-variant */
     --text-muted: #858585;           /* MD3 black outline */
     
-    --accent-primary: #d0bcff;       /* MD3 dark primary */
-    --accent-primary-rgb: 208, 188, 255;
+    --accent-primary: #82b1ff;       /* Lighter Brand Blue */
+    --accent-primary-rgb: 130, 177, 255;
     --accent-blue: #a8c7fa;          /* MD3 dark blue */
     --accent-blue-rgb: 168, 199, 250;
     --accent-green: #b4dfb4;         /* MD3 dark green */
@@ -129,7 +129,7 @@ body.black-mode {
     --accent-yellow-rgb: 239, 184, 200;
     
     --card-shadow: rgba(0, 0, 0, 0.85);
-    --card-glow: rgba(208, 188, 255, 0.04);
+    --card-glow: rgba(130, 177, 255, 0.04);
     --shadow-color: rgba(0, 0, 0, 0.95);
 
     /* MD3 Black Mode Tokens */
@@ -137,11 +137,11 @@ body.black-mode {
     --md3-surface: #121212;
     --md3-surface-container: #1a1a1a;
     --md3-surface-container-high: #242424;
-    --md3-primary: #d0bcff;
-    --md3-on-primary: #381e72;
-    --md3-primary-container: #4f378b;
-    --md3-on-primary-container: #e8def8;
-    --md3-secondary-container: #333333;
+    --md3-primary: #82b1ff;
+    --md3-on-primary: #002f6c;
+    --md3-primary-container: #00459e;
+    --md3-on-primary-container: #d6e4ff;
+    --md3-secondary-container: #1b222c;
     --md3-on-secondary-container: #e6e1e5;
     --md3-tertiary: #efb8c8;
     --md3-outline: #858585;
@@ -359,9 +359,7 @@ body.sidebar-collapsed .workspace {
 .brand-logo {
     width: 32px;
     height: 32px;
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-blue));
-    border-radius: 10px;
-    box-shadow: 0 0 16px var(--card-glow);
+    flex-shrink: 0;
 }
 .brand-title {
     font-family: var(--font-heading);
