@@ -3794,9 +3794,9 @@ body.light-mode .agent-breaks-breakdown-wrapper {
    SKEUOMORPHISM THEME OVERRIDES
    ========================================================================== */
 
-/* Apply global noise overlay over the main background */
+/* Apply global background gradient */
 body {
-    background-image: var(--sk-bg-noise), linear-gradient(to bottom, var(--bg-main), var(--bg-main)) !important;
+    background-image: linear-gradient(to bottom, var(--bg-main), var(--bg-main)) !important;
 }
 
 /* --- Card & Sidebar Surfaces (Raised, Beveled, Tactile) --- */
@@ -3825,7 +3825,6 @@ body {
 .ai-report-chart-card,
 .ai-report-narrative {
     background: var(--sk-card-bg) !important;
-    background-image: var(--sk-bg-noise), var(--sk-card-bg) !important;
     border: 1px solid var(--sk-card-border) !important;
     box-shadow: var(--sk-card-shadow) !important;
     backdrop-filter: none !important;
