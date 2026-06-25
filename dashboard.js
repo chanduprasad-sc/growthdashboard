@@ -1235,6 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Perform background sync/fetch and setup event listeners
     loadDashboardData();
     setupEventListeners();
+    initCustomDropdowns();
 });
 
 async function loadDashboardData() {
@@ -1655,52 +1656,90 @@ function setupEventListeners() {
     });
 
     // Theme Switcher (Light / Dark / Black)
-    document.getElementById('theme-toggle-btn').addEventListener('click', () => {
-        const body = document.body;
-        const btnText = document.querySelector('.theme-text');
+    document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
+        const toggleTheme = () => {
+            const body = document.body;
+            const btnText = document.querySelector('.theme-text');
 
-        if (body.classList.contains('light-mode')) {
-            // Light -> Dark
-            body.classList.remove('light-mode');
-            body.classList.add('dark-mode');
-            btnText.innerText = 'Black Mode';
-            THEME_COLORS.textPrimary = '#f0f4ff';
-            THEME_COLORS.textSecondary = '#cbd5e1';
-            THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
-            THEME_COLORS.blue = '#00d4ff';       // Electric Cyan
-            THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Dark mode)
-            THEME_COLORS.green = '#10b981';      // Emerald
-            THEME_COLORS.red = '#f43f5e';        // Coral Red
-            THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
-        } else if (body.classList.contains('dark-mode')) {
-            // Dark -> Black
-            body.classList.remove('dark-mode');
-            body.classList.add('black-mode');
-            btnText.innerText = 'Light Mode';
-            THEME_COLORS.textPrimary = '#f8fafc';
-            THEME_COLORS.textSecondary = '#cbd5e1';
-            THEME_COLORS.border = 'rgba(255, 255, 255, 0.1)';
-            THEME_COLORS.blue = '#38bdf8';       // Bright Cyan
-            THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Black mode)
-            THEME_COLORS.green = '#34d399';      // Mint
-            THEME_COLORS.red = '#fb7185';        // Rose
-            THEME_COLORS.yellow = '#fcd34d';     // Amber
-        } else {
-            // Black -> Light
-            body.classList.remove('black-mode');
-            body.classList.add('light-mode');
-            btnText.innerText = 'Dark Mode';
-            THEME_COLORS.textPrimary = '#0f172a';
-            THEME_COLORS.textSecondary = '#334155';
-            THEME_COLORS.border = 'rgba(0, 0, 0, 0.07)';
-            THEME_COLORS.blue = '#0284c7';       // Sky Blue
-            THEME_COLORS.purple = '#1f7ae0';     // smallcase Brand Blue (Light mode)
-            THEME_COLORS.green = '#059669';      // Forest Green
-            THEME_COLORS.red = '#e11d48';        // Rose Red
-            THEME_COLORS.yellow = '#d97706';     // Amber Yellow
+            if (body.classList.contains('light-mode')) {
+                // Light -> Dark
+                body.classList.remove('light-mode');
+                body.classList.add('dark-mode');
+                btnText.innerText = 'Black Mode';
+                THEME_COLORS.textPrimary = '#f0f4ff';
+                THEME_COLORS.textSecondary = '#cbd5e1';
+                THEME_COLORS.border = 'rgba(255, 255, 255, 0.16)';
+                THEME_COLORS.blue = '#00d4ff';       // Electric Cyan
+                THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Dark mode)
+                THEME_COLORS.green = '#10b981';      // Emerald
+                THEME_COLORS.red = '#f43f5e';        // Coral Red
+                THEME_COLORS.yellow = '#fbbf24';     // Warm Amber
+            } else if (body.classList.contains('dark-mode')) {
+                // Dark -> Black
+                body.classList.remove('dark-mode');
+                body.classList.add('black-mode');
+                btnText.innerText = 'Light Mode';
+                THEME_COLORS.textPrimary = '#f8fafc';
+                THEME_COLORS.textSecondary = '#cbd5e1';
+                THEME_COLORS.border = 'rgba(255, 255, 255, 0.1)';
+                THEME_COLORS.blue = '#38bdf8';       // Bright Cyan
+                THEME_COLORS.purple = '#82b1ff';     // Lighter Brand Blue (Black mode)
+                THEME_COLORS.green = '#34d399';      // Mint
+                THEME_COLORS.red = '#fb7185';        // Rose
+                THEME_COLORS.yellow = '#fcd34d';     // Amber
+            } else {
+                // Black -> Light
+                body.classList.remove('black-mode');
+                body.classList.add('light-mode');
+                btnText.innerText = 'Dark Mode';
+                THEME_COLORS.textPrimary = '#0f172a';
+                THEME_COLORS.textSecondary = '#334155';
+                THEME_COLORS.border = 'rgba(0, 0, 0, 0.07)';
+                THEME_COLORS.blue = '#0284c7';       // Sky Blue
+                THEME_COLORS.purple = '#1f7ae0';     // smallcase Brand Blue (Light mode)
+                THEME_COLORS.green = '#059669';      // Forest Green
+                THEME_COLORS.red = '#e11d48';        // Rose Red
+                THEME_COLORS.yellow = '#d97706';     // Amber Yellow
+            }
+
+            buildViewModel();
+        };
+
+        const isAppearanceTransition = document.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        
+        if (!isAppearanceTransition) {
+            toggleTheme();
+            return;
         }
 
-        buildViewModel();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        const endRadius = Math.hypot(
+            Math.max(x, window.innerWidth - x),
+            Math.max(y, window.innerHeight - y)
+        );
+
+        const transition = document.startViewTransition(() => {
+            toggleTheme();
+        });
+
+        transition.ready.then(() => {
+            const clipPath = [
+                `circle(0px at ${x}px ${y}px)`,
+                `circle(${endRadius}px at ${x}px ${y}px)`
+            ];
+            document.documentElement.animate(
+                {
+                    clipPath: clipPath
+                },
+                {
+                    duration: 500,
+                    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                    pseudoElement: '::view-transition-new(root)'
+                }
+            );
+        });
     });
 
     // Sidebar collapse/expand event listeners
@@ -2127,6 +2166,9 @@ function buildViewModel() {
     } else if (currentTab === 'tab-ai-summary') {
         renderAISummaryTab();
     }
+
+    // Initialize BorderGlow on newly rendered cards
+    initBorderGlows();
 }
 
 function renderWeeklyPulseDashboard() {
@@ -8901,5 +8943,330 @@ function renderAgentQACoaching(selectedAgent) {
             </tr>`;
         }).join('');
     }
+}
+
+// ==========================================================================
+// CUSTOM POPOVER DROPDOWNS (SHADCN/UI STYLE)
+// ==========================================================================
+
+function convertSelectToCustomDropdown(select) {
+    if (select.dataset.customDropdownInitialized) return;
+    select.dataset.customDropdownInitialized = 'true';
+
+    // Hide native select
+    select.style.display = 'none';
+
+    // Create wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'custom-select-wrapper';
+    select.parentNode.insertBefore(wrapper, select);
+    wrapper.appendChild(select);
+
+    // Create trigger button
+    const trigger = document.createElement('button');
+    trigger.className = 'custom-select-trigger';
+    trigger.type = 'button';
+    
+    const valueSpan = document.createElement('span');
+    valueSpan.className = 'custom-select-value';
+    trigger.appendChild(valueSpan);
+
+    const chevron = document.createElement('span');
+    chevron.className = 'custom-select-chevron';
+    chevron.innerHTML = `
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+    `;
+    trigger.appendChild(chevron);
+    wrapper.appendChild(trigger);
+
+    // Create panel
+    const panel = document.createElement('div');
+    panel.className = 'custom-select-panel';
+    wrapper.appendChild(panel);
+
+    // Sync selected value text and highlight option
+    function syncValue() {
+        const selectedOption = select.options[select.selectedIndex];
+        valueSpan.textContent = selectedOption ? selectedOption.textContent : '';
+        
+        const val = select.value;
+        panel.querySelectorAll('.custom-select-option').forEach(opt => {
+            if (opt.dataset.value === val) {
+                opt.classList.add('selected');
+            } else {
+                opt.classList.remove('selected');
+            }
+        });
+    }
+
+    // Rebuild option list
+    function rebuildOptions() {
+        panel.innerHTML = '';
+        Array.from(select.options).forEach(option => {
+            const optDiv = document.createElement('div');
+            optDiv.className = 'custom-select-option';
+            optDiv.textContent = option.textContent;
+            optDiv.dataset.value = option.value;
+            
+            if (option.value === select.value) {
+                optDiv.classList.add('selected');
+            }
+            
+            optDiv.addEventListener('click', (e) => {
+                e.stopPropagation();
+                select.value = option.value;
+                syncValue();
+                panel.classList.remove('show');
+                trigger.classList.remove('active');
+                
+                // Dispatch change event to trigger filters
+                const event = new Event('change', { bubbles: true });
+                select.dispatchEvent(event);
+            });
+            panel.appendChild(optDiv);
+        });
+        syncValue();
+    }
+
+    // Trigger toggle handler
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        
+        // Close all other dropdown panels
+        document.querySelectorAll('.custom-select-panel.show').forEach(p => {
+            if (p !== panel) {
+                p.classList.remove('show');
+                p.previousElementSibling.classList.remove('active');
+            }
+        });
+        
+        panel.classList.toggle('show');
+        trigger.classList.toggle('active');
+    });
+
+    // Close when clicking elsewhere
+    document.addEventListener('click', () => {
+        panel.classList.remove('show');
+        trigger.classList.remove('active');
+    });
+
+    // Build the initial set of options
+    rebuildOptions();
+
+    // Observe future select option mutations (e.g. dynamic population)
+    const observer = new MutationObserver(() => {
+        rebuildOptions();
+    });
+    observer.observe(select, { childList: true });
+
+    // Intercept select.value assignments to keep custom UI in sync
+    const originalDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    Object.defineProperty(select, 'value', {
+        get() {
+            return originalDescriptor.get.call(this);
+        },
+        set(val) {
+            originalDescriptor.set.call(this, val);
+            syncValue();
+        }
+    });
+}
+
+function initCustomDropdowns() {
+    const targets = [
+        '#filter-broker',
+        '#filter-poc',
+        '#filter-agent',
+        '#monthly-month-select',
+        '#monthly-year-select',
+        '#agent-perf-select'
+    ];
+    targets.forEach(selector => {
+        const select = document.querySelector(selector);
+        if (select) {
+            convertSelectToCustomDropdown(select);
+        }
+    });
+}
+
+// ==========================================================================
+// BORDER GLOW ANIMATED EFFECT (REACT BITS PORT TO VANILLA JS)
+// ==========================================================================
+
+function getCenterOfElement(el) {
+    const rect = el.getBoundingClientRect();
+    return [rect.width / 2, rect.height / 2];
+}
+
+function getEdgeProximity(el, x, y) {
+    const [cx, cy] = getCenterOfElement(el);
+    const dx = x - cx;
+    const dy = y - cy;
+    let kx = Infinity;
+    let ky = Infinity;
+    if (dx !== 0) kx = cx / Math.abs(dx);
+    if (dy !== 0) ky = cy / Math.abs(dy);
+    return Math.min(Math.max(1 / Math.min(kx, ky), 0), 1);
+}
+
+function getCursorAngle(el, x, y) {
+    const [cx, cy] = getCenterOfElement(el);
+    const dx = x - cx;
+    const dy = y - cy;
+    if (dx === 0 && dy === 0) return 0;
+    const radians = Math.atan2(dy, dx);
+    let degrees = radians * (180 / Math.PI) + 90;
+    if (degrees < 0) degrees += 360;
+    return degrees;
+}
+
+function parseHSL(hslStr) {
+    const match = hslStr.match(/([\d.]+)\s*([\d.]+)%?\s*([\d.]+)%?/);
+    if (!match) return { h: 210, s: 90, l: 60 }; // Default to brand blue HSL
+    return { h: parseFloat(match[1]), s: parseFloat(match[2]), l: parseFloat(match[3]) };
+}
+
+function buildGlowVars(glowColor, intensity) {
+    const { h, s, l } = parseHSL(glowColor);
+    const base = `${h}deg ${s}% ${l}%`;
+    const opacities = [100, 60, 50, 40, 30, 20, 10];
+    const keys = ['', '-60', '-50', '-40', '-30', '-20', '-10'];
+    const vars = {};
+    for (let i = 0; i < opacities.length; i++) {
+        vars[`--glow-color${keys[i]}`] = `hsl(${base} / ${Math.min(opacities[i] * intensity, 100)}%)`;
+    }
+    return vars;
+}
+
+const GRADIENT_POSITIONS = ['80% 55%', '69% 34%', '8% 6%', '41% 38%', '86% 85%', '82% 18%', '51% 4%'];
+const GRADIENT_KEYS = ['--gradient-one', '--gradient-two', '--gradient-three', '--gradient-four', '--gradient-five', '--gradient-six', '--gradient-seven'];
+const COLOR_MAP = [0, 1, 2, 0, 1, 2, 1];
+
+function buildGradientVars(colors) {
+    const vars = {};
+    for (let i = 0; i < 7; i++) {
+        const c = colors[Math.min(COLOR_MAP[i], colors.length - 1)];
+        vars[GRADIENT_KEYS[i]] = `radial-gradient(at ${GRADIENT_POSITIONS[i]}, ${c} 0px, transparent 50%)`;
+    }
+    vars['--gradient-base'] = `linear-gradient(${colors[0]} 0 100%)`;
+    return vars;
+}
+
+function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+function easeInCubic(x) { return x * x * x; }
+
+function animateValue({ start = 0, end = 100, duration = 1000, delay = 0, ease = easeOutCubic, onUpdate, onEnd }) {
+    const t0 = performance.now() + delay;
+    function tick() {
+        const elapsed = performance.now() - t0;
+        const t = Math.min(elapsed / duration, 1);
+        onUpdate(start + (end - start) * ease(t));
+        if (t < 1) requestAnimationFrame(tick);
+        else if (onEnd) onEnd();
+    }
+    setTimeout(() => requestAnimationFrame(tick), delay);
+}
+
+function initBorderGlows() {
+    const selectors = [
+        '.visual-card',
+        '.kpi-card',
+        '.channel-summary-card',
+        '.agent-score-card',
+        '.deepdive-chart-card',
+        '.intelligence-panel'
+    ];
+    const cards = document.querySelectorAll(selectors.join(', '));
+
+    cards.forEach(card => {
+        if (card.dataset.borderGlowInitialized) return;
+        card.dataset.borderGlowInitialized = 'true';
+
+        // 1. Wrap all children inside .border-glow-inner
+        const inner = document.createElement('div');
+        inner.className = 'border-glow-inner';
+        while (card.firstChild) {
+            inner.appendChild(card.firstChild);
+        }
+        card.appendChild(inner);
+
+        // 2. Prepend the .edge-light span
+        const edgeLight = document.createElement('span');
+        edgeLight.className = 'edge-light';
+        card.insertBefore(edgeLight, inner);
+
+        // 3. Add class
+        card.classList.add('border-glow-card');
+
+        // 4. Set CSS variables (Read from computed style of card for border radius)
+        const computedStyle = window.getComputedStyle(card);
+        const rawBorderRadius = computedStyle.borderRadius || '16px';
+        const borderRadiusVal = parseFloat(rawBorderRadius) || 16;
+
+        const edgeSensitivity = 30;
+        const glowColor = '210 90 60'; // Brand Blue HSL
+        const backgroundColor = 'var(--bg-card)';
+        const glowRadius = 40;
+        const glowIntensity = 1.0;
+        const coneSpread = 25;
+        const fillOpacity = 0.15;
+        const colors = ['#c084fc', '#f472b6', '#38bdf8']; // Purple, pink, cyan
+
+        card.style.setProperty('--card-bg', backgroundColor);
+        card.style.setProperty('--edge-sensitivity', edgeSensitivity);
+        card.style.setProperty('--border-radius', `${borderRadiusVal}px`);
+        card.style.setProperty('--glow-padding', `${glowRadius}px`);
+        card.style.setProperty('--cone-spread', coneSpread);
+        card.style.setProperty('--fill-opacity', fillOpacity);
+
+        // Set glow vars
+        const glowVars = buildGlowVars(glowColor, glowIntensity);
+        Object.keys(glowVars).forEach(k => card.style.setProperty(k, glowVars[k]));
+
+        // Set gradient vars
+        const gradVars = buildGradientVars(colors);
+        Object.keys(gradVars).forEach(k => card.style.setProperty(k, gradVars[k]));
+
+        // 5. Setup pointer/mouse move events
+        card.addEventListener('pointermove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const edge = getEdgeProximity(card, x, y);
+            const angle = getCursorAngle(card, x, y);
+
+            card.style.setProperty('--edge-proximity', `${(edge * 100).toFixed(3)}`);
+            card.style.setProperty('--cursor-angle', `${angle.toFixed(3)}deg`);
+        });
+
+        card.addEventListener('pointerleave', () => {
+            // Smoothly fade out when cursor leaves
+            card.style.setProperty('--edge-proximity', '0');
+        });
+
+        // 6. Setup sweep intro animation if desired
+        const animated = true;
+        if (animated) {
+            const angleStart = 110;
+            const angleEnd = 465;
+            card.classList.add('sweep-active');
+            card.style.setProperty('--cursor-angle', `${angleStart}deg`);
+
+            animateValue({ duration: 500, onUpdate: v => card.style.setProperty('--edge-proximity', v) });
+            animateValue({ ease: easeInCubic, duration: 1500, end: 50, onUpdate: v => {
+                card.style.setProperty('--cursor-angle', `${(angleEnd - angleStart) * (v / 100) + angleStart}deg`);
+            }});
+            animateValue({ ease: easeOutCubic, delay: 1500, duration: 2250, start: 50, end: 100, onUpdate: v => {
+                card.style.setProperty('--cursor-angle', `${(angleEnd - angleStart) * (v / 100) + angleStart}deg`);
+            }});
+            animateValue({ ease: easeInCubic, delay: 2500, duration: 1500, start: 100, end: 0,
+                onUpdate: v => card.style.setProperty('--edge-proximity', v),
+                onEnd: () => card.classList.remove('sweep-active'),
+            });
+        }
+    });
 }
 
