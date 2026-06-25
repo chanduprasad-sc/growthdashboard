@@ -2,6 +2,260 @@
 // B2B GROWTH & SUPPORT ANALYTICS DASHBOARD - FRONTEND ENGINE
 // ==========================================================================
 
+// Global Chart Interceptor and Redesigner for Premium Financial Dashboard style
+(function() {
+    // Hex to RGBA local helper
+    function localHexToRgba(hex, alpha) {
+        hex = String(hex).replace('#', '');
+        if (hex.length === 3) {
+            hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+        }
+        const r = parseInt(hex.substring(0, 2), 16) || 0;
+        const g = parseInt(hex.substring(2, 4), 16) || 0;
+        const b = parseInt(hex.substring(4, 6), 16) || 0;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    if (window.Chart) {
+        const OriginalChart = window.Chart;
+        
+        // Define color mapping helper
+        function mapFinancialColors(colors, isDark, index) {
+            const palette = isDark ? [
+                '#3b82f6', // Premium Accent Blue (smallcase Brand Blue equivalent)
+                '#10b981', // Positive Emerald
+                '#ef4444', // Negative Coral
+                '#8b5cf6', // Indigo Purple
+                '#f59e0b', // Amber Yellow
+                '#06b6d4', // Teal Cyan
+                '#ec4899', // Pink Accent
+                '#64748b'  // Slate Gray
+            ] : [
+                '#1d4ed8', // Dark Blue
+                '#047857', // Forest Green
+                '#b91c1c', // Crimson
+                '#6d28d9', // Deep Violet
+                '#b45309', // Dark Amber
+                '#0e7490', // Cyan
+                '#be185d', // Deep Pink
+                '#475569'  // Slate Gray
+            ];
+
+            if (Array.isArray(colors)) {
+                return colors.map((col, idx) => {
+                    if (typeof col === 'string') {
+                        const lowCol = col.toLowerCase();
+                        if (lowCol.includes('14, 165, 233') || lowCol.includes('#0284c7')) return palette[0];
+                        if (lowCol.includes('16, 185, 129') || lowCol.includes('#059669')) return palette[1];
+                        if (lowCol.includes('244, 63, 94') || lowCol.includes('#e11d48') || lowCol.includes('ef4444')) return palette[2];
+                        if (lowCol.includes('168, 85, 247') || lowCol.includes('#1f7ae0') || lowCol.includes('8b5cf6')) return palette[3];
+                        if (lowCol.includes('20, 184, 166') || lowCol.includes('#d97706') || lowCol.includes('f59e0b')) return palette[4];
+                    }
+                    return col;
+                });
+            }
+
+            if (typeof colors === 'string') {
+                const lowCol = colors.toLowerCase();
+                if (lowCol.includes('14, 165, 233') || lowCol === '#0284c7') return palette[0];
+                if (lowCol.includes('16, 185, 129') || lowCol === '#059669') return palette[1];
+                if (lowCol.includes('244, 63, 94') || lowCol === '#e11d48' || lowCol.includes('ef4444')) return palette[2];
+                if (lowCol.includes('168, 85, 247') || lowCol === '#1f7ae0' || lowCol.includes('8b5cf6')) return palette[3];
+                if (lowCol.includes('20, 184, 166') || lowCol === '#d97706' || lowCol.includes('f59e0b')) return palette[4];
+            }
+            return colors;
+        }
+
+        // Define config enhancer
+        function financialChartConfig(config) {
+            const isDark = document.body.classList.contains('dark-mode');
+            
+            if (!config.options) config.options = {};
+            config.options.responsive = true;
+            config.options.maintainAspectRatio = false;
+            
+            const textSecondary = isDark ? '#94a3b8' : '#64748b';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+            const tooltipBg = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+            const tooltipColor = isDark ? '#f8fafc' : '#0f172a';
+            const tooltipBorder = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+
+            if (!config.options.plugins) config.options.plugins = {};
+            
+            // Custom tooltips
+            config.options.plugins.tooltip = {
+                enabled: true,
+                backgroundColor: tooltipBg,
+                titleColor: tooltipColor,
+                bodyColor: textSecondary,
+                borderColor: tooltipBorder,
+                borderWidth: 1,
+                padding: 10,
+                cornerRadius: 6,
+                titleFont: { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", weight: '600', size: 12 },
+                bodyFont: { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 11 },
+                displayColors: true,
+                boxWidth: 6,
+                boxHeight: 6,
+                boxPadding: 4,
+                usePointStyle: true,
+                ...config.options.plugins.tooltip
+            };
+
+            // Custom legend
+            if (config.options.plugins.legend) {
+                config.options.plugins.legend = {
+                    display: config.options.plugins.legend.display !== false,
+                    position: config.options.plugins.legend.position || 'top',
+                    align: 'end',
+                    labels: {
+                        color: textSecondary,
+                        boxWidth: 8,
+                        boxHeight: 8,
+                        padding: 16,
+                        usePointStyle: true,
+                        font: { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 10, weight: '500' }
+                    },
+                    ...config.options.plugins.legend
+                };
+            } else {
+                config.options.plugins.legend = { display: false };
+            }
+
+            // Custom scales for cartesian
+            if (config.options.scales) {
+                Object.keys(config.options.scales).forEach(key => {
+                    const scale = config.options.scales[key];
+                    if (scale) {
+                        scale.grid = {
+                            display: scale.grid?.display !== false,
+                            color: gridColor,
+                            drawBorder: false,
+                            drawTicks: false,
+                            ...scale.grid
+                        };
+                        scale.ticks = {
+                            color: textSecondary,
+                            padding: 8,
+                            font: { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 9 },
+                            ...scale.ticks
+                        };
+                    }
+                });
+            }
+
+            // Datasets
+            if (config.data && config.data.datasets) {
+                config.data.datasets.forEach((dataset, idx) => {
+                    if (config.type === 'line' || dataset.type === 'line') {
+                        dataset.tension = dataset.tension !== undefined ? dataset.tension : 0.35;
+                        dataset.borderWidth = dataset.borderWidth !== undefined ? dataset.borderWidth : 2;
+                        dataset.pointRadius = dataset.pointRadius !== undefined ? dataset.pointRadius : 0;
+                        dataset.pointHoverRadius = dataset.pointHoverRadius !== undefined ? dataset.pointHoverRadius : 4;
+                        dataset.pointHoverBorderWidth = 1;
+                        
+                        // Area Gradients
+                        if (dataset.fill === true || dataset.fill === 'origin') {
+                            dataset.backgroundColor = (context) => {
+                                const chart = context.chart;
+                                const {ctx, chartArea} = chart;
+                                if (!chartArea) return null;
+                                const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                                const baseColor = dataset.borderColor || '#3b82f6';
+                                gradient.addColorStop(0, localHexToRgba(baseColor, 0.25));
+                                gradient.addColorStop(1, localHexToRgba(baseColor, 0.0));
+                                return gradient;
+                            };
+                        }
+                    }
+                    
+                    if (config.type === 'bar' || dataset.type === 'bar') {
+                        dataset.borderRadius = dataset.borderRadius !== undefined ? dataset.borderRadius : 3;
+                        dataset.borderWidth = 0;
+                    }
+
+                    if (dataset.backgroundColor) {
+                        dataset.backgroundColor = mapFinancialColors(dataset.backgroundColor, isDark, idx);
+                    }
+                    if (dataset.borderColor) {
+                        dataset.borderColor = mapFinancialColors(dataset.borderColor, isDark, idx);
+                    }
+                });
+            }
+
+            return config;
+        }
+
+        window.Chart = function(ctx, config) {
+            const enhancedConfig = financialChartConfig(config);
+            const inst = new OriginalChart(ctx, enhancedConfig);
+            setTimeout(addChartExportButtons, 100);
+            return inst;
+        };
+        Object.setPrototypeOf(window.Chart, OriginalChart);
+        window.Chart.prototype = OriginalChart.prototype;
+    }
+})();
+
+// Global Export Buttons Helper
+function addChartExportButtons() {
+    const canvases = document.querySelectorAll('canvas');
+    canvases.forEach(canvas => {
+        if (canvas.id === 'intel-sankey-canvas' || canvas.id === 'agent-breaks-timeline') {
+            return;
+        }
+        
+        const card = canvas.closest('.deepdive-chart-card, .ai-report-chart-card, .chart-wrapper, .intelligence-panel, .dashboard-card, .weekly-pulse-card, .chart-card, .theme-card');
+        if (!card) return;
+        
+        if (card.querySelector('.chart-export-btn')) return;
+        
+        const btn = document.createElement('button');
+        btn.className = 'chart-export-btn';
+        btn.title = 'Export Chart as Image';
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+        `;
+        
+        if (getComputedStyle(card).position === 'static') {
+            card.style.position = 'relative';
+        }
+        
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            try {
+                const chartInst = Chart.getChart(canvas);
+                if (chartInst) {
+                    const url = chartInst.toBase64Image();
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${canvas.id || 'chart'}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                } else {
+                    const url = canvas.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${canvas.id || 'chart'}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+            } catch (err) {
+                console.error('Failed to export chart:', err);
+            }
+        });
+        
+        card.appendChild(btn);
+    });
+}
+
+
 // Global State
 let rawData = null;
 let currentTab = 'tab-weekly-pulse';

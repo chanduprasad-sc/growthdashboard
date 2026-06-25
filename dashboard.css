@@ -4787,3 +4787,70 @@ body.light-mode .drp-popup {
     box-shadow: 0 16px 48px rgba(31,38,135,0.14), 0 4px 16px rgba(31,38,135,0.08), 0 0 0 1px rgba(0,0,0,0.06);
 }
 
+/* ====================================================================
+   NEW STYLES: Popover overrides and Premium Export button
+   ==================================================================== */
+
+.drp-popup:popover-open {
+    margin: 0;
+    border: 1px solid var(--color-edge);
+    padding: 0;
+    background: var(--color-cloud);
+    border-radius: 16px;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.12);
+}
+body.dark-mode .drp-popup:popover-open {
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+}
+.drp-popup:focus-visible {
+    outline: none;
+}
+
+/* --- Premium Chart Export Button --- */
+.chart-export-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--color-edge, rgba(0,0,0,0.08));
+    background: var(--bg-card, #ffffff);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+    z-index: 10;
+}
+.deepdive-chart-card:hover .chart-export-btn,
+.ai-report-chart-card:hover .chart-export-btn,
+.chart-wrapper:hover .chart-export-btn,
+.intelligence-panel:hover .chart-export-btn,
+.dashboard-card:hover .chart-export-btn,
+.weekly-pulse-card:hover .chart-export-btn,
+.chart-card:hover .chart-export-btn {
+    opacity: 1;
+}
+.chart-export-btn:hover {
+    background: var(--bg-card-hover, rgba(0,0,0,0.04));
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+body.dark-mode .chart-export-btn {
+    background: var(--color-cloud, rgba(255,255,255,0.03));
+    border-color: var(--color-edge, rgba(255,255,255,0.08));
+}
+body.dark-mode .chart-export-btn:hover {
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+

@@ -173,7 +173,7 @@
                         <label class="filter-label">Custom Range</label>
                         <div id="date-range-picker-root">
                             <!-- trigger button -->
-                            <button id="drp-trigger" class="drp-trigger" aria-haspopup="true" aria-expanded="false">
+                            <button id="drp-trigger" class="drp-trigger" aria-haspopup="true" aria-expanded="false" popovertarget="drp-popup">
                                 <svg class="drp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                                 </svg>
@@ -188,7 +188,7 @@
                             <input type="date" id="filter-date-to"   style="display:none">
 
                             <!-- calendar popup -->
-                            <div id="drp-popup" class="drp-popup" role="dialog" aria-label="Date range calendar" hidden>
+                            <div id="drp-popup" class="drp-popup" role="dialog" aria-label="Date range calendar" popover="auto">
                                 <div class="drp-popup-inner">
                                     <!-- shortcut chips -->
                                     <div class="drp-shortcuts">
