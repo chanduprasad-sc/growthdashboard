@@ -1237,6 +1237,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDashboardData();
     setupEventListeners();
     initCustomDropdowns();
+    initSlidingIndicators();
 });
 
 async function loadDashboardData() {
@@ -9349,6 +9350,81 @@ function initCustomDropdowns() {
                 p.hidePopover();
             }
         });
+    });
+}
+
+function initSlidingIndicators() {
+    const containers = document.querySelectorAll('.nav-menu, .preset-buttons, .channel-pills');
+    
+    function updateIndicator(container) {
+        const activeBtn = container.querySelector('.active');
+        let indicator = container.querySelector('.sliding-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = 'sliding-indicator';
+            container.insertBefore(indicator, container.firstChild);
+        }
+        
+        if (activeBtn && activeBtn.offsetWidth > 0 && activeBtn.offsetHeight > 0) {
+            indicator.style.width = `${activeBtn.offsetWidth}px`;
+            indicator.style.height = `${activeBtn.offsetHeight}px`;
+            indicator.style.transform = `translate3d(${activeBtn.offsetLeft}px, ${activeBtn.offsetTop}px, 0)`;
+            indicator.style.opacity = '1';
+        } else {
+            indicator.style.opacity = '0';
+        }
+    }
+    
+    function updateAll() {
+        containers.forEach(updateIndicator);
+    }
+    
+    // Initial run
+    updateAll();
+    
+    // Also run after a short delay to ensure fonts/layout are stable
+    setTimeout(updateAll, 100);
+    setTimeout(updateAll, 500);
+    
+    // Handle resize
+    window.addEventListener('resize', updateAll);
+    
+    // Listen to transitions (like sidebar toggle or filters collapsible expanding)
+    document.body.addEventListener('transitionend', (e) => {
+        if (e.propertyName === 'width' || e.propertyName === 'transform' || e.propertyName === 'margin-left') {
+            updateAll();
+        }
+    });
+
+    // Listen to popover/collapsible details toggling
+    document.body.addEventListener('toggle', (e) => {
+        updateAll();
+    }, true);
+    
+    // MutationObserver to watch for class changes on elements (like active class toggles)
+    const observer = new MutationObserver((mutations) => {
+        let shouldUpdate = false;
+        for (let mutation of mutations) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                shouldUpdate = true;
+                break;
+            }
+        }
+        if (shouldUpdate) {
+            updateAll();
+        }
+    });
+    
+    observer.observe(document.body, {
+        attributes: true,
+        subtree: true,
+        attributeFilter: ['class']
+    });
+    
+    // Fallback click handler on body to catch any dynamic state changes that might not fire mutations immediately
+    document.body.addEventListener('click', () => {
+        updateAll();
+        requestAnimationFrame(updateAll);
     });
 }
 

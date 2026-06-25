@@ -4419,3 +4419,77 @@ body.black-mode .date-picker:focus {
     transform: scale(0.95) !important;
 }
 
+/* ==========================================================================
+   ANIMATED SLIDING TAB INDICATORS (ANIMATE-UI STYLE)
+   ========================================================================== */
+.sliding-indicator {
+    position: absolute !important;
+    z-index: 0 !important;
+    pointer-events: none !important;
+    transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
+                width 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
+                height 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
+                opacity 0.2s ease !important;
+}
+
+/* Sidebar Nav Indicators */
+.nav-menu {
+    position: relative !important;
+}
+.nav-menu .sliding-indicator {
+    border-radius: 16px !important;
+    background: rgba(255, 255, 255, 0.11) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2), 0 0 14px rgba(0, 212, 255, 0.2) !important;
+}
+body.light-mode .nav-menu .sliding-indicator {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 0 14px rgba(139, 92, 246, 0.12) !important;
+}
+
+/* Rounded-pill Indicators (Presets and Channels) */
+.preset-buttons, .channel-pills {
+    position: relative !important;
+}
+.preset-buttons .sliding-indicator,
+.channel-pills .sliding-indicator {
+    border-radius: 100px !important;
+    background-color: var(--accent-blue) !important;
+    box-shadow: 0 4px 14px rgba(0, 212, 255, 0.3) !important;
+}
+body.light-mode .preset-buttons .sliding-indicator,
+body.light-mode .channel-pills .sliding-indicator {
+    background-color: var(--accent-primary) !important;
+    box-shadow: 0 4px 14px rgba(139, 92, 246, 0.25) !important;
+}
+
+/* Disable static active backgrounds so the sliding indicator is visible */
+.nav-btn.active, 
+body.light-mode .nav-btn.active,
+.preset-btn.active, 
+.pill-btn.active,
+body.light-mode .preset-btn.active, 
+body.light-mode .pill-btn.active {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Ensure text/icon colors are correct on active buttons (sliding indicator behind them) */
+.nav-btn.active {
+    color: #ffffff !important;
+}
+body.light-mode .nav-btn.active {
+    color: var(--text-primary) !important;
+}
+
+.preset-btn.active, 
+.pill-btn.active {
+    color: #060a13 !important; /* dark text on cyan indicator in dark mode */
+}
+body.light-mode .preset-btn.active, 
+body.light-mode .pill-btn.active {
+    color: #ffffff !important; /* white text on purple indicator in light mode */
+}
+
