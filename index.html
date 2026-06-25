@@ -168,14 +168,81 @@
                         </div>
                     </div>
 
-                    <!-- Custom Range -->
-                    <div class="filter-group">
+                    <!-- Custom Range — MUI-Style Date Range Picker -->
+                    <div class="filter-group" id="drp-filter-group">
                         <label class="filter-label">Custom Range</label>
-                        <div class="date-inputs">
-                            <input type="date" id="filter-date-from" class="date-picker">
-                            <span class="date-separator">to</span>
-                            <input type="date" id="filter-date-to" class="date-picker">
-                            <button id="apply-date-btn" class="apply-btn">Apply Range</button>
+                        <div id="date-range-picker-root">
+                            <!-- trigger button -->
+                            <button id="drp-trigger" class="drp-trigger" aria-haspopup="true" aria-expanded="false">
+                                <svg class="drp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                                </svg>
+                                <span id="drp-label">Select date range</span>
+                                <svg class="drp-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </button>
+
+                            <!-- hidden inputs kept for compatibility with existing JS -->
+                            <input type="date" id="filter-date-from" style="display:none">
+                            <input type="date" id="filter-date-to"   style="display:none">
+
+                            <!-- calendar popup -->
+                            <div id="drp-popup" class="drp-popup" role="dialog" aria-label="Date range calendar" hidden>
+                                <div class="drp-popup-inner">
+                                    <!-- shortcut chips -->
+                                    <div class="drp-shortcuts">
+                                        <button class="drp-chip" data-shortcut="today">Today</button>
+                                        <button class="drp-chip" data-shortcut="yesterday">Yesterday</button>
+                                        <button class="drp-chip" data-shortcut="7d">Last 7 days</button>
+                                        <button class="drp-chip" data-shortcut="30d">Last 30 days</button>
+                                        <button class="drp-chip" data-shortcut="month">This month</button>
+                                        <button class="drp-chip" data-shortcut="year">This year</button>
+                                    </div>
+
+                                    <!-- dual calendars -->
+                                    <div class="drp-calendars">
+                                        <div class="drp-cal" id="drp-cal-left">
+                                            <div class="drp-cal-header">
+                                                <button class="drp-nav-btn" id="drp-prev-month" aria-label="Previous month">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                                                </button>
+                                                <span class="drp-cal-title" id="drp-left-title"></span>
+                                                <button class="drp-nav-btn drp-nav-mid" id="drp-next-month-left" aria-label="Next month">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                                                </button>
+                                            </div>
+                                            <div class="drp-weekdays"></div>
+                                            <div class="drp-days" id="drp-days-left"></div>
+                                        </div>
+                                        <div class="drp-cal-divider"></div>
+                                        <div class="drp-cal" id="drp-cal-right">
+                                            <div class="drp-cal-header">
+                                                <button class="drp-nav-btn drp-nav-mid" id="drp-prev-month-right" aria-label="Previous month">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                                                </button>
+                                                <span class="drp-cal-title" id="drp-right-title"></span>
+                                                <button class="drp-nav-btn" id="drp-next-month" aria-label="Next month">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                                                </button>
+                                            </div>
+                                            <div class="drp-weekdays"></div>
+                                            <div class="drp-days" id="drp-days-right"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- footer -->
+                                    <div class="drp-footer">
+                                        <div class="drp-selected-range" id="drp-range-display">No range selected</div>
+                                        <div class="drp-footer-actions">
+                                            <button id="drp-cancel-btn" class="drp-btn-cancel">Cancel</button>
+                                            <button id="drp-apply-btn" class="drp-btn-apply">Apply Range</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- hidden apply target kept for compatibility -->
+                            <button id="apply-date-btn" style="display:none"></button>
                         </div>
                     </div>
                 </div>

@@ -1551,18 +1551,8 @@ function setupEventListeners() {
         });
     });
 
-    // Custom date apply
-    document.getElementById('apply-date-btn').addEventListener('click', () => {
-        const from = document.getElementById('filter-date-from').value;
-        const to = document.getElementById('filter-date-to').value;
-        if (from && to) {
-            activeFilters.datePreset = 'custom';
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-            activeFilters.dateFrom = from;
-            activeFilters.dateTo = to;
-            buildViewModel();
-        }
-    });
+    // MUI-style Date Range Picker
+    initDateRangePicker();
 
     // Quick Channel Pills selector (Combined, Call Ticket, WhatsApp)
     document.querySelectorAll('.pill-btn').forEach(btn => {
@@ -2017,7 +2007,324 @@ function setDefaultDateRange() {
     });
 }
 
+// =============================================================================
+// MUI-STYLE DATE RANGE PICKER (vanilla JS)
+// =============================================================================
+function initDateRangePicker() {
+    const MONTHS = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+    const WDAYS  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+    const trigger     = document.getElementById('drp-trigger');
+    const popup       = document.getElementById('drp-popup');
+    const labelEl     = document.getElementById('drp-label');
+    const rangeDisp   = document.getElementById('drp-range-display');
+    const applyBtn    = document.getElementById('drp-apply-btn');
+    const cancelBtn   = document.getElementById('drp-cancel-btn');
+    const leftTitle   = document.getElementById('drp-left-title');
+    const rightTitle  = document.getElementById('drp-right-title');
+    const daysLeft    = document.getElementById('drp-days-left');
+    const daysRight   = document.getElementById('drp-days-right');
+    const prevMonthBtn = document.getElementById('drp-prev-month');
+    const nextMonthBtn = document.getElementById('drp-next-month');
+
+    if (!trigger || !popup) return;
+
+    // Build weekday headers once
+    document.querySelectorAll('.drp-weekdays').forEach(container => {
+        WDAYS.forEach(d => {
+            const span = document.createElement('span');
+            span.className = 'drp-wday';
+            span.textContent = d;
+            container.appendChild(span);
+        });
+    });
+
+    // State
+    const today    = new Date();
+    today.setHours(0,0,0,0);
+    let viewYear   = today.getFullYear();
+    let viewMonth  = today.getMonth(); // left calendar month
+    let startDate  = null;
+    let endDate    = null;
+    let hoverDate  = null;
+    let selecting  = false; // false = waiting for start, true = waiting for end
+
+    function fmt(d) {
+        if (!d) return '';
+        const y = d.getFullYear();
+        const m = String(d.getMonth()+1).padStart(2,'0');
+        const day = String(d.getDate()).padStart(2,'0');
+        return `${y}-${m}-${day}`;
+    }
+    function fmtDisplay(d) {
+        if (!d) return '';
+        return `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`;
+    }
+    function parseDate(str) {
+        if (!str) return null;
+        const [y,m,d] = str.split('-').map(Number);
+        return new Date(y, m-1, d);
+    }
+    function sameDay(a, b) {
+        return a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+    }
+    function clamp(d, lo, hi) {
+        if (lo && d < lo) return lo;
+        if (hi && d > hi) return hi;
+        return d;
+    }
+
+    function updateLabel() {
+        if (startDate && endDate) {
+            labelEl.textContent = `${fmtDisplay(startDate)}  →  ${fmtDisplay(endDate)}`;
+        } else if (startDate) {
+            labelEl.textContent = `${fmtDisplay(startDate)}  →  …`;
+        } else {
+            labelEl.textContent = 'Select date range';
+        }
+    }
+    function updateRangeDisplay() {
+        if (startDate && endDate) {
+            rangeDisp.textContent = `${fmtDisplay(startDate)}  –  ${fmtDisplay(endDate)}`;
+            rangeDisp.classList.add('drp-has-range');
+            applyBtn.disabled = false;
+        } else if (startDate) {
+            rangeDisp.textContent = `${fmtDisplay(startDate)}  –  pick end date`;
+            rangeDisp.classList.remove('drp-has-range');
+            applyBtn.disabled = true;
+        } else {
+            rangeDisp.textContent = 'No range selected';
+            rangeDisp.classList.remove('drp-has-range');
+            applyBtn.disabled = true;
+        }
+    }
+
+    function renderMonth(container, year, month) {
+        container.innerHTML = '';
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month+1, 0).getDate();
+        const effectiveEnd = endDate || (selecting ? (hoverDate || null) : null);
+
+        for (let i = 0; i < firstDay; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'drp-day drp-day-empty';
+            container.appendChild(empty);
+        }
+
+        const colOfFirst = firstDay;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const date = new Date(year, month, d);
+            const el = document.createElement('div');
+            el.className = 'drp-day';
+            el.textContent = d;
+            el.dataset.date = fmt(date);
+
+            if (sameDay(date, today))    el.classList.add('drp-day-today');
+            if (sameDay(date, startDate)) el.classList.add('drp-day-start');
+            if (endDate && sameDay(date, endDate)) el.classList.add('drp-day-end');
+
+            const rangeEnd = effectiveEnd;
+            if (startDate && rangeEnd) {
+                const lo = startDate <= rangeEnd ? startDate : rangeEnd;
+                const hi = startDate <= rangeEnd ? rangeEnd : startDate;
+                if (date > lo && date < hi) {
+                    el.classList.add('drp-day-in-range');
+                    // determine column position (0-6 = Su-Sa)
+                    const col = (colOfFirst + d - 1) % 7;
+                    if (col === 0) el.classList.add('drp-day-range-start-of-row');
+                    if (col === 6) el.classList.add('drp-day-range-end-of-row');
+                } else if (selecting && hoverDate && !endDate) {
+                    // hover preview for second pick
+                    const hlo = startDate <= hoverDate ? startDate : hoverDate;
+                    const hhi = startDate <= hoverDate ? hoverDate : startDate;
+                    if (date > hlo && date < hhi) el.classList.add('drp-day-hover-range');
+                }
+            }
+
+            el.addEventListener('click', () => onDayClick(date));
+            el.addEventListener('mouseenter', () => onDayHover(date));
+            container.appendChild(el);
+        }
+    }
+
+    function renderBothMonths() {
+        // Left: viewYear/viewMonth, Right: next month
+        let ry = viewMonth === 11 ? viewYear+1 : viewYear;
+        let rm = viewMonth === 11 ? 0 : viewMonth+1;
+        leftTitle.textContent  = `${MONTHS[viewMonth]} ${viewYear}`;
+        rightTitle.textContent = `${MONTHS[rm]} ${ry}`;
+        renderMonth(daysLeft,  viewYear, viewMonth);
+        renderMonth(daysRight, ry, rm);
+    }
+
+    function onDayClick(date) {
+        if (!selecting || (startDate && date < startDate)) {
+            // start fresh
+            startDate = date;
+            endDate = null;
+            selecting = true;
+        } else {
+            // set end
+            if (date < startDate) {
+                endDate = startDate;
+                startDate = date;
+            } else {
+                endDate = date;
+            }
+            selecting = false;
+        }
+        renderBothMonths();
+        updateRangeDisplay();
+    }
+
+    function onDayHover(date) {
+        hoverDate = date;
+        if (selecting && startDate && !endDate) {
+            renderBothMonths();
+        }
+    }
+
+    function openPopup() {
+        // Initialise view to include the current active range
+        if (activeFilters.dateFrom) {
+            const d = parseDate(activeFilters.dateFrom);
+            startDate = d;
+            viewYear  = d.getFullYear();
+            viewMonth = d.getMonth();
+        }
+        if (activeFilters.dateTo) {
+            endDate = parseDate(activeFilters.dateTo);
+        }
+        selecting = false;
+        renderBothMonths();
+        updateRangeDisplay();
+        popup.removeAttribute('hidden');
+        trigger.classList.add('drp-open');
+        trigger.setAttribute('aria-expanded', 'true');
+        // Flip if out of viewport
+        requestAnimationFrame(() => {
+            const rect = popup.getBoundingClientRect();
+            if (rect.right > window.innerWidth - 8) {
+                popup.style.left = 'auto';
+                popup.style.right = '0';
+            } else {
+                popup.style.left = '0';
+                popup.style.right = 'auto';
+            }
+            if (rect.bottom > window.innerHeight - 8) {
+                popup.style.top = 'auto';
+                popup.style.bottom = 'calc(100% + 8px)';
+            } else {
+                popup.style.top = 'calc(100% + 8px)';
+                popup.style.bottom = 'auto';
+            }
+        });
+    }
+
+    function closePopup() {
+        popup.setAttribute('hidden', '');
+        trigger.classList.remove('drp-open');
+        trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    function applyRange() {
+        if (!startDate || !endDate) return;
+        activeFilters.datePreset = 'custom';
+        activeFilters.dateFrom = fmt(startDate);
+        activeFilters.dateTo   = fmt(endDate);
+        // keep hidden inputs in sync
+        const elFrom = document.getElementById('filter-date-from');
+        const elTo   = document.getElementById('filter-date-to');
+        if (elFrom) elFrom.value = activeFilters.dateFrom;
+        if (elTo)   elTo.value   = activeFilters.dateTo;
+        // deactivate preset pills
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        updateLabel();
+        closePopup();
+        buildViewModel();
+    }
+
+    // ── Wire up shortcut chips ──
+    document.querySelectorAll('.drp-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('.drp-chip').forEach(c => c.classList.remove('drp-chip-active'));
+            chip.classList.add('drp-chip-active');
+            const sc = chip.dataset.shortcut;
+            const now = new Date(); now.setHours(0,0,0,0);
+            let from = new Date(now), to = new Date(now);
+            if (sc === 'today') {
+                /* default */
+            } else if (sc === 'yesterday') {
+                from.setDate(now.getDate()-1);
+                to.setDate(now.getDate()-1);
+            } else if (sc === '7d') {
+                from.setDate(now.getDate()-7);
+            } else if (sc === '30d') {
+                from.setDate(now.getDate()-30);
+            } else if (sc === 'month') {
+                from = new Date(now.getFullYear(), now.getMonth(), 1);
+                to   = new Date(now.getFullYear(), now.getMonth()+1, 0);
+            } else if (sc === 'year') {
+                from = new Date(now.getFullYear(), 0, 1);
+                to   = new Date(now.getFullYear(), 11, 31);
+            }
+            startDate = from; endDate = to; selecting = false;
+            viewYear  = from.getFullYear(); viewMonth = from.getMonth();
+            renderBothMonths();
+            updateRangeDisplay();
+        });
+    });
+
+    // ── Month navigation ──
+    prevMonthBtn.addEventListener('click', () => {
+        if (viewMonth === 0) { viewYear--; viewMonth = 11; }
+        else viewMonth--;
+        renderBothMonths();
+    });
+    nextMonthBtn.addEventListener('click', () => {
+        if (viewMonth === 11) { viewYear++; viewMonth = 0; }
+        else viewMonth++;
+        renderBothMonths();
+    });
+
+    // ── Apply / Cancel ──
+    applyBtn.addEventListener('click', applyRange);
+    cancelBtn.addEventListener('click', closePopup);
+
+    // ── Toggle open/close ──
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!popup.hasAttribute('hidden')) {
+            closePopup();
+        } else {
+            openPopup();
+        }
+    });
+
+    // ── Close on outside click ──
+    document.addEventListener('click', (e) => {
+        if (!popup.hasAttribute('hidden') && !popup.contains(e.target) && e.target !== trigger) {
+            closePopup();
+        }
+    });
+
+    // ── Close on Escape ──
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !popup.hasAttribute('hidden')) closePopup();
+    });
+
+    // ── Sync initial label if filters already set ──
+    if (activeFilters.dateFrom && activeFilters.dateTo) {
+        startDate = parseDate(activeFilters.dateFrom);
+        endDate   = parseDate(activeFilters.dateTo);
+        updateLabel();
+    }
+}
+
 function setDateRangeFromPreset(preset) {
+
     // Always use the actual current date so presets stay relative to today
     const now = new Date();
     const baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // midnight local
@@ -2066,6 +2373,15 @@ function setDateRangeFromPreset(preset) {
 
     document.getElementById('filter-date-from').value = activeFilters.dateFrom;
     document.getElementById('filter-date-to').value = activeFilters.dateTo;
+
+    // Sync the DRP trigger label
+    const labelEl = document.getElementById('drp-label');
+    if (labelEl) {
+        const MONTHS = ['January','February','March','April','May','June',
+                        'July','August','September','October','November','December'];
+        const fmtD = (d) => `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`;
+        labelEl.textContent = `${fmtD(fromDate)}  →  ${fmtD(toDate)}`;
+    }
 }
 
 // Helper to compute previous comparative period dates
