@@ -1,137 +1,161 @@
-@import url("https://fonts.googleapis.com/css2?family=Calistoga&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
-
 /* ==========================================================================
    DESIGN SYSTEM - CSS VARIABLES & ROOT
    ========================================================================== */
 :root {
     /* Typography */
-    --font-heading: 'Calistoga', Georgia, serif;
-    --font-body: 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-heading: 'SF Pro Display', -apple-system, 'BlinkMacSystemFont', 'Helvetica Neue', sans-serif;
+    --font-body: 'SF Pro Text', -apple-system, 'BlinkMacSystemFont', sans-serif;
+    --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, 'DejaVu Sans Mono', monospace;
     
     /* Animation settings */
-    --transition-smooth: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    --transition-fast: all 0.15s ease-out;
+    --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     
-    /* Blur settings */
-    --glass-blur: blur(12px);
-
-    /* Shared Colors */
-    --orange: #f97316;
+    /* Glass blur baseline */
+    --glass-blur: blur(24px) saturate(180%);
 }
 
 body.dark-mode {
-    --bg-main: #0B0F19;               /* Deep slate blue-black canvas */
-    --bg-sidebar: #020617;             /* Inverted deep background for sidebar */
-    --bg-card: #1E293B;
-    --border-color: #334155;
-    --text-primary: #F8FAFC;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
+    --bg-main: #0a0e1a;
+    --bg-sidebar: rgba(10, 14, 26, 0.4);
+    --bg-card: rgba(255, 255, 255, 0.06);
+    --border-color: rgba(255, 255, 255, 0.16);
+    --text-primary: #f0f4ff;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
     
-    --accent-primary: #3B82F6;        /* Electric Blue for dark-theme */
-    --accent-secondary: #60A5FA;
-    --accent-gradient: linear-gradient(135deg, #3B82F6, #60A5FA);
+    --accent-primary: #82b1ff;     /* Bright Blue Accent */
+    --accent-primary-rgb: 130, 177, 255;
+    --accent-secondary: #60a5fa;
+    --accent-gradient: linear-gradient(135deg, #82b1ff, #60a5fa);
+    --accent-blue: #00d4ff;        /* Electric Cyan */
+    --accent-blue-rgb: 0, 212, 255;
+    --accent-green: #10b981;       /* Emerald */
+    --accent-green-rgb: 16, 185, 129;
+    --accent-red: #f43f5e;         /* Coral Red */
+    --accent-red-rgb: 244, 63, 94;
+    --accent-yellow: #fbbf24;      /* Warm Amber */
+    --accent-yellow-rgb: 251, 191, 36;
     
-    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    --card-shadow-hover: 0 20px 25px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(59, 130, 246, 0.15);
+    --card-shadow: rgba(0, 0, 0, 0.25);
+    --card-glow: rgba(130, 177, 255, 0.12);
+    --shadow-color: rgba(0, 0, 0, 0.4);
 
     /* UI Kit Color Tokens */
-    --color-cloud: #1E293B;
-    --color-edge: #334155;
-    --color-mist: #94A3B8;
-    --color-ink: #3B82F6;
+    --color-cloud: rgba(255, 255, 255, 0.06);
+    --color-edge: rgba(255, 255, 255, 0.16);
+    --color-mist: #cbd5e1;
+    --color-ink: #82b1ff;
 
     /* Theme Mappings */
-    --glass-bg: #1E293B;
-    --glass-border: #334155;
-    --glass-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    --glass-shadow-high: 0 20px 25px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(59, 130, 246, 0.15);
-    --glass-radius: 14px;
+    --glass-bg: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.16);
+    --glass-shadow: rgba(0, 0, 0, 0.25);
+    --glass-shadow-high: rgba(0, 0, 0, 0.4);
+    --glass-radius: 16px;
     --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
     
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.3);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,0.35);
-    --shadow-xl: 0 20px 25px rgba(0,0,0,0.4);
-    --shadow-accent: 0 4px 14px rgba(59, 130, 246, 0.2);
-    --shadow-accent-lg: 0 8px 24px rgba(59, 130, 246, 0.3);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.15);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.2);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.25);
+    --shadow-xl: 0 20px 25px rgba(0,0,0,0.3);
+    --shadow-accent: 0 4px 14px rgba(130, 177, 255, 0.25);
+    --shadow-accent-lg: 0 8px 24px rgba(130, 177, 255, 0.35);
 }
 
 body.light-mode {
-    --bg-main: #FAFAFA;               /* Light warm off-white canvas */
-    --bg-sidebar: #0F172A;             /* Inverted deep slate background for sidebar */
-    --bg-card: #FFFFFF;
-    --border-color: #E2E8F0;
-    --text-primary: #0F172A;          /* Deep slate */
-    --text-secondary: #64748B;        /* Slate-500 */
-    --text-muted: #94A3B8;
+    --bg-main: #fcfcff;
+    --bg-sidebar: rgba(255, 255, 255, 0.55);
+    --bg-card: rgba(255, 255, 255, 0.7);
+    --border-color: rgba(0, 0, 0, 0.07);
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #94a3b8;
     
-    --accent-primary: #0052FF;        /* Signature Electric Blue */
-    --accent-secondary: #4D7CFF;
-    --accent-gradient: linear-gradient(135deg, #0052FF, #4D7CFF);
+    --accent-primary: #1f7ae0;     /* smallcase brand blue */
+    --accent-primary-rgb: 31, 122, 224;
+    --accent-secondary: #4ea3f7;
+    --accent-gradient: linear-gradient(135deg, #1f7ae0, #4ea3f7);
+    --accent-blue: #0284c7;        /* Sky Blue */
+    --accent-blue-rgb: 2, 132, 199;
+    --accent-green: #059669;       /* Forest Green */
+    --accent-green-rgb: 5, 150, 105;
+    --accent-red: #e11d48;         /* Rose Red */
+    --accent-red-rgb: 225, 29, 72;
+    --accent-yellow: #d97706;      /* Amber Yellow */
+    --accent-yellow-rgb: 217, 119, 6;
     
-    --card-shadow: 0 4px 6px rgba(15, 23, 42, 0.05);
-    --card-shadow-hover: 0 20px 25px rgba(15, 23, 42, 0.08), 0 4px 14px rgba(0, 82, 255, 0.12);
+    --card-shadow: rgba(15, 23, 42, 0.04);
+    --card-glow: rgba(31, 122, 224, 0.03);
+    --shadow-color: rgba(15, 23, 42, 0.01);
 
     /* UI Kit Color Tokens */
-    --color-cloud: #FFFFFF;
-    --color-edge: #E2E8F0;
-    --color-mist: #64748B;
-    --color-ink: #0052FF;
+    --color-cloud: rgba(255, 255, 255, 0.7);
+    --color-edge: rgba(0, 0, 0, 0.07);
+    --color-mist: #334155;
+    --color-ink: #1f7ae0;
 
     /* Theme Mappings */
-    --glass-bg: #FFFFFF;
-    --glass-border: #E2E8F0;
-    --glass-shadow: 0 4px 6px rgba(15, 23, 42, 0.05);
-    --glass-shadow-high: 0 20px 25px rgba(15, 23, 42, 0.08), 0 4px 14px rgba(0, 82, 255, 0.12);
-    --glass-radius: 14px;
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.07);
+    --glass-shadow: rgba(15, 23, 42, 0.04);
+    --glass-shadow-high: rgba(15, 23, 42, 0.08);
+    --glass-radius: 16px;
     --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
     
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,0.08);
-    --shadow-xl: 0 20px 25px rgba(0,0,0,0.1);
-    --shadow-accent: 0 4px 14px rgba(0, 82, 255, 0.22);
-    --shadow-accent-lg: 0 8px 24px rgba(0, 82, 255, 0.3);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.04);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.05);
+    --shadow-xl: 0 20px 25px rgba(0,0,0,0.07);
+    --shadow-accent: 0 4px 14px rgba(31, 122, 224, 0.15);
+    --shadow-accent-lg: 0 8px 24px rgba(31, 122, 224, 0.25);
 }
 
 body.black-mode {
-    --bg-main: #020617;               /* Pitch-black canvas */
-    --bg-sidebar: #090d16;             /* Deepest background for sidebar */
-    --bg-card: #0F172A;
-    --border-color: #1E293B;
-    --text-primary: #F8FAFC;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
+    --bg-main: #000000;
+    --bg-sidebar: rgba(0, 0, 0, 0.65);
+    --bg-card: rgba(20, 20, 20, 0.35);
+    --border-color: rgba(255, 255, 255, 0.10);
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
     
-    --accent-primary: #3B82F6;
-    --accent-secondary: #60A5FA;
-    --accent-gradient: linear-gradient(135deg, #3B82F6, #60A5FA);
+    --accent-primary: #c084fc;     /* Brighter Violet */
+    --accent-primary-rgb: 192, 132, 252;
+    --accent-secondary: #d8b4fe;
+    --accent-gradient: linear-gradient(135deg, #c084fc, #d8b4fe);
+    --accent-blue: #38bdf8;        /* Brighter Cyan */
+    --accent-blue-rgb: 56, 189, 248;
+    --accent-green: #34d399;       /* Brighter Emerald */
+    --accent-green-rgb: 52, 211, 153;
+    --accent-red: #fb7185;         /* Brighter Coral */
+    --accent-red-rgb: 251, 113, 133;
+    --accent-yellow: #fcd34d;      /* Brighter Yellow */
+    --accent-yellow-rgb: 252, 211, 77;
     
-    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
-    --card-shadow-hover: 0 20px 25px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(59, 130, 246, 0.15);
+    --card-shadow: rgba(0, 0, 0, 0.85);
+    --card-glow: rgba(56, 189, 248, 0.05);
+    --shadow-color: rgba(0, 0, 0, 0.95);
 
     /* UI Kit Color Tokens */
-    --color-cloud: #0F172A;
-    --color-edge: #1E293B;
-    --color-mist: #94A3B8;
-    --color-ink: #3B82F6;
+    --color-cloud: rgba(20, 20, 20, 0.35);
+    --color-edge: rgba(255, 255, 255, 0.10);
+    --color-mist: #cbd5e1;
+    --color-ink: #c084fc;
 
     /* Theme Mappings */
-    --glass-bg: #0F172A;
-    --glass-border: #1E293B;
-    --glass-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
-    --glass-shadow-high: 0 20px 25px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(59, 130, 246, 0.15);
-    --glass-radius: 14px;
+    --glass-bg: rgba(20, 20, 20, 0.35);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-shadow: rgba(0, 0, 0, 0.85);
+    --glass-shadow-high: rgba(0, 0, 0, 0.95);
+    --glass-radius: 16px;
     --glass-easing: cubic-bezier(0.16, 1, 0.3, 1);
     
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.5);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,0.55);
-    --shadow-xl: 0 20px 25px rgba(0,0,0,0.6);
-    --shadow-accent: 0 4px 14px rgba(59, 130, 246, 0.15);
-    --shadow-accent-lg: 0 8px 24px rgba(59, 130, 246, 0.25);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.6);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.6);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.7);
+    --shadow-xl: 0 20px 25px rgba(0,0,0,0.8);
+    --shadow-accent: 0 4px 14px rgba(192, 132, 252, 0.15);
+    --shadow-accent-lg: 0 8px 24px rgba(192, 132, 252, 0.25);
 }
 
 /* ==========================================================================
@@ -3900,7 +3924,7 @@ input[type="text"],
 select:focus,
 input:focus {
     border-color: var(--accent-primary) !important;
-    box-shadow: 0 0 0 2px rgba(0, 82, 255, 0.15) !important;
+    box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.15) !important;
 }
 
 /* --- Minimalist Modern Tabs, Pills and Buttons --- */
@@ -4160,7 +4184,7 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.08) !important;
 }
 .scrollbar-themed::-webkit-scrollbar-thumb:hover {
-    background: rgba(31, 122, 224, 0.3) !important;
+    background: rgba(var(--accent-primary-rgb), 0.3) !important;
 }
 
 /* ==========================================================================
@@ -4247,7 +4271,7 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
 }
 
 .custom-select-trigger.active {
-    box-shadow: 0 0 0 2px rgba(0, 82, 255, 0.15) !important;
+    box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.15) !important;
 }
 
 .custom-select-value {
@@ -4317,13 +4341,8 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
 }
 
 .custom-select-option:hover {
-    background: rgba(0, 82, 255, 0.08) !important;
+    background: rgba(var(--accent-primary-rgb), 0.08) !important;
     color: var(--text-primary) !important;
-}
-
-body.dark-mode .custom-select-option:hover,
-body.black-mode .custom-select-option:hover {
-    background: rgba(59, 130, 246, 0.1) !important;
 }
 
 .custom-select-option.selected {
