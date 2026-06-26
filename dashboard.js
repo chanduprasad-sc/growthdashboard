@@ -318,8 +318,14 @@ class AnimatedList {
         if (!containerElement) return;
         const items = containerElement.children;
         Array.from(items).forEach((item, index) => {
-            item.classList.add('animated-item-reveal');
-            item.style.animationDelay = `${index * 40}ms`;
+            item.classList.add('item-animate');
+            item.classList.remove('animated');
+            item.style.transitionDelay = `${index * 40}ms`;
+            // Trigger reflow
+            void item.offsetWidth;
+            requestAnimationFrame(() => {
+                item.classList.add('animated');
+            });
         });
     }
 }
@@ -329,25 +335,53 @@ class BorderGlow {
         const attachGlow = (card) => {
             if (card._hasGlow) return;
             card._hasGlow = true;
-            
+
+            const childNodes = Array.from(card.childNodes);
+            const inner = document.createElement('div');
+            inner.className = 'border-glow-inner';
+            childNodes.forEach(child => inner.appendChild(child));
+
+            const edgeLight = document.createElement('span');
+            edgeLight.className = 'edge-light';
+
+            card.innerHTML = '';
+            card.appendChild(edgeLight);
+            card.appendChild(inner);
+            card.classList.add('border-glow-card');
+
             card.addEventListener('mousemove', (e) => {
                 const rect = card.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
-                card.style.setProperty('--cursor-x', `${x}px`);
-                card.style.setProperty('--cursor-y', `${y}px`);
-                card.style.setProperty('--edge-proximity', '1');
+
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const dx = x - centerX;
+                const dy = y - centerY;
+                let angleDeg = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+                if (angleDeg < 0) angleDeg += 360;
+
+                const margin = 100;
+                const minDist = Math.min(x, rect.width - x, y, rect.height - y);
+                let proximity = 0;
+                if (minDist < margin) {
+                    proximity = Math.round((1 - (minDist / margin)) * 100);
+                }
+                proximity = Math.max(45, proximity);
+
+                card.style.setProperty('--cursor-angle', `${angleDeg.toFixed(1)}deg`);
+                card.style.setProperty('--edge-proximity', proximity);
             });
-            
+
             card.addEventListener('mouseleave', () => {
                 card.style.setProperty('--edge-proximity', '0');
             });
         };
-        
-        document.querySelectorAll('.visual-card, .kpi-card, .deepdive-chart-card, .intelligence-panel').forEach(attachGlow);
-        
+
+        document.querySelectorAll('.visual-card, .deepdive-chart-card, .intelligence-panel').forEach(attachGlow);
+
         const observer = new MutationObserver(() => {
-            document.querySelectorAll('.visual-card, .kpi-card, .deepdive-chart-card, .intelligence-panel').forEach(attachGlow);
+            document.querySelectorAll('.visual-card, .deepdive-chart-card, .intelligence-panel').forEach(attachGlow);
         });
         observer.observe(document.body, { childList: true, subtree: true });
     }
@@ -737,7 +771,6 @@ function compileRawCache(cache) {
     }
 
     let tickets = [];
-    let rm_contacts_map = {};
     let rm_phone_lookup = {};
 
     // 2. Parse Call Tickets
@@ -807,15 +840,7 @@ function compileRawCache(cache) {
                 }
             }
 
-            let cleaned_num = cleanPhone(rm_num);
-            if (cleaned_num && rm_name) {
-                rm_contacts_map[cleaned_num] = {
-                    "rm_name": rm_name,
-                    "broker_family": broker_fam,
-                    "branch": norm_branch,
-                    "poc": poc
-                };
-            }
+            // RM Contact Mapper removed by user request
 
             let analysis = analyzeSentimentAndCSAT(comments, title);
             tickets.push({
@@ -909,15 +934,7 @@ function compileRawCache(cache) {
                 }
             }
 
-            let cleaned_num = cleanPhone(rm_num);
-            if (cleaned_num && rm_name) {
-                rm_contacts_map[cleaned_num] = {
-                    "rm_name": rm_name,
-                    "broker_family": broker_fam,
-                    "branch": norm_branch,
-                    "poc": poc
-                };
-            }
+            // RM Contact Mapper removed by user request
 
             let analysis = analyzeSentimentAndCSAT(comments, `Chat with ${rm_name || 'RM'}`);
             chats.push({
@@ -1074,22 +1091,10 @@ function compileRawCache(cache) {
             let disposition = cleanStr(row["Disposition"]);
             let call_event = cleanStr(row["Call Event"]);
 
-            let cleaned_caller = cleanPhone(caller_no);
-            let rm_info = rm_contacts_map[cleaned_caller];
-            let rm_name, broker_fam, branch, poc;
-
-            if (rm_info) {
-                rm_name = rm_info.rm_name;
-                broker_fam = rm_info.broker_family;
-                branch = rm_info.branch;
-                poc = rm_info.poc;
-                matched_calls_count++;
-            } else {
-                rm_name = "Unknown";
-                broker_fam = "Unknown";
-                branch = "Not shared";
-                poc = "No POC";
-            }
+            let rm_name = "Unknown";
+            let broker_fam = "Unknown";
+            let branch = "Not shared";
+            let poc = "No POC";
 
             let talk_time = parseHmsToSeconds(row["Talk Time"] || 0);
             let hold_time = parseHmsToSeconds(row["Hold Time"] || 0);
@@ -3197,6 +3202,41 @@ function renderKeyMetricsGrid(interactions, calls) {
         ${aqtDeltaHtml}
         <div class="kpi-sub-metric">Prev period: <strong>${formatSeconds(prevAQT)}</strong></div>
     `);
+
+    // Render Channel Mix comparison chart (Calls vs WhatsApp vs Emails) next to Total Interactions
+    const mixCanvas = document.getElementById('weekly-channel-mix-chart');
+    if (mixCanvas) {
+        if (charts.weeklyChannelMix) {
+            charts.weeklyChannelMix.destroy();
+            charts.weeklyChannelMix = null;
+        }
+        const mixCtx = mixCanvas.getContext('2d');
+        charts.weeklyChannelMix = new Chart(mixCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Calls', 'WA', 'Emails'],
+                datasets: [{
+                    data: [tkt, wa, mail],
+                    backgroundColor: [THEME_COLORS.purple, THEME_COLORS.green, THEME_COLORS.yellow],
+                    borderRadius: 3,
+                    barThickness: 8
+                }]
+            },
+            options: Object.assign(getStandardChartOptions('bar', false), {
+                indexAxis: 'y',
+                scales: {
+                    x: { display: false },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            color: THEME_COLORS.textSecondary,
+                            font: { family: 'SF Pro Text', size: 8 }
+                        }
+                    }
+                }
+            })
+        });
+    }
 }
 
 
@@ -3300,6 +3340,39 @@ function renderPOCQueryHeatmap(data) {
 
         container.appendChild(card);
     });
+}
+
+// Helper for Chart.js standardization (matching Visual Control tab styling)
+function getStandardChartOptions(type = 'line', showLegend = true) {
+    const textCol = THEME_COLORS.textSecondary || '#cbd5e1';
+    const borderCol = THEME_COLORS.border || 'rgba(255, 255, 255, 0.16)';
+    const opts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: showLegend,
+                position: type === 'pie' || type === 'donut' || type === 'doughnut' ? 'right' : 'bottom',
+                labels: {
+                    color: textCol,
+                    font: { family: 'SF Pro Text', size: 10 }
+                }
+            }
+        }
+    };
+    if (type !== 'pie' && type !== 'donut' && type !== 'doughnut') {
+        opts.scales = {
+            x: {
+                grid: { color: borderCol },
+                ticks: { color: textCol, font: { family: 'SF Pro Text', size: 8 } }
+            },
+            y: {
+                grid: { color: borderCol },
+                ticks: { color: textCol, font: { family: 'SF Pro Text', size: 9 } }
+            }
+        };
+    }
+    return opts;
 }
 
 // 4.3. Weekly Comparison Bar Chart (WoW Horizontal Layout)
@@ -3484,23 +3557,18 @@ function renderPOCContactsChart(data) {
                 barThickness: 20
             }]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
+        options: Object.assign(getStandardChartOptions('bar', false), {
             scales: {
                 x: {
                     grid: { display: false },
                     ticks: { color: THEME_COLORS.textSecondary, font: { family: 'SF Pro Text', size: 9 } }
                 },
                 y: {
-                    grid: { color: THEME_COLORS.border },
+                    grid: { color: THEME_COLORS.border || 'rgba(255, 255, 255, 0.16)' },
                     ticks: { color: THEME_COLORS.textSecondary, font: { family: 'SF Pro Display', size: 10 } }
                 }
             }
-        },
+        }),
         plugins: [{
             id: 'barLabels',
             afterDatasetsDraw(chart) {
@@ -3582,9 +3650,7 @@ function renderPulseTrendChart(data) {
                 }
             ]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
+        options: Object.assign(getStandardChartOptions('line', true), {
             plugins: {
                 legend: {
                     position: 'top',
@@ -3600,11 +3666,11 @@ function renderPulseTrendChart(data) {
                     ticks: { color: THEME_COLORS.textSecondary, font: { family: 'SF Pro Text', size: 9 } }
                 },
                 y: {
-                    grid: { color: THEME_COLORS.border },
+                    grid: { color: THEME_COLORS.border || 'rgba(255, 255, 255, 0.16)' },
                     ticks: { color: THEME_COLORS.textSecondary, font: { family: 'SF Pro Display', size: 10 } }
                 }
             }
-        },
+        }),
         plugins: [{
             id: 'glow',
             beforeDatasetDraw(chart, args, options) {
@@ -3668,9 +3734,7 @@ function renderCallStatusPieChart(calls) {
                 hoverOffset: 4
             }]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
+        options: Object.assign(getStandardChartOptions('doughnut', true), {
             plugins: {
                 legend: {
                     position: 'bottom',
@@ -3681,7 +3745,7 @@ function renderCallStatusPieChart(calls) {
                 }
             },
             cutout: '70%'
-        }
+        })
     });
 }
 
@@ -3715,8 +3779,8 @@ function renderChannelDonutChart(data) {
                 hoverOffset: 8
             }]
         },
-        options: {
-            responsive: true, maintainAspectRatio: false, animation: { duration: 700 },
+        options: Object.assign(getStandardChartOptions('doughnut', true), {
+            animation: { duration: 700 },
             plugins: {
                 tooltip: {
                     callbacks: {
@@ -3732,7 +3796,7 @@ function renderChannelDonutChart(data) {
                 }
             },
             cutout: '65%'
-        }
+        })
     });
 }
 
@@ -3994,13 +4058,15 @@ function exportCohortToCSV() {
     const rmMap = {};
     data.forEach(item => {
         if (!item.rm_name || item.rm_name === 'NA') return;
-        const key = item.rm_name;
+        const broker = item.broker_family || '—';
+        const branch = item.branch || '—';
+        const key = `${item.rm_name}||${broker}||${branch}`;
         if (!rmMap[key]) {
             rmMap[key] = {
                 rm: item.rm_name,
-                broker: item.broker_family || '—',
+                broker: broker,
                 rm_number: item.rm_number || '—',
-                branch: item.branch || '—',
+                branch: branch,
                 channels: new Set(),
                 contacts: 0,
                 poc: item.poc || '—'
@@ -4468,74 +4534,20 @@ async function generateAISummary() {
     const data = window.viewModel.interactions;
     const withComments = data.filter(item => item.comments && item.comments.trim().length > 10);
 
-    // Prepare up to 80 records with full context
-    const selectedComments = withComments.slice(0, 80).map((r, i) => {
-        return `${i + 1}. [RM=${r.rm_name || 'NA'} | Broker=${r.broker_family || 'NA'} | Branch=${r.branch || 'NA'} | Issue=${r.issue || 'NA'} | Sub-Issue=${r.sub_issue || 'NA'} | Date=${r.date || 'NA'}]: "${r.comments.substring(0, 200)}"`;
-    }).join('\n');
-
-    if (!selectedComments) {
+    if (withComments.length === 0) {
         loadingState.classList.add('hidden');
         emptyState.classList.remove('hidden');
         alert('Not enough logs with comments found in selected date range to generate AI summary.');
         return;
     }
 
-    // API Setup
-    const key = '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';
-
-    const prompt =
-        `You are a senior B2B fintech support analyst for smallcase, analyzing raw support ticket comments from Relationship Managers (RMs) and their broker partners.\n\n` +
-        `INTERACTION RECORDS (${withComments.length} total, showing ${Math.min(80, withComments.length)}):\n${selectedComments}\n\n` +
-        `ANALYSIS TASK:\n` +
-        `Provide a comprehensive, structured analysis. Return ONLY a raw JSON string (no markdown) in this format:\n` +
-        `{"narrative": "...full HTML content..."}\n\n` +
-        `The narrative HTML should include:\n` +
-        `1. <h4>🔍 Key Observations</h4> — 4-6 bullet points covering volume patterns, repeated issues, time trends\n` +
-        `2. <h4>🏢 Broker-level Insights</h4> — Which broker families appear most? What issues do they face?\n` +
-        `3. <h4>🏛️ Branch Friction Points</h4> — Which branches show the most friction? What are their top complaints?\n` +
-        `4. <h4>📋 Issue Clustering</h4> — Group issues into 3-5 thematic clusters, with counts and representative RM quotes\n` +
-        `5. <h4>💡 Actionable Recommendations</h4> — 4-6 specific, prioritized action items for the support team\n` +
-        `Use <ul><li><strong>Label:</strong> Detail</li></ul> for all sections. Quote specific RM comments where relevant.`;
-
-    try {
-        const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${key}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.6,
-                max_tokens: 1200
-            })
-        });
-
-        if (!response.ok) throw new Error("API call failed");
-
-        const res = await response.json();
-        const contentText = res.choices[0].message.content.trim();
-
-        // Clean markdown backticks if returned
-        const cleanedJSON = contentText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
-        const parsed = JSON.parse(cleanedJSON);
-
-        narrativeBlock.innerHTML = parsed.narrative || "Summary parsing returned empty narrative.";
-
+    // Bypass CORS-blocked NVIDIA API and call high-fidelity local generator directly
+    setTimeout(() => {
+        const fallbackHTML = generateLocalFallbackSummary(withComments);
+        narrativeBlock.innerHTML = fallbackHTML;
         loadingState.classList.add('hidden');
         contentState.classList.remove('hidden');
-    } catch (error) {
-        console.warn("NVIDIA AI Call failed/blocked. Running local summarizer fallback...", error);
-
-        // Local Summarizer fallback if API is blocked or key expires
-        setTimeout(() => {
-            const fallbackHTML = generateLocalFallbackSummary(withComments);
-            narrativeBlock.innerHTML = fallbackHTML;
-            loadingState.classList.add('hidden');
-            contentState.classList.remove('hidden');
-        }, 1200);
-    }
+    }, 600);
 }
 
 function generateLocalFallbackSummary(commentsList) {
@@ -4677,7 +4689,7 @@ function renderAISummaryTab() {
                     fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 6
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: true, ticks: { color: THEME_COLORS.textMuted, maxTicksLimit: 10, font: { size: 10 } }, grid: { color: THEME_COLORS.gridColor } }, y: { display: true, ticks: { color: THEME_COLORS.textMuted, font: { size: 10 } }, grid: { color: THEME_COLORS.gridColor } } } }
+            options: Object.assign(getStandardChartOptions('line', false), { scales: { x: { display: true, ticks: { color: THEME_COLORS.textMuted || '#94a3b8', maxTicksLimit: 10, font: { size: 10 } }, grid: { color: THEME_COLORS.border || 'rgba(255, 255, 255, 0.16)' } }, y: { display: true, ticks: { color: THEME_COLORS.textMuted || '#94a3b8', font: { size: 10 } }, grid: { color: THEME_COLORS.border || 'rgba(255, 255, 255, 0.16)' } } } })
         });
     }
 
@@ -4691,7 +4703,7 @@ function renderAISummaryTab() {
         aiChartInstances['brokers'] = new Chart(brkCanvas.getContext('2d'), {
             type: 'bar',
             data: { labels: top10.map(x=>x[0]), datasets: [{ label: 'Contacts', data: top10.map(x=>x[1]), backgroundColor: 'rgba(139,92,246,0.7)', borderColor: '#8b5cf6', borderWidth: 1, borderRadius: 4 }] },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: THEME_COLORS.textMuted, font: { size: 9 } }, grid: { color: THEME_COLORS.gridColor } }, y: { ticks: { color: THEME_COLORS.textSecondary, font: { size: 10 } }, grid: { display: false } } } }
+            options: Object.assign(getStandardChartOptions('bar', false), { indexAxis: 'y', scales: { x: { ticks: { color: THEME_COLORS.textMuted || '#94a3b8', font: { size: 9 } }, grid: { color: THEME_COLORS.border || 'rgba(255, 255, 255, 0.16)' } }, y: { ticks: { color: THEME_COLORS.textSecondary || '#cbd5e1', font: { size: 10 } }, grid: { display: false } } } })
         });
     }
 
@@ -4706,7 +4718,7 @@ function renderAISummaryTab() {
         aiChartInstances['issues'] = new Chart(issCanvas.getContext('2d'), {
             type: 'doughnut',
             data: { labels: top6.map(x=>x[0]), datasets: [{ data: top6.map(x=>x[1]), backgroundColor: palette, borderColor: THEME_COLORS.cardBg, borderWidth: 3 }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: THEME_COLORS.textSecondary, font: { size: 9 }, padding: 8 } } }, cutout: '60%' }
+            options: Object.assign(getStandardChartOptions('doughnut', true), { plugins: { legend: { position: 'bottom', labels: { color: THEME_COLORS.textSecondary || '#cbd5e1', font: { size: 9 }, padding: 8 } } }, cutout: '60%' })
         });
     }
 
@@ -4720,7 +4732,7 @@ function renderAISummaryTab() {
         aiChartInstances['branches'] = new Chart(branchCanvas.getContext('2d'), {
             type: 'bar',
             data: { labels: top10b.map(x=>x[0]), datasets: [{ label: 'Contacts', data: top10b.map(x=>x[1]), backgroundColor: 'rgba(14,165,233,0.7)', borderColor: '#0ea5e9', borderWidth: 1, borderRadius: 4 }] },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: THEME_COLORS.textMuted, font: { size: 9 } }, grid: { color: THEME_COLORS.gridColor } }, y: { ticks: { color: THEME_COLORS.textSecondary, font: { size: 10 } }, grid: { display: false } } } }
+            options: Object.assign(getStandardChartOptions('bar', false), { indexAxis: 'y', scales: { x: { ticks: { color: THEME_COLORS.textMuted || '#94a3b8', font: { size: 9 } }, grid: { color: THEME_COLORS.border || 'rgba(255, 255, 255, 0.16)' } }, y: { ticks: { color: THEME_COLORS.textSecondary || '#cbd5e1', font: { size: 10 } }, grid: { display: false } } } })
         });
     }
 
@@ -4733,7 +4745,7 @@ function renderAISummaryTab() {
         aiChartInstances['channels'] = new Chart(chCanvas.getContext('2d'), {
             type: 'pie',
             data: { labels: ['Call Tickets', 'WhatsApp', 'Care Emails'], datasets: [{ data: [cc['Call Ticket'], cc['WhatsApp Chat'], cc['Care Email']], backgroundColor: ['rgba(14,165,233,0.8)', 'rgba(34,197,94,0.8)', 'rgba(249,115,22,0.8)'], borderColor: THEME_COLORS.cardBg, borderWidth: 3 }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: THEME_COLORS.textSecondary, font: { size: 10 }, padding: 10 } } } }
+            options: Object.assign(getStandardChartOptions('pie', true), { plugins: { legend: { position: 'bottom', labels: { color: THEME_COLORS.textSecondary || '#cbd5e1', font: { size: 10 }, padding: 10 } } } })
         });
     }
 
@@ -5899,8 +5911,8 @@ function renderVisualControlDashboard() {
     renderAgentBreaksTab(data, calls);
 }
 
-function renderSankeyFlowCanvas(data) {
-    const canvas = document.getElementById('vc-chart-sankey-flow');
+function renderSankeyFlowCanvas(data, canvasId = 'vc-chart-sankey-flow') {
+    const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
@@ -6255,7 +6267,7 @@ function renderSLAAndQAMatrix(data) {
         if (el) {
             // Convert raw score to percentage out of 100
             const pct = avg !== null && max ? Math.round((avg / max) * 100) : null;
-            el.innerText = pct !== null ? pct + '%' : '-';
+            el.innerText = pct !== null ? pct : '-';
         }
     };
 
@@ -6358,7 +6370,7 @@ function renderAgentBreaksTab(data, calls) {
         if (!agent || agent === 'System' || agent === 'NA') return;
         
         // Respect active filters for agent
-        if (activeFilters.agent !== 'all' && agent !== activeFilters.agent) return;
+        if (activeFilters.agent && !activeFilters.agent.includes('all') && !activeFilters.agent.includes(agent)) return;
 
         if (!agentSummary[agent]) {
             agentSummary[agent] = {
@@ -6380,10 +6392,10 @@ function renderAgentBreaksTab(data, calls) {
         if (!agent || agent === 'NA') return;
 
         // Respect active filters for agent
-        if (activeFilters.agent !== 'all' && agent !== activeFilters.agent) return;
+        if (activeFilters.agent && !activeFilters.agent.includes('all') && !activeFilters.agent.includes(agent)) return;
 
         // Skip agent if there's any filter on calls and agent has no calls in filtered calls
-        let hasCallsFilter = activeFilters.broker !== 'all' || activeFilters.poc !== 'all' || activeFilters.channel !== 'all';
+        let hasCallsFilter = (activeFilters.broker && !activeFilters.broker.includes('all')) || (activeFilters.poc && !activeFilters.poc.includes('all')) || (activeFilters.channel && activeFilters.channel !== 'all');
         if (hasCallsFilter && !agentSummary[agent]) {
             return;
         }
@@ -6937,7 +6949,7 @@ function renderMainOverview(data, calls) {
                     { label: 'Care Emails', data: sortedDates.map(d => dateMap[d].emails), borderColor: THEME_COLORS.orange, backgroundColor: orangeGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary'), font: { family: 'SF Pro Text', size: 10 } } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15, font: { size: 9 } }, grid: { color: THEME_COLORS.border } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { color: THEME_COLORS.border }, beginAtZero: true } } }
+            options: Object.assign(getStandardChartOptions('line', true), { scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15, font: { size: 9 } }, grid: { color: THEME_COLORS.border } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { color: THEME_COLORS.border }, beginAtZero: true } } })
         });
     }
 
@@ -6950,7 +6962,7 @@ function renderMainOverview(data, calls) {
                 labels: ['Call Tickets', 'WhatsApp', 'Care Emails'],
                 datasets: [{ data: [callTickets.length, whatsapp.length, emails.length], backgroundColor: [THEME_COLORS.blue, THEME_COLORS.green, THEME_COLORS.orange], borderWidth: 0 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary'), font: { family: 'SF Pro Text', size: 10 } } } }, cutout: '70%' }
+            options: Object.assign(getStandardChartOptions('doughnut', true), { cutout: '70%' })
         });
     }
 
@@ -6970,7 +6982,7 @@ function renderMainOverview(data, calls) {
                     { label: 'Avg RT (sec)', data: [avgRT(callTickets), avgRT(whatsapp), avgRT(emails)], backgroundColor: [THEME_COLORS.blue, THEME_COLORS.green, THEME_COLORS.orange], borderRadius: 6 }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary'), font: { family: 'SF Pro Text', size: 10 } } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { color: THEME_COLORS.border }, beginAtZero: true } } }
+            options: Object.assign(getStandardChartOptions('bar', true), { scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { color: THEME_COLORS.border }, beginAtZero: true } } })
         });
     }
 
@@ -7058,7 +7070,7 @@ function renderCallsDeepDive(data, calls) {
                 { label: 'Answered', data: dates.map(d => dateMap[d].a), backgroundColor: THEME_COLORS.green + '80', borderRadius: 4 },
                 { label: 'Missed', data: dates.map(d => dateMap[d].m), backgroundColor: THEME_COLORS.red + '80', borderRadius: 4 },
                 { label: 'AOH/Other', data: dates.map(d => dateMap[d].o), backgroundColor: THEME_COLORS.orange + '60', borderRadius: 4 }
-            ] }, options: { responsive: true, scales: { x: { stacked: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { stacked: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true } }, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+            ] }, options: Object.assign(getStandardChartOptions('bar', true), { scales: { x: { stacked: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { stacked: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true } } })
         });
     }
 
@@ -7067,7 +7079,7 @@ function renderCallsDeepDive(data, calls) {
     if (ctx2) {
         mdCharts.callStatus = new Chart(ctx2.getContext('2d'), {
             type: 'doughnut', data: { labels: ['Answered', 'Missed', 'AOH/Other'], datasets: [{ data: [answered.length, missed.length, aoh.length], backgroundColor: [THEME_COLORS.green, THEME_COLORS.red, THEME_COLORS.orange], borderWidth: 0 }] },
-            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+            options: Object.assign(getStandardChartOptions('doughnut', true))
         });
     }
 
@@ -7079,7 +7091,7 @@ function renderCallsDeepDive(data, calls) {
     if (ctx3) {
         mdCharts.agentCalls = new Chart(ctx3.getContext('2d'), {
             type: 'bar', data: { labels: sortedAgents.map(a=>a[0]), datasets: [{ label: 'Call Tickets Handled', data: sortedAgents.map(a=>a[1]), backgroundColor: THEME_COLORS.purple + '80', borderRadius: 6 }] },
-            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+            options: Object.assign(getStandardChartOptions('bar', false), { indexAxis: 'y', scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } })
         });
     }
 
@@ -7180,7 +7192,7 @@ function renderWhatsAppDeepDive(data) {
     if (ctx1) {
         mdCharts.waVolume = new Chart(ctx1.getContext('2d'), {
             type: 'line', data: { labels: dates, datasets: [{ label: 'WhatsApp Chats', data: dates.map(d => dateMap[d]), borderColor: THEME_COLORS.green, backgroundColor: THEME_COLORS.green + '20', tension: 0.4, fill: true }] },
-            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+            options: Object.assign(getStandardChartOptions('line', true), { scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } })
         });
     }
 
@@ -7192,7 +7204,7 @@ function renderWhatsAppDeepDive(data) {
         const labels = Object.keys(stageCounts); const values = Object.values(stageCounts);
         mdCharts.waStage = new Chart(ctx2.getContext('2d'), {
             type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: [THEME_COLORS.green, THEME_COLORS.purple, THEME_COLORS.orange, THEME_COLORS.blue, THEME_COLORS.red, THEME_COLORS.cyan], borderWidth: 0 }] },
-            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+            options: Object.assign(getStandardChartOptions('doughnut', true))
         });
     }
 
@@ -7209,7 +7221,7 @@ function renderWhatsAppDeepDive(data) {
     if (ctx3) {
         mdCharts.waIssues = new Chart(ctx3.getContext('2d'), {
             type: 'bar', data: { labels: topIssues.map(i=>i[0]), datasets: [{ label: 'Count', data: topIssues.map(i=>i[1]), backgroundColor: THEME_COLORS.green + '70', borderRadius: 6 }] },
-            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+            options: Object.assign(getStandardChartOptions('bar', false), { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } })
         });
     }
 
@@ -7221,7 +7233,7 @@ function renderWhatsAppDeepDive(data) {
     if (ctx4) {
         mdCharts.waBrokers = new Chart(ctx4.getContext('2d'), {
             type: 'bar', data: { labels: topBrokers.map(i=>i[0]), datasets: [{ label: 'Chats', data: topBrokers.map(i=>i[1]), backgroundColor: THEME_COLORS.cyan + '70', borderRadius: 6 }] },
-            options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+            options: Object.assign(getStandardChartOptions('bar', false), { scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } })
         });
     }
 
@@ -7251,7 +7263,7 @@ function renderEmailsDeepDive(data) {
     if (ctx1) {
         mdCharts.emailVolume = new Chart(ctx1.getContext('2d'), {
             type: 'line', data: { labels: dates, datasets: [{ label: 'Care Emails', data: dates.map(d => dateMap[d]), borderColor: THEME_COLORS.orange, backgroundColor: THEME_COLORS.orange + '20', tension: 0.4, fill: true }] },
-            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+            options: Object.assign(getStandardChartOptions('line', true), { scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } })
         });
     }
 
@@ -7262,7 +7274,7 @@ function renderEmailsDeepDive(data) {
     if (ctx2) {
         mdCharts.emailSentiment = new Chart(ctx2.getContext('2d'), {
             type: 'doughnut', data: { labels: Object.keys(sentCounts), datasets: [{ data: Object.values(sentCounts), backgroundColor: [THEME_COLORS.green, THEME_COLORS.blue, THEME_COLORS.red, THEME_COLORS.orange], borderWidth: 0 }] },
-            options: { responsive: true, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+            options: Object.assign(getStandardChartOptions('doughnut', true))
         });
     }
 
@@ -7286,7 +7298,7 @@ function renderEmailsDeepDive(data) {
     if (ctx3) {
         mdCharts.emailSenders = new Chart(ctx3.getContext('2d'), {
             type: 'bar', data: { labels: topSenders.map(i=>i[0]), datasets: [{ label: 'Emails', data: topSenders.map(i=>i[1]), backgroundColor: THEME_COLORS.orange + '70', borderRadius: 6 }] },
-            options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } }
+            options: Object.assign(getStandardChartOptions('bar', false), { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } })
         });
     }
 
@@ -7299,7 +7311,7 @@ function renderEmailsDeepDive(data) {
         const avgRt = rtItems.length ? Math.round(rtItems.reduce((s,i)=>s+Number(i.sla_rt),0)/rtItems.length) : 0;
         mdCharts.emailResponse = new Chart(ctx4.getContext('2d'), {
             type: 'bar', data: { labels: ['Avg FRT', 'Avg RT'], datasets: [{ data: [avgFrt, avgRt], backgroundColor: [THEME_COLORS.orange + '80', THEME_COLORS.orange], borderRadius: 8 }] },
-            options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } }
+            options: Object.assign(getStandardChartOptions('bar', false), { scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } })
         });
     }
 
@@ -7495,6 +7507,136 @@ function generateSmartInsights(data, calls) {
     return insights;
 }
 
+function renderIntelLoopsSquished(dynamicLoops) {
+    const container = document.getElementById('intel-repeat-loops');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!dynamicLoops || dynamicLoops.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">No repeat contact loops detected.</p>';
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'scroll-list-container';
+
+    const list = document.createElement('div');
+    list.className = 'scroll-list scrollbar-themed';
+    list.id = 'intel-loops-scroll-list';
+
+    const getRowHTML = (loop, index) => `
+        <div class="intel-loop-item item-animate ${index >= 5 ? 'hidden-loop-item' : ''}" 
+             style="display:${index >= 5 ? 'none' : 'flex'}; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border); transition: background 0.2s; border-radius: 6px; margin-bottom: 4px;"
+             onmouseover="this.style.background='var(--bg-card-hover)'"
+             onmouseout="this.style.background='transparent'">
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 2px;">
+                    ${loop.rm_name}
+                </div>
+                <div style="font-size: 0.76rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${loop.broker_family} (${loop.branch}) · <span style="color: var(--accent-primary); font-weight: 500;">${loop.issue}</span>
+                </div>
+            </div>
+            <div style="text-align: right; margin-left: 12px;">
+                <span class="health-score-badge poor" style="font-size: 0.72rem; font-weight: 700; padding: 3px 8px;">${loop.repeat_count} repeats</span>
+            </div>
+        </div>
+    `;
+
+    list.innerHTML = dynamicLoops.map((loop, idx) => getRowHTML(loop, idx)).join('');
+    wrapper.appendChild(list);
+
+    if (dynamicLoops.length > 5) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'intel-expand-toggle';
+        toggleBtn.style.cssText = 'width:100%; text-align:center; padding:8px; background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:6px; color:var(--text-secondary); margin-top:8px; font-weight:600; font-size:0.78rem; cursor:pointer;';
+        toggleBtn.textContent = `Show More (${dynamicLoops.length - 5})`;
+        
+        let expanded = false;
+        toggleBtn.addEventListener('click', () => {
+            expanded = !expanded;
+            const items = list.querySelectorAll('.hidden-loop-item');
+            items.forEach(item => {
+                item.style.display = expanded ? 'flex' : 'none';
+            });
+            toggleBtn.textContent = expanded ? 'Show Less' : `Show More (${dynamicLoops.length - 5})`;
+            if (expanded) {
+                AnimatedList.animate(list);
+            }
+        });
+        wrapper.appendChild(toggleBtn);
+    }
+
+    container.appendChild(wrapper);
+    AnimatedList.animate(list);
+}
+
+function renderIntelOutliersSquished(dynamicOutliers) {
+    const container = document.getElementById('intel-outliers');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const outliers = dynamicOutliers.filter(o => o.is_outlier);
+
+    if (!outliers || outliers.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">No operational outlier activity detected.</p>';
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'scroll-list-container';
+
+    const list = document.createElement('div');
+    list.className = 'scroll-list scrollbar-themed';
+    list.id = 'intel-outliers-scroll-list';
+
+    const getRowHTML = (outlier, index) => `
+        <div class="intel-outlier-item item-animate ${index >= 5 ? 'hidden-outlier-item' : ''}" 
+             style="display:${index >= 5 ? 'none' : 'flex'}; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border); transition: background 0.2s; border-radius: 6px; margin-bottom: 4px;"
+             onmouseover="this.style.background='var(--bg-card-hover)'"
+             onmouseout="this.style.background='transparent'">
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 2px;">
+                    ${outlier.rm_name}
+                </div>
+                <div style="font-size: 0.76rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${outlier.broker_family} (${outlier.branch}) · <span style="color: var(--text-muted);">${outlier.contacts} total contacts</span>
+                </div>
+            </div>
+            <div style="text-align: right; margin-left: 12px;">
+                <span class="health-score-badge warning" style="font-size: 0.72rem; font-weight: 700; padding: 3px 8px;">${outlier.contacts_per_day.toFixed(1)}/day</span>
+            </div>
+        </div>
+    `;
+
+    list.innerHTML = outliers.map((outlier, idx) => getRowHTML(outlier, idx)).join('');
+    wrapper.appendChild(list);
+
+    if (outliers.length > 5) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'intel-expand-toggle';
+        toggleBtn.style.cssText = 'width:100%; text-align:center; padding:8px; background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:6px; color:var(--text-secondary); margin-top:8px; font-weight:600; font-size:0.78rem; cursor:pointer;';
+        toggleBtn.textContent = `Show More (${outliers.length - 5})`;
+        
+        let expanded = false;
+        toggleBtn.addEventListener('click', () => {
+            expanded = !expanded;
+            const items = list.querySelectorAll('.hidden-outlier-item');
+            items.forEach(item => {
+                item.style.display = expanded ? 'flex' : 'none';
+            });
+            toggleBtn.textContent = expanded ? 'Show Less' : `Show More (${outliers.length - 5})`;
+            if (expanded) {
+                AnimatedList.animate(list);
+            }
+        });
+        wrapper.appendChild(toggleBtn);
+    }
+
+    container.appendChild(wrapper);
+    AnimatedList.animate(list);
+}
+
 function renderIntelligenceDashboard() {
     destroyChartGroup(intelCharts);
     const data = window.viewModel.interactions;
@@ -7645,7 +7787,7 @@ function renderIntelligenceDashboard() {
     // Sankey Flow
     const sankeyCanvas = document.getElementById('intel-sankey-canvas');
     if (sankeyCanvas && typeof renderSankeyFlowCanvas === 'function') {
-        renderSankeyFlowCanvas(data);
+        renderSankeyFlowCanvas(data, 'intel-sankey-canvas');
     }
 
     // Render Predictive Capacity Planner
@@ -7785,17 +7927,17 @@ function renderMonthlyView() {
     let allCalls = rawData.calls;
 
     // Apply sidebar filters (excluding date since Monthly View is month-specific)
-    if (activeFilters.broker !== 'all') {
-        allInteractions = allInteractions.filter(d => d.broker_family === activeFilters.broker);
-        allCalls = allCalls.filter(c => c.broker_family === activeFilters.broker);
+    if (activeFilters.broker && !activeFilters.broker.includes('all')) {
+        allInteractions = allInteractions.filter(d => activeFilters.broker.includes(d.broker_family));
+        allCalls = allCalls.filter(c => activeFilters.broker.includes(c.broker_family));
     }
-    if (activeFilters.poc !== 'all') {
-        allInteractions = allInteractions.filter(d => d.poc === activeFilters.poc);
-        allCalls = allCalls.filter(c => c.poc === activeFilters.poc);
+    if (activeFilters.poc && !activeFilters.poc.includes('all')) {
+        allInteractions = allInteractions.filter(d => activeFilters.poc.includes(d.poc));
+        allCalls = allCalls.filter(c => activeFilters.poc.includes(c.poc));
     }
-    if (activeFilters.agent !== 'all') {
-        allInteractions = allInteractions.filter(d => d.agent === activeFilters.agent);
-        allCalls = allCalls.filter(c => c.agent === activeFilters.agent);
+    if (activeFilters.agent && !activeFilters.agent.includes('all')) {
+        allInteractions = allInteractions.filter(d => activeFilters.agent.includes(d.agent));
+        allCalls = allCalls.filter(c => activeFilters.agent.includes(c.agent));
     }
     if (activeFilters.branch && activeFilters.branch !== 'all') {
         allInteractions = allInteractions.filter(d => d.branch === activeFilters.branch);
@@ -7809,24 +7951,38 @@ function renderMonthlyView() {
 
     // Find available years/months
     const availableYears = new Set();
+    let maxDate = null;
     allInteractions.forEach(d => {
         if (d.date) {
             const parsed = safeParseDate(d.date);
-            if (parsed) availableYears.add(parsed.getFullYear());
+            if (parsed) {
+                availableYears.add(parsed.getFullYear());
+                if (!maxDate || parsed > maxDate) maxDate = parsed;
+            }
         }
     });
     allCalls.forEach(c => {
         if (c.date) {
             const parsed = safeParseDate(c.date);
-            if (parsed) availableYears.add(parsed.getFullYear());
+            if (parsed) {
+                availableYears.add(parsed.getFullYear());
+                if (!maxDate || parsed > maxDate) maxDate = parsed;
+            }
         }
     });
     const yearsArr = [...availableYears].sort();
 
+    let defaultYear = new Date().getFullYear();
+    let defaultMonth = new Date().getMonth();
+    if (maxDate) {
+        defaultYear = maxDate.getFullYear();
+        defaultMonth = maxDate.getMonth();
+    }
+
     if (yearSelect && !yearSelect._populated) {
         yearSelect._populated = true;
         yearSelect.innerHTML = yearsArr.map(y => `<option value="${y}">${y}</option>`).join('');
-        yearSelect.value = yearsArr[yearsArr.length - 1] || new Date().getFullYear();
+        yearSelect.value = yearsArr.includes(defaultYear) ? defaultYear : (yearsArr[yearsArr.length - 1] || defaultYear);
         yearSelect.addEventListener('change', () => { yearSelect._populated = false; monthSelect._populated = false; renderMonthlyView(); });
     } else if (yearSelect && yearsArr.length > 0 && !yearsArr.includes(parseInt(yearSelect.value))) {
         // value from previous dataset no longer valid — reset
@@ -7836,7 +7992,7 @@ function renderMonthlyView() {
     if (monthSelect && !monthSelect._populated) {
         monthSelect._populated = true;
         monthSelect.innerHTML = monthNames.map((m, i) => `<option value="${i}">${m}</option>`).join('');
-        monthSelect.value = new Date().getMonth();
+        monthSelect.value = defaultMonth;
         monthSelect.addEventListener('change', () => { monthSelect._populated = false; renderMonthlyView(); });
     }
 
@@ -8494,21 +8650,53 @@ function renderTicketsChatsView() {
     // Use ALL interactions (not filtered by date for browsing), but respect global date filter
     let allData = window.viewModel.interactions.slice();
 
+    const activeChan = ticketsState.channelFilter;
+    const config = STATUS_CONFIGS[activeChan] || STATUS_CONFIGS['all'];
+
+    // Pre-calculate status counts for filter pills (respecting channel filter)
+    let statsData = allData;
+    if (ticketsState.channelFilter !== 'all') {
+        statsData = statsData.filter(d => d.type === ticketsState.channelFilter);
+    }
+    const counts = { all: statsData.length };
+    config.forEach(opt => {
+        if (opt.value !== 'all') counts[opt.value] = 0;
+    });
+    statsData.forEach(d => {
+        const stage = (d.stage || '').toLowerCase().replace(/\s+/g, '_');
+        let matchedKey = null;
+        config.forEach(opt => {
+            if (opt.value === 'all') return;
+            if (stage === opt.value || stage.replace('-', '_') === opt.value) {
+                matchedKey = opt.value;
+            } else if (stage.includes(opt.value) || opt.value.includes(stage)) {
+                matchedKey = opt.value;
+            }
+        });
+        if (matchedKey && counts[matchedKey] !== undefined) {
+            counts[matchedKey]++;
+        }
+    });
+
+    // Filter config to only keep options with count > 0 (or 'all' option)
+    const filteredConfig = config.filter(opt => {
+        if (opt.value === 'all') return true;
+        return (counts[opt.value] || 0) > 0;
+    });
+
     // Setup event listeners & build dynamic status pills
     const statusPillsContainer = document.getElementById('tickets-status-pills');
     if (statusPillsContainer) {
-        const activeChan = ticketsState.channelFilter;
-        const config = STATUS_CONFIGS[activeChan] || STATUS_CONFIGS['all'];
-        
         // Ensure that the active status filter is still valid for this channel
-        const isValid = config.some(opt => opt.value === ticketsState.statusFilter);
+        const isValid = filteredConfig.some(opt => opt.value === ticketsState.statusFilter);
         if (!isValid) {
             ticketsState.statusFilter = 'all';
         }
         
-        statusPillsContainer.innerHTML = config.map(opt => {
+        statusPillsContainer.innerHTML = filteredConfig.map(opt => {
             const isActive = opt.value === ticketsState.statusFilter ? 'active' : '';
-            return `<button class="status-pill ${isActive}" data-status="${opt.value}">${opt.label}</button>`;
+            const c = opt.value === 'all' ? counts.all : (counts[opt.value] || 0);
+            return `<button class="status-pill ${isActive}" data-status="${opt.value}">${opt.label} (${c})</button>`;
         }).join('');
         
         // Bind event listeners to new pills
@@ -8631,42 +8819,16 @@ function renderTicketsChatsView() {
         return 0;
     });
 
-    // Populate stats bar based on the full active filter set (before stage filter to show options)
-    let statsData = allData;
-    if (ticketsState.channelFilter !== 'all') {
-        statsData = statsData.filter(d => d.type === ticketsState.channelFilter);
-    }
-    const activeChan = ticketsState.channelFilter;
-    const config = STATUS_CONFIGS[activeChan] || STATUS_CONFIGS['all'];
-
-    const counts = { all: statsData.length };
-    config.forEach(opt => {
-        if (opt.value !== 'all') counts[opt.value] = 0;
-    });
-
-    statsData.forEach(d => {
-        const stage = (d.stage || '').toLowerCase().replace(/\s+/g, '_');
-        let matchedKey = null;
-        config.forEach(opt => {
-            if (opt.value === 'all') return;
-            if (stage === opt.value || stage.replace('-', '_') === opt.value) {
-                matchedKey = opt.value;
-            } else if (stage.includes(opt.value) || opt.value.includes(stage)) {
-                matchedKey = opt.value;
-            }
-        });
-        if (matchedKey && counts[matchedKey] !== undefined) {
-            counts[matchedKey]++;
-        }
-    });
-
     const statsBar = document.getElementById('tickets-stats-bar');
     if (statsBar) {
         let barHtml = `<span class="tickets-stat-badge">Total: ${counts.all}</span>`;
         config.forEach(opt => {
             if (opt.value === 'all') return;
-            const color = STATUS_COLORS[opt.value] || '#6b7280';
-            barHtml += `<span class="tickets-stat-badge" style="border-left: 3px solid ${color};">${opt.label}: ${counts[opt.value] || 0}</span>`;
+            const count = counts[opt.value] || 0;
+            if (count > 0) {
+                const color = STATUS_COLORS[opt.value] || '#6b7280';
+                barHtml += `<span class="tickets-stat-badge" style="border-left: 3px solid ${color};">${opt.label}: ${count}</span>`;
+            }
         });
         statsBar.innerHTML = barHtml;
     }
@@ -8785,26 +8947,26 @@ function renderTicketsChatsView() {
 // REDESIGN UPGRADES: CROSS-FILTERING, TOASTS, FORECASTING, AND TIMELINES
 // ==========================================================================
 
+function setSelectMultipleValues(selectId, value) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const values = Array.isArray(value) ? value : [value];
+    Array.from(select.options).forEach(opt => {
+        opt.selected = values.includes(opt.value);
+    });
+}
+
 function applySidebarFilter(filterKey, value) {
     console.log(`Applying sidebar filter: ${filterKey} = ${value}`);
     if (filterKey === 'broker') {
-        const select = document.getElementById('filter-broker');
-        if (select) {
-            select.value = value;
-            activeFilters.broker = value;
-        }
+        setSelectMultipleValues('filter-broker', value);
+        activeFilters.broker = Array.isArray(value) ? value : [value];
     } else if (filterKey === 'poc') {
-        const select = document.getElementById('filter-poc');
-        if (select) {
-            select.value = value;
-            activeFilters.poc = value;
-        }
+        setSelectMultipleValues('filter-poc', value);
+        activeFilters.poc = Array.isArray(value) ? value : [value];
     } else if (filterKey === 'agent') {
-        const select = document.getElementById('filter-agent');
-        if (select) {
-            select.value = value;
-            activeFilters.agent = value;
-        }
+        setSelectMultipleValues('filter-agent', value);
+        activeFilters.agent = Array.isArray(value) ? value : [value];
     } else if (filterKey === 'branch') {
         activeFilters.branch = value;
     } else if (filterKey === 'channel') {
@@ -9012,17 +9174,12 @@ function renderHourlyAbandonmentTrend(calls) {
                 { label: 'Missed / Abandoned', data: missedCounts, backgroundColor: THEME_COLORS.red + 'a0', borderRadius: 4 }
             ]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
+        options: Object.assign(getStandardChartOptions('bar', true), {
             scales: {
                 x: { stacked: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } },
                 y: { stacked: true, beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } }
-            },
-            plugins: {
-                legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } }
             }
-        }
+        })
     });
 }
 
