@@ -7678,7 +7678,56 @@ function renderIntelligenceDashboard() {
             const grade = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'moderate' : 'poor';
             return { name, total: d.total, repeats: d.repeats, score, grade };
         }).sort((a,b) => b.score - a.score);
-        healthDiv.innerHTML = brokerScores.length ? `<table class="dashboard-table" style="font-size:0.82rem;"><thead><tr><th>Broker</th><th style="text-align:right">Volume</th><th style="text-align:right">Repeats</th><th style="text-align:right">Health Score</th></tr></thead><tbody>${brokerScores.map(b => `<tr class="clickable-row" data-broker="${b.name}" style="cursor:pointer;"><td>${b.name}</td><td style="text-align:right">${b.total}</td><td style="text-align:right">${b.repeats}</td><td style="text-align:right"><span class="health-score-badge ${b.grade}">${b.score}/100</span></td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--text-muted);text-align:center;padding:20px;">No broker data available.</p>';
+
+        const top5 = brokerScores.slice(0, 5);
+        const rest = brokerScores.slice(5);
+
+        let tableHtml = `
+            <table class="dashboard-table" style="font-size:0.82rem; margin-bottom: 0;">
+                <thead>
+                    <tr>
+                        <th>Broker</th>
+                        <th style="text-align:right">Volume</th>
+                        <th style="text-align:right">Repeats</th>
+                        <th style="text-align:right">Health Score</th>
+                    </tr>
+                </thead>
+                <tbody id="intel-broker-health-tbody">
+                    ${top5.map((b, idx) => `
+                        <tr class="clickable-row item-animate" data-broker="${b.name}" style="cursor:pointer;">
+                            <td>${b.name}</td>
+                            <td style="text-align:right">${b.total}</td>
+                            <td style="text-align:right">${b.repeats}</td>
+                            <td style="text-align:right">
+                                <span class="health-score-badge ${b.grade}">${b.score}/100</span>
+                            </td>
+                        </tr>
+                    `).join('')}
+                    ${rest.map((b, idx) => `
+                        <tr class="clickable-row hidden-broker-row" data-broker="${b.name}" style="cursor:pointer; display:none;">
+                            <td>${b.name}</td>
+                            <td style="text-align:right">${b.total}</td>
+                            <td style="text-align:right">${b.repeats}</td>
+                            <td style="text-align:right">
+                                <span class="health-score-badge ${b.grade}">${b.score}/100</span>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+
+        if (brokerScores.length > 5) {
+            tableHtml += `
+                <div style="text-align:center; margin-top:10px;">
+                    <button id="intel-broker-toggle-btn" class="export-btn" style="padding: 4px 12px; font-size: 0.75rem; border-radius: 6px; line-height: 1.4;">
+                        Show More (${brokerScores.length - 5})
+                    </button>
+                </div>
+            `;
+        }
+
+        healthDiv.innerHTML = brokerScores.length ? tableHtml : '<p style="color:var(--text-muted);text-align:center;padding:20px;">No broker data available.</p>';
 
         healthDiv.querySelectorAll('.clickable-row').forEach(row => {
             row.addEventListener('click', () => {
@@ -7686,6 +7735,22 @@ function renderIntelligenceDashboard() {
                 openBrokerHealthDiagnosticsModal(bName);
             });
         });
+
+        const toggleBtn = healthDiv.querySelector('#intel-broker-toggle-btn');
+        if (toggleBtn) {
+            let expanded = false;
+            toggleBtn.addEventListener('click', () => {
+                expanded = !expanded;
+                const hiddenRows = healthDiv.querySelectorAll('.hidden-broker-row');
+                hiddenRows.forEach(row => {
+                    row.style.display = expanded ? 'table-row' : 'none';
+                    if (expanded) {
+                        row.classList.add('item-animate', 'animated');
+                    }
+                });
+                toggleBtn.innerText = expanded ? 'Show Less' : `Show More (${brokerScores.length - 5})`;
+            });
+        }
     }
 
     // Time-of-Day Heatmap

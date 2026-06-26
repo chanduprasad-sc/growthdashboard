@@ -927,6 +927,41 @@ function renderKeyMetricsGrid(interactions, calls) {
     
     document.getElementById('pulse-aht').innerText = formatDuration(finalAHT);
     document.getElementById('pulse-aqt').innerText = formatDuration(finalAQT);
+
+    // Render Channel Mix comparison chart (Calls vs WhatsApp vs Emails) next to Total Interactions
+    const mixCanvas = document.getElementById('weekly-channel-mix-chart');
+    if (mixCanvas) {
+        if (charts.weeklyChannelMix) {
+            charts.weeklyChannelMix.destroy();
+            charts.weeklyChannelMix = null;
+        }
+        const mixCtx = mixCanvas.getContext('2d');
+        charts.weeklyChannelMix = new Chart(mixCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Calls', 'WA', 'Emails'],
+                datasets: [{
+                    data: [tkt, wa, mail],
+                    backgroundColor: [THEME_COLORS.purple, THEME_COLORS.green, THEME_COLORS.yellow],
+                    borderRadius: 3,
+                    barThickness: 8
+                }]
+            },
+            options: Object.assign(getStandardChartOptions('bar', false), {
+                indexAxis: 'y',
+                scales: {
+                    x: { display: false },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            color: THEME_COLORS.textSecondary,
+                            font: { family: 'SF Pro Text', size: 8 }
+                        }
+                    }
+                }
+            })
+        });
+    }
 }
 
 // 4.2. POC Query Heatmap Matrix (Blocks Layout)
@@ -1029,6 +1064,38 @@ function renderPOCQueryHeatmap(data) {
         
         container.appendChild(card);
     });
+}
+// Helper for Chart.js standardization (matching Visual Control tab styling)
+function getStandardChartOptions(type = 'line', showLegend = true) {
+    const textCol = THEME_COLORS.textSecondary || '#cbd5e1';
+    const borderCol = THEME_COLORS.border || 'rgba(255, 255, 255, 0.16)';
+    const opts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: showLegend,
+                position: type === 'pie' || type === 'donut' || type === 'doughnut' ? 'right' : 'bottom',
+                labels: {
+                    color: textCol,
+                    font: { family: 'SF Pro Text', size: 10 }
+                }
+            }
+        }
+    };
+    if (type !== 'pie' && type !== 'donut' && type !== 'doughnut') {
+        opts.scales = {
+            x: {
+                grid: { color: borderCol },
+                ticks: { color: textCol, font: { family: 'SF Pro Text', size: 8 } }
+            },
+            y: {
+                grid: { color: borderCol },
+                ticks: { color: textCol, font: { family: 'SF Pro Text', size: 9 } }
+            }
+        };
+    }
+    return opts;
 }
 
 // 4.3. Weekly Comparison Bar Chart (WoW Horizontal Layout)
