@@ -3197,61 +3197,6 @@ function renderKeyMetricsGrid(interactions, calls) {
         ${aqtDeltaHtml}
         <div class="kpi-sub-metric">Prev period: <strong>${formatSeconds(prevAQT)}</strong></div>
     `);
-
-    // Render Weekly Pulse Channel Mix chart (horizontal bar chart)
-    const ctxCanvas = document.getElementById('weekly-channel-mix-chart');
-    if (ctxCanvas) {
-        // Destroy existing chart if it exists to avoid overlaps
-        if (window._weeklyChannelMixChartInstance) {
-            window._weeklyChannelMixChartInstance.destroy();
-        }
-        const ctx = ctxCanvas.getContext('2d');
-        window._weeklyChannelMixChartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Calls', 'WA', 'Emails'],
-                datasets: [{
-                    data: [tkt, wa, mail],
-                    backgroundColor: [
-                        'rgba(139, 92, 246, 0.75)',
-                        'rgba(56, 189, 248, 0.75)',
-                        'rgba(249, 115, 22, 0.75)'
-                    ],
-                    borderColor: [
-                        'var(--purple)',
-                        'var(--blue)',
-                        'var(--orange)'
-                    ],
-                    borderWidth: 1,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: { enabled: true }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: { display: false },
-                        border: { display: false }
-                    },
-                    y: {
-                        grid: { display: false },
-                        ticks: {
-                            color: 'var(--text-muted)',
-                            font: { size: 9, family: 'Outfit' }
-                        },
-                        border: { display: false }
-                    }
-                }
-            }
-        });
-    }
 }
 
 
@@ -4552,12 +4497,45 @@ async function generateAISummary() {
         `5. <h4>💡 Actionable Recommendations</h4> — 4-6 specific, prioritized action items for the support team\n` +
         `Use <ul><li><strong>Label:</strong> Detail</li></ul> for all sections. Quote specific RM comments where relevant.`;
 
+    try {
+        const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${key}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.6,
+                max_tokens: 1200
+            })
+        });
+
+        if (!response.ok) throw new Error("API call failed");
+
+        const res = await response.json();
+        const contentText = res.choices[0].message.content.trim();
+
+        // Clean markdown backticks if returned
+        const cleanedJSON = contentText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+        const parsed = JSON.parse(cleanedJSON);
+
+        narrativeBlock.innerHTML = parsed.narrative || "Summary parsing returned empty narrative.";
+
+        loadingState.classList.add('hidden');
+        contentState.classList.remove('hidden');
+    } catch (error) {
+        console.warn("NVIDIA AI Call failed/blocked. Running local summarizer fallback...", error);
+
+        // Local Summarizer fallback if API is blocked or key expires
         setTimeout(() => {
             const fallbackHTML = generateLocalFallbackSummary(withComments);
             narrativeBlock.innerHTML = fallbackHTML;
             loadingState.classList.add('hidden');
             contentState.classList.remove('hidden');
-        }, 800);
+        }, 1200);
+    }
 }
 
 function generateLocalFallbackSummary(commentsList) {
@@ -4814,7 +4792,21 @@ async function generateAITabNarrative() {
         `6. <h4>💡 Prioritized Recommendations</h4> — Specific, actionable steps ordered by impact\n` +
         `Return ONLY raw JSON: {"narrative": "...HTML..."}`;
 
-    narrativeContent.innerHTML = generateLocalFallbackSummary(withComments);
+    try {
+        const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', messages: [{ role: 'user', content: prompt }], temperature: 0.6, max_tokens: 2000 })
+        });
+        if (!response.ok) throw new Error('API failed');
+        const res = await response.json();
+        const text = res.choices[0].message.content.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/,'').trim();
+        const parsed = JSON.parse(text);
+        narrativeContent.innerHTML = parsed.narrative || '<p>Narrative parsing returned empty.</p>';
+    } catch (err) {
+        console.warn('AI narrative failed, using local fallback', err);
+        narrativeContent.innerHTML = generateLocalFallbackSummary(withComments);
+    }
 }
 
 // -------------------------------------------------------------
@@ -5907,8 +5899,8 @@ function renderVisualControlDashboard() {
     renderAgentBreaksTab(data, calls);
 }
 
-function renderSankeyFlowCanvas(data, canvasId = 'vc-chart-sankey-flow') {
-    const canvas = document.getElementById(canvasId);
+function renderSankeyFlowCanvas(data) {
+    const canvas = document.getElementById('vc-chart-sankey-flow');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
@@ -6222,46 +6214,28 @@ function renderSLAAndQAMatrix(data) {
 
     data.forEach(item => {
         if (item.qa_overall !== null && item.qa_overall !== undefined) {
-            const normalizedOverall = normalizeQAScore(item.qa_overall, 45);
-            if (normalizedOverall !== null) {
-                overallSum += normalizedOverall;
-                overallCount++;
-            }
+            overallSum += item.qa_overall;
+            overallCount++;
 
             if (item.qa_greeting !== null && item.qa_greeting !== undefined) {
-                const normGreeting = normalizeQAScore(item.qa_greeting, 5);
-                if (normGreeting !== null) {
-                    greetingSum += normGreeting;
-                    greetingCount++;
-                }
+                greetingSum += item.qa_greeting;
+                greetingCount++;
             }
             if (item.qa_grammar !== null && item.qa_grammar !== undefined) {
-                const normGrammar = normalizeQAScore(item.qa_grammar, 5);
-                if (normGrammar !== null) {
-                    grammarSum += normGrammar;
-                    grammarCount++;
-                }
+                grammarSum += item.qa_grammar;
+                grammarCount++;
             }
             if (item.qa_acknowledgement !== null && item.qa_acknowledgement !== undefined) {
-                const normAck = normalizeQAScore(item.qa_acknowledgement, 15);
-                if (normAck !== null) {
-                    ackSum += normAck;
-                    ackCount++;
-                }
+                ackSum += item.qa_acknowledgement;
+                ackCount++;
             }
             if (item.qa_sla !== null && item.qa_sla !== undefined) {
-                const normSla = normalizeQAScore(item.qa_sla, 15);
-                if (normSla !== null) {
-                    slaQASum += normSla;
-                    slaQACount++;
-                }
+                slaQASum += item.qa_sla;
+                slaQACount++;
             }
             if (item.qa_assistance !== null && item.qa_assistance !== undefined) {
-                const normAssistance = normalizeQAScore(item.qa_assistance, 5);
-                if (normAssistance !== null) {
-                    assistanceSum += normAssistance;
-                    assistanceCount++;
-                }
+                assistanceSum += item.qa_assistance;
+                assistanceCount++;
             }
 
             // Leaderboard
@@ -6270,28 +6244,27 @@ function renderSLAAndQAMatrix(data) {
                 if (!agentQA[agent]) {
                     agentQA[agent] = { sum: 0, count: 0 };
                 }
-                const normOverall = normalizeQAScore(item.qa_overall, 45);
-                if (normOverall !== null) {
-                    agentQA[agent].sum += normOverall;
-                    agentQA[agent].count++;
-                }
+                agentQA[agent].sum += item.qa_overall;
+                agentQA[agent].count++;
             }
         }
     });
 
-    const setQAVal = (id, avg) => {
+    const setQAVal = (id, avg, max) => {
         const el = document.getElementById(id);
         if (el) {
-            el.innerText = avg !== null ? Math.round(avg) : '-';
+            // Convert raw score to percentage out of 100
+            const pct = avg !== null && max ? Math.round((avg / max) * 100) : null;
+            el.innerText = pct !== null ? pct + '%' : '-';
         }
     };
 
-    setQAVal('vc-qa-greetings', greetingCount ? greetingSum / greetingCount : null);
-    setQAVal('vc-qa-grammar', grammarCount ? grammarSum / grammarCount : null);
-    setQAVal('vc-qa-acknowledgement', ackCount ? ackSum / ackCount : null);
-    setQAVal('vc-qa-sla', slaQACount ? slaQASum / slaQACount : null);
-    setQAVal('vc-qa-assistance', assistanceCount ? assistanceSum / assistanceCount : null);
-    setQAVal('vc-qa-overall', overallCount ? overallSum / overallCount : null);
+    setQAVal('vc-qa-greetings', greetingCount ? greetingSum / greetingCount : null, 5);
+    setQAVal('vc-qa-grammar', grammarCount ? grammarSum / grammarCount : null, 5);
+    setQAVal('vc-qa-acknowledgement', ackCount ? ackSum / ackCount : null, 15);
+    setQAVal('vc-qa-sla', slaQACount ? slaQASum / slaQACount : null, 15);
+    setQAVal('vc-qa-assistance', assistanceCount ? assistanceSum / assistanceCount : null, 5);
+    setQAVal('vc-qa-overall', overallCount ? overallSum / overallCount : null, 45);
 
     // Render Agent QA Leaderboard
     const qaLeaderboardBody = document.getElementById('vc-qa-leaderboard-body');
@@ -6308,7 +6281,7 @@ function renderSLAAndQAMatrix(data) {
             qaLeaderboardBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted" style="padding: 10px;">No QA audits compiled for this period</td></tr>';
         } else {
             qaLeaderboardBody.innerHTML = sortedAgents.map(a => {
-                const pct = Math.round(a.avg);
+                const pct = Math.round((a.avg / 45) * 100);
                 const color = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--orange)' : 'var(--red, #ef4444)';
                 return `
                 <tr>
@@ -7672,7 +7645,7 @@ function renderIntelligenceDashboard() {
     // Sankey Flow
     const sankeyCanvas = document.getElementById('intel-sankey-canvas');
     if (sankeyCanvas && typeof renderSankeyFlowCanvas === 'function') {
-        renderSankeyFlowCanvas(data, 'intel-sankey-canvas');
+        renderSankeyFlowCanvas(data);
     }
 
     // Render Predictive Capacity Planner
@@ -7850,23 +7823,21 @@ function renderMonthlyView() {
     });
     const yearsArr = [...availableYears].sort();
 
-    if (yearSelect) {
+    if (yearSelect && !yearSelect._populated) {
+        yearSelect._populated = true;
         yearSelect.innerHTML = yearsArr.map(y => `<option value="${y}">${y}</option>`).join('');
-        if (yearsArr.length > 0) {
-            yearSelect.value = yearsArr[yearsArr.length - 1];
-        }
-        if (!yearSelect._listenerSet) {
-            yearSelect._listenerSet = true;
-            yearSelect.addEventListener('change', () => { renderMonthlyView(); });
-        }
+        yearSelect.value = yearsArr[yearsArr.length - 1] || new Date().getFullYear();
+        yearSelect.addEventListener('change', () => { yearSelect._populated = false; monthSelect._populated = false; renderMonthlyView(); });
+    } else if (yearSelect && yearsArr.length > 0 && !yearsArr.includes(parseInt(yearSelect.value))) {
+        // value from previous dataset no longer valid — reset
+        yearSelect.innerHTML = yearsArr.map(y => `<option value="${y}">${y}</option>`).join('');
+        yearSelect.value = yearsArr[yearsArr.length - 1];
     }
-    if (monthSelect) {
+    if (monthSelect && !monthSelect._populated) {
+        monthSelect._populated = true;
         monthSelect.innerHTML = monthNames.map((m, i) => `<option value="${i}">${m}</option>`).join('');
         monthSelect.value = new Date().getMonth();
-        if (!monthSelect._listenerSet) {
-            monthSelect._listenerSet = true;
-            monthSelect.addEventListener('change', () => { renderMonthlyView(); });
-        }
+        monthSelect.addEventListener('change', () => { monthSelect._populated = false; renderMonthlyView(); });
     }
 
     const selectedYear = parseInt(yearSelect.value);
@@ -8535,22 +8506,7 @@ function renderTicketsChatsView() {
             ticketsState.statusFilter = 'all';
         }
         
-        // Count interactions per stage/status for current channelFiltered dataset
-        const stageCounts = {};
-        allData.forEach(item => {
-            const stage = (item.stage || '').toLowerCase().replace(/\s+/g, '_');
-            // Check channel filter match
-            if (activeChan === 'all' || item.type === activeChan) {
-                stageCounts[stage] = (stageCounts[stage] || 0) + 1;
-            }
-        });
-
-        const filteredConfig = config.filter(opt => {
-            if (opt.value === 'all') return true;
-            return (stageCounts[opt.value] || 0) > 0;
-        });
-        
-        statusPillsContainer.innerHTML = filteredConfig.map(opt => {
+        statusPillsContainer.innerHTML = config.map(opt => {
             const isActive = opt.value === ticketsState.statusFilter ? 'active' : '';
             return `<button class="status-pill ${isActive}" data-status="${opt.value}">${opt.label}</button>`;
         }).join('');
@@ -8966,8 +8922,8 @@ function renderPredictiveCapacityPlanner() {
     }
     
     plannerContainer.innerHTML = `
-        <div class="visual-card" style="text-align: left; padding: 20px; border-radius: 14px;">
-            <div class="score-label" style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">🔮 Predicted Volume (Next 7d)</div>
+        <div class="agent-score-card" style="text-align: left; padding: 20px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px;">
+            <div class="score-label">🔮 Predicted Volume (Next 7d)</div>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 500;">
                     <span>📞 Voice Calls:</span>
@@ -8983,8 +8939,8 @@ function renderPredictiveCapacityPlanner() {
                 </div>
             </div>
         </div>
-        <div class="visual-card" style="text-align: left; padding: 20px; border-radius: 14px;">
-            <div class="score-label" style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">⚡ Workload Capacity Planner</div>
+        <div class="agent-score-card" style="text-align: left; padding: 20px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px;">
+            <div class="score-label">⚡ Workload Capacity Planner</div>
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 500;">
                     <span>Required Effort:</span>
@@ -9000,9 +8956,9 @@ function renderPredictiveCapacityPlanner() {
                 </div>
             </div>
         </div>
-        <div class="visual-card" style="text-align: left; padding: 20px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div class="agent-score-card" style="text-align: left; padding: 20px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-                <div class="score-label" style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">📊 Expected Utilization</div>
+                <div class="score-label">📊 Expected Utilization</div>
                 <div class="score-value" style="font-size: 2.2rem; color: var(--purple); margin: 8px 0 4px; font-weight:800;">${utilizationPct}%</div>
             </div>
             <span class="health-score-badge ${statusClass}" style="align-self: flex-start; margin-top: auto; font-size: 0.72rem; padding: 4px 10px; font-weight:700;">${statusText}</span>
@@ -9691,39 +9647,24 @@ function renderAgentQACoaching(selectedAgent) {
 
     audited.forEach(d => {
         if (d.qa_greeting !== null && !isNaN(d.qa_greeting)) {
-            const val = normalizeQAScore(d.qa_greeting, 5);
-            if (val !== null) {
-                dimensions.greeting.sum += val;
-                dimensions.greeting.count++;
-            }
+            dimensions.greeting.sum += d.qa_greeting;
+            dimensions.greeting.count++;
         }
         if (d.qa_grammar !== null && !isNaN(d.qa_grammar)) {
-            const val = normalizeQAScore(d.qa_grammar, 5);
-            if (val !== null) {
-                dimensions.grammar.sum += val;
-                dimensions.grammar.count++;
-            }
+            dimensions.grammar.sum += d.qa_grammar;
+            dimensions.grammar.count++;
         }
         if (d.qa_acknowledgement !== null && !isNaN(d.qa_acknowledgement)) {
-            const val = normalizeQAScore(d.qa_acknowledgement, 15);
-            if (val !== null) {
-                dimensions.acknowledgement.sum += val;
-                dimensions.acknowledgement.count++;
-            }
+            dimensions.acknowledgement.sum += d.qa_acknowledgement;
+            dimensions.acknowledgement.count++;
         }
         if (d.qa_sla !== null && !isNaN(d.qa_sla)) {
-            const val = normalizeQAScore(d.qa_sla, 15);
-            if (val !== null) {
-                dimensions.sla.sum += val;
-                dimensions.sla.count++;
-            }
+            dimensions.sla.sum += d.qa_sla;
+            dimensions.sla.count++;
         }
         if (d.qa_assistance !== null && !isNaN(d.qa_assistance)) {
-            const val = normalizeQAScore(d.qa_assistance, 5);
-            if (val !== null) {
-                dimensions.assistance.sum += val;
-                dimensions.assistance.count++;
-            }
+            dimensions.assistance.sum += d.qa_assistance;
+            dimensions.assistance.count++;
         }
     });
 
@@ -9750,15 +9691,15 @@ function renderAgentQACoaching(selectedAgent) {
 
     let html = '';
     Object.entries(dimensions).forEach(([key, dim]) => {
-        const avg = dim.count > 0 ? (dim.sum / dim.count) : 100;
-        const ratio = avg / 100;
+        const avg = dim.count > 0 ? (dim.sum / dim.count) : dim.max;
+        const ratio = avg / dim.max;
 
         if (ratio < lowestScore) {
             lowestScore = ratio;
             lowestKey = key;
         }
 
-        const pct = Math.round(avg);
+        const pct = Math.round(ratio * 100);
         let progressColor = 'var(--purple)';
         if (pct < 70) progressColor = 'var(--red)';
         else if (pct < 85) progressColor = 'var(--orange)';
@@ -9768,7 +9709,7 @@ function renderAgentQACoaching(selectedAgent) {
             <div class="coaching-bar-group" style="margin-bottom:12px;">
                 <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-weight:600;margin-bottom:4px;">
                     <span style="color:var(--text-primary);">${dim.label}</span>
-                    <span style="color:var(--text-secondary);">${pct} / 100</span>
+                    <span style="color:var(--text-secondary);">${avg.toFixed(1)} / ${dim.max} (${pct}%)</span>
                 </div>
                 <div class="progress-bar-bg" style="background:rgba(255,255,255,0.03);height:8px;border-radius:4px;overflow:hidden;border:1px solid var(--border-color);">
                     <div style="background:${progressColor};height:100%;width:${pct}%;border-radius:4px;transition:width 0.5s ease-out;"></div>
@@ -9794,7 +9735,7 @@ function renderAgentQACoaching(selectedAgent) {
     if (auditedTbody && audited.length > 0) {
         auditedTbody.innerHTML = audited.map(d => {
             const v = Number(d.qa_overall);
-            const qaPct = Math.round(normalizeQAScore(v, 45));
+            const qaPct = Math.round(v > 45 ? v : (v / 45) * 100);
             const csatStars = d.csat ? '★'.repeat(Math.round(d.csat)) + '☆'.repeat(5 - Math.round(d.csat)) : '-';
             const commentsEscaped = (d.comments || '').replace(/"/g, '&quot;');
             return `<tr>
