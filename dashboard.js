@@ -1547,7 +1547,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDashboardData();
     setupEventListeners();
     initCustomDropdowns();
-    BorderGlow.init();
+    // BorderGlow.init();
 });
 
 async function loadDashboardData() {

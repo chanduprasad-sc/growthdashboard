@@ -3857,9 +3857,6 @@ body.light-mode {
 .hotspots-list,
 .explorer-left-pane,
 .explorer-right-pane,
-.chart-container,
-.intelligence-panel canvas,
-.deepdive-chart-card canvas,
 .ticket-detail-panel,
 .live-feed-viewport {
     background: rgba(0, 0, 0, 0.2) !important;
@@ -3879,7 +3876,6 @@ body.light-mode .ai-summary-output,
 body.light-mode .hotspots-list,
 body.light-mode .explorer-left-pane,
 body.light-mode .explorer-right-pane,
-body.light-mode .chart-container,
 body.light-mode .ticket-detail-panel,
 body.light-mode .live-feed-viewport {
     background: rgba(255, 255, 255, 0.45) !important;

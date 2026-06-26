@@ -450,21 +450,22 @@
                             </div>
                         </div>
                     </div>
-
                     <!-- Section 7: Attribute Explorer Widget -->
                     <div class="visual-card attribute-explorer-card">
                         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
                             <div>
-                                <h3 class="card-title" style="margin:0;">Cross-Attribute Explorer Matrix</h3>
+                                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                                    <h3 class="card-title" style="margin:0;">Cross-Attribute Explorer Matrix</h3>
+                                    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; font-weight:600; color:var(--text-secondary); cursor:pointer;" title="Sticky: allow selecting multiple items">
+                                        <span class="toggle-label-text">Sticky Toggle</span>
+                                        <div id="explorer-sticky-toggle" class="sticky-toggle-track" style="position:relative; width:34px; height:20px; border-radius:10px; background:var(--border-color); cursor:pointer; transition:background 0.2s;">
+                                            <div class="sticky-toggle-thumb" style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left 0.2s;"></div>
+                                        </div>
+                                    </label>
+                                </div>
                                 <p class="card-subtitle" style="margin:4px 0 0 0;">Click on any category tab, choose an option, and dissect its sub-attributes dynamically</p>
                             </div>
                             <div style="display:flex; align-items:center; gap:12px;">
-                                <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; font-weight:600; color:var(--text-secondary); cursor:pointer;" title="Sticky: allow selecting multiple items">
-                                    <span class="toggle-label-text">Sticky Toggle</span>
-                                    <div id="explorer-sticky-toggle" class="sticky-toggle-track" style="position:relative; width:34px; height:20px; border-radius:10px; background:var(--border-color); cursor:pointer; transition:background 0.2s;">
-                                        <div class="sticky-toggle-thumb" style="position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left 0.2s;"></div>
-                                    </div>
-                                </label>
                                 <button id="explorer-reset-btn" class="export-btn" style="padding: 4px 12px; font-size: 0.8rem; border-radius: 6px; line-height: 1.4;">Reset</button>
                             </div>
                         </div>
