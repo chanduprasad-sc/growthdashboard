@@ -268,6 +268,8 @@ let activeFilters = {
     poc: ['all'],
     agent: ['all'],
     hideSmallcaseRm: ['none'],
+    issueType: ['all'],
+    subIssueType: ['all'],
     branch: 'all',
     searchQuery: '',
     includeCareEmails: false
@@ -1948,9 +1950,12 @@ function setupEventListeners() {
             dateFrom: '',
             dateTo: '',
             channel: 'all',
-            broker: 'all',
-            poc: 'all',
-            agent: 'all',
+            broker: ['all'],
+            poc: ['all'],
+            agent: ['all'],
+            hideSmallcaseRm: ['none'],
+            issueType: ['all'],
+            subIssueType: ['all'],
             branch: 'all',
             searchQuery: '',
             includeCareEmails: false
@@ -1989,6 +1994,8 @@ function setupEventListeners() {
         resetSelectMultiple('filter-poc', 'all');
         resetSelectMultiple('filter-agent', 'all');
         resetSelectMultiple('filter-hide-smallcase-rm', 'none');
+        resetSelectMultiple('filter-issue-type', 'all');
+        resetSelectMultiple('filter-sub-issue-type', 'all');
 
         setDefaultDateRange();
         buildViewModel();
@@ -2015,6 +2022,20 @@ function setupEventListeners() {
     if (hideSmallcaseRmSelect) {
         hideSmallcaseRmSelect.addEventListener('change', (e) => {
             activeFilters.hideSmallcaseRm = getSelectValues(e.target);
+            buildViewModel();
+        });
+    }
+    const issueTypeSelect = document.getElementById('filter-issue-type');
+    if (issueTypeSelect) {
+        issueTypeSelect.addEventListener('change', (e) => {
+            activeFilters.issueType = getSelectValues(e.target);
+            buildViewModel();
+        });
+    }
+    const subIssueTypeSelect = document.getElementById('filter-sub-issue-type');
+    if (subIssueTypeSelect) {
+        subIssueTypeSelect.addEventListener('change', (e) => {
+            activeFilters.subIssueType = getSelectValues(e.target);
             buildViewModel();
         });
     }
@@ -2307,6 +2328,8 @@ function populateFilterDropdowns() {
     const pocs = new Set();
     const agents = new Set();
     const smallcaseRms = new Set();
+    const issueTypes = new Set();
+    const subIssueTypes = new Set();
 
     const allowedBrokers = new Set([
         'Axis', 'Axis MTF', 'HDFC', 'HDFC MTF', 'SBI', 'SBI MTF', 'HDFCsky',
@@ -2322,6 +2345,8 @@ function populateFilterDropdowns() {
         }
         if (item.poc && item.poc !== 'Not shared' && item.poc !== 'No POC') pocs.add(item.poc);
         if (item.agent && item.agent !== 'Unassigned' && item.agent !== 'System') agents.add(item.agent);
+        if (item.issue) issueTypes.add(item.issue);
+        if (item.sub_issue) subIssueTypes.add(item.sub_issue);
         
         if (cleanStr(item.branch).toLowerCase() === 'smallcase') {
             const rm = cleanStr(item.rm_name || item.RM_Name || item.rm);
@@ -2389,6 +2414,32 @@ function populateFilterDropdowns() {
         smallcaseRmSelect.innerHTML = html;
         Array.from(smallcaseRmSelect.options).forEach(opt => {
             opt.selected = currentSmallcaseRm.includes(opt.value);
+        });
+    }
+
+    const issueTypeSelect = document.getElementById('filter-issue-type');
+    const currentIssueType = issueTypeSelect ? Array.from(issueTypeSelect.selectedOptions).map(o => o.value) : ['all'];
+    if (issueTypeSelect) {
+        let html = '<option value="all">All Issue Types</option>';
+        Array.from(issueTypes).sort().forEach(it => {
+            html += `<option value="${it}">${it}</option>`;
+        });
+        issueTypeSelect.innerHTML = html;
+        Array.from(issueTypeSelect.options).forEach(opt => {
+            opt.selected = currentIssueType.includes(opt.value);
+        });
+    }
+
+    const subIssueTypeSelect = document.getElementById('filter-sub-issue-type');
+    const currentSubIssueType = subIssueTypeSelect ? Array.from(subIssueTypeSelect.selectedOptions).map(o => o.value) : ['all'];
+    if (subIssueTypeSelect) {
+        let html = '<option value="all">All Sub-Issue Types</option>';
+        Array.from(subIssueTypes).sort().forEach(sit => {
+            html += `<option value="${sit}">${sit}</option>`;
+        });
+        subIssueTypeSelect.innerHTML = html;
+        Array.from(subIssueTypeSelect.options).forEach(opt => {
+            opt.selected = currentSubIssueType.includes(opt.value);
         });
     }
 }
@@ -2775,6 +2826,12 @@ function buildViewModel() {
         if (activeFilters.agent && !activeFilters.agent.includes('all')) {
             if (!activeFilters.agent.includes(item.agent)) return false;
         }
+        if (activeFilters.issueType && !activeFilters.issueType.includes('all')) {
+            if (!activeFilters.issueType.includes(item.issue)) return false;
+        }
+        if (activeFilters.subIssueType && !activeFilters.subIssueType.includes('all')) {
+            if (!activeFilters.subIssueType.includes(item.sub_issue)) return false;
+        }
         if (activeFilters.branch && activeFilters.branch !== 'all' && item.branch !== activeFilters.branch) return false;
 
         // smallcase RM hiding filter
@@ -2803,6 +2860,14 @@ function buildViewModel() {
         }
         if (activeFilters.agent && !activeFilters.agent.includes('all')) {
             if (!activeFilters.agent.includes(call.agent)) return false;
+        }
+        if (activeFilters.issueType && !activeFilters.issueType.includes('all')) {
+            const issue = call.issue || 'Voice Call';
+            if (!activeFilters.issueType.includes(issue)) return false;
+        }
+        if (activeFilters.subIssueType && !activeFilters.subIssueType.includes('all')) {
+            const subIssue = call.sub_issue || 'Voice Call';
+            if (!activeFilters.subIssueType.includes(subIssue)) return false;
         }
         if (activeFilters.branch && activeFilters.branch !== 'all' && call.branch !== activeFilters.branch) return false;
 
@@ -2844,6 +2909,12 @@ function buildViewModel() {
         }
         if (activeFilters.agent && !activeFilters.agent.includes('all')) {
             if (!activeFilters.agent.includes(item.agent)) return false;
+        }
+        if (activeFilters.issueType && !activeFilters.issueType.includes('all')) {
+            if (!activeFilters.issueType.includes(item.issue)) return false;
+        }
+        if (activeFilters.subIssueType && !activeFilters.subIssueType.includes('all')) {
+            if (!activeFilters.subIssueType.includes(item.sub_issue)) return false;
         }
 
         // smallcase RM hiding filter
@@ -8008,6 +8079,14 @@ function renderMonthlyView() {
         allInteractions = allInteractions.filter(d => d.branch === activeFilters.branch);
         allCalls = allCalls.filter(c => c.branch === activeFilters.branch);
     }
+    if (activeFilters.issueType && !activeFilters.issueType.includes('all')) {
+        allInteractions = allInteractions.filter(d => activeFilters.issueType.includes(d.issue));
+        allCalls = allCalls.filter(c => activeFilters.issueType.includes(c.issue || 'Voice Call'));
+    }
+    if (activeFilters.subIssueType && !activeFilters.subIssueType.includes('all')) {
+        allInteractions = allInteractions.filter(d => activeFilters.subIssueType.includes(d.sub_issue));
+        allCalls = allCalls.filter(c => activeFilters.subIssueType.includes(c.sub_issue || 'Voice Call'));
+    }
 
     // Populate month/year selectors
     const monthSelect = document.getElementById('monthly-month-select');
@@ -10258,6 +10337,8 @@ function initCustomDropdowns() {
         '#filter-poc',
         '#filter-agent',
         '#filter-hide-smallcase-rm',
+        '#filter-issue-type',
+        '#filter-sub-issue-type',
         '#monthly-month-select',
         '#monthly-year-select',
         '#agent-perf-select'

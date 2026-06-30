@@ -5238,70 +5238,72 @@ body.light-mode input[type="range"] {
     -webkit-backdrop-filter: blur(12px) !important;
 }
 
-/* 2. Modal Content (Glass Container) */
+/* 2. Modal Content (Glass Container -> Solid Premium Theme) */
 .modal-content {
-    background: rgba(15, 23, 42, 0.55) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.35) !important;
-    backdrop-filter: blur(30px) saturate(150%) !important;
-    -webkit-backdrop-filter: blur(30px) saturate(150%) !important;
+    background: #0f121d !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5) !important;
     border-radius: 24px !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    width: 95% !important;
+    max-width: 1450px !important;
 }
 
 body.light-mode .modal-content {
-    background: rgba(255, 255, 255, 0.5) !important;
-    border: 1px solid rgba(0, 0, 0, 0.06) !important;
-    box-shadow: 0 32px 80px rgba(31, 38, 135, 0.1) !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 32px 80px rgba(31, 38, 135, 0.15) !important;
 }
 
 /* 3. Modal KPI Cards (Nested Cards) */
 .modal-kpi-card,
 .modal-content .kpi-card {
-    background: rgba(255, 255, 255, 0.02) !important;
-    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    background: #151928 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
     border-radius: 16px !important;
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.03) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 body.light-mode .modal-kpi-card,
 body.light-mode .modal-content .kpi-card {
-    background: rgba(255, 255, 255, 0.25) !important;
-    border: 1px solid rgba(0, 0, 0, 0.04) !important;
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6), 0 4px 12px rgba(0, 0, 0, 0.02) !important;
+    background: #f8fafc !important;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02) !important;
 }
 
 /* 4. Modal Panels (Inner Sections) */
 .modal-panel,
 .modal-content .modal-panel {
-    background: rgba(0, 0, 0, 0.15) !important;
-    border: 1px solid rgba(255, 255, 255, 0.04) !important;
+    background: #131726 !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
     border-radius: 20px !important;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 
 body.light-mode .modal-panel,
 body.light-mode .modal-content .modal-panel {
-    background: rgba(0, 0, 0, 0.015) !important;
-    border: 1px solid rgba(0, 0, 0, 0.03) !important;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.01) !important;
+    background: #f8fafc !important;
+    border: 1px solid rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.02) !important;
 }
 
 /* 5. Inner Panel Table Wrappers (Recessed Slots) */
 .modal-content .panel-table-wrapper {
-    background: rgba(0, 0, 0, 0.2) !important;
+    background: #0d101c !important;
     border: 1px solid rgba(255, 255, 255, 0.03) !important;
     border-radius: 12px !important;
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.15) !important;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.3) !important;
 }
 
 body.light-mode .modal-content .panel-table-wrapper {
-    background: rgba(0, 0, 0, 0.01) !important;
+    background: #f1f5f9 !important;
     border: 1px solid rgba(0, 0, 0, 0.02) !important;
-    box-shadow: inset 0 2px 6px rgba(31, 38, 135, 0.02) !important;
+    box-shadow: inset 0 2px 6px rgba(31, 38, 135, 0.04) !important;
 }
 
 /* 6. Table Rows Transparency */
