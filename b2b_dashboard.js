@@ -267,8 +267,6 @@ let activeFilters = {
     broker: 'all',
     poc: 'all',
     agent: 'all',
-    issueType: 'all',
-    subIssueType: 'all',
     searchQuery: ''
 };
 
@@ -444,11 +442,6 @@ function setupEventListeners() {
         document.getElementById('filter-poc').value = 'all';
         document.getElementById('filter-agent').value = 'all';
         
-        const filterIssueType = document.getElementById('filter-issue-type');
-        if (filterIssueType) filterIssueType.value = 'all';
-        const filterSubIssueType = document.getElementById('filter-sub-issue-type');
-        if (filterSubIssueType) filterSubIssueType.value = 'all';
-        
         setDefaultDateRange();
         buildViewModel();
     });
@@ -466,20 +459,6 @@ function setupEventListeners() {
         activeFilters.agent = e.target.value;
         buildViewModel();
     });
-    const filterIssueTypeEl = document.getElementById('filter-issue-type');
-    if (filterIssueTypeEl) {
-        filterIssueTypeEl.addEventListener('change', (e) => {
-            activeFilters.issueType = e.target.value;
-            buildViewModel();
-        });
-    }
-    const filterSubIssueTypeEl = document.getElementById('filter-sub-issue-type');
-    if (filterSubIssueTypeEl) {
-        filterSubIssueTypeEl.addEventListener('change', (e) => {
-            activeFilters.subIssueType = e.target.value;
-            buildViewModel();
-        });
-    }
 
     // Theme Switcher (Light/Dark)
     document.getElementById('theme-toggle-btn').addEventListener('click', (e) => {
@@ -618,8 +597,6 @@ function populateFilterDropdowns() {
     const brokers = new Set();
     const pocs = new Set();
     const agents = new Set();
-    const issueTypes = new Set();
-    const subIssueTypes = new Set();
     
     const allowedBrokers = new Set([
         'Axis', 'Axis MTF', 'HDFC', 'HDFC MTF', 'SBI', 'SBI MTF', 'HDFCsky', 
@@ -635,8 +612,6 @@ function populateFilterDropdowns() {
         }
         if (item.poc && item.poc !== 'Not shared' && item.poc !== 'No POC') pocs.add(item.poc);
         if (item.agent && item.agent !== 'Unassigned' && item.agent !== 'System') agents.add(item.agent);
-        if (item.issue) issueTypes.add(item.issue);
-        if (item.sub_issue) subIssueTypes.add(item.sub_issue);
     });
     
     const brokerSelect = document.getElementById('filter-broker');
@@ -670,28 +645,6 @@ function populateFilterDropdowns() {
         });
         agentSelect.innerHTML = html;
         agentSelect.value = currentVal || 'all';
-    }
-
-    const issueTypeSelect = document.getElementById('filter-issue-type');
-    if (issueTypeSelect) {
-        const currentVal = issueTypeSelect.value;
-        let html = '<option value="all">All Issue Types</option>';
-        Array.from(issueTypes).sort().forEach(it => {
-            html += `<option value="${it}">${it}</option>`;
-        });
-        issueTypeSelect.innerHTML = html;
-        issueTypeSelect.value = currentVal || 'all';
-    }
-
-    const subIssueTypeSelect = document.getElementById('filter-sub-issue-type');
-    if (subIssueTypeSelect) {
-        const currentVal = subIssueTypeSelect.value;
-        let html = '<option value="all">All Sub-Issue Types</option>';
-        Array.from(subIssueTypes).sort().forEach(sit => {
-            html += `<option value="${sit}">${sit}</option>`;
-        });
-        subIssueTypeSelect.innerHTML = html;
-        subIssueTypeSelect.value = currentVal || 'all';
     }
 }
 
@@ -788,8 +741,6 @@ function buildViewModel() {
         if (activeFilters.broker !== 'all' && item.broker_family !== activeFilters.broker) return false;
         if (activeFilters.poc !== 'all' && item.poc !== activeFilters.poc) return false;
         if (activeFilters.agent !== 'all' && item.agent !== activeFilters.agent) return false;
-        if (activeFilters.issueType !== 'all' && item.issue !== activeFilters.issueType) return false;
-        if (activeFilters.subIssueType !== 'all' && item.sub_issue !== activeFilters.subIssueType) return false;
         
         return true;
     });
@@ -804,8 +755,6 @@ function buildViewModel() {
         if (activeFilters.broker !== 'all' && call.broker_family !== activeFilters.broker) return false;
         if (activeFilters.poc !== 'all' && call.poc !== activeFilters.poc) return false;
         if (activeFilters.agent !== 'all' && call.agent !== activeFilters.agent) return false;
-        if (activeFilters.issueType !== 'all' && (call.issue || 'Voice Call') !== activeFilters.issueType) return false;
-        if (activeFilters.subIssueType !== 'all' && (call.sub_issue || 'Voice Call') !== activeFilters.subIssueType) return false;
         
         return true;
     });
@@ -824,8 +773,6 @@ function buildViewModel() {
         if (activeFilters.broker !== 'all' && item.broker_family !== activeFilters.broker) return false;
         if (activeFilters.poc !== 'all' && item.poc !== activeFilters.poc) return false;
         if (activeFilters.agent !== 'all' && item.agent !== activeFilters.agent) return false;
-        if (activeFilters.issueType !== 'all' && item.issue !== activeFilters.issueType) return false;
-        if (activeFilters.subIssueType !== 'all' && item.sub_issue !== activeFilters.subIssueType) return false;
         
         return true;
     });
