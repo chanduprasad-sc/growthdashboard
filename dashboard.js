@@ -11256,6 +11256,8 @@ function initCustomDropdowns() {
 // ================================================================
 let dtActiveSubTab = 'dt-redash';
 let clickupTasks = [];
+let clickupActiveTab = 'active'; // 'active' or 'closed'
+let clickupModalActiveTab = 'active'; // 'active' or 'closed'
 
 function renderDailyToolsTab() {
     // Setup sub-tab event listeners (only once)
@@ -11311,6 +11313,66 @@ function renderDailyToolsTab() {
         if (btnCloseDeepDive) {
             btnCloseDeepDive.addEventListener('click', () => {
                 closeClickupDeepdive();
+            });
+        }
+
+        // ClickUp Dashboard Active/Closed Tabs
+        const btnActiveTab = document.getElementById('btn-clickup-active-tab');
+        const btnClosedTab = document.getElementById('btn-clickup-closed-tab');
+        if (btnActiveTab && btnClosedTab) {
+            btnActiveTab.addEventListener('click', () => {
+                clickupActiveTab = 'active';
+                btnActiveTab.classList.add('active');
+                btnActiveTab.style.background = 'var(--accent-primary)';
+                btnActiveTab.style.color = 'white';
+                
+                btnClosedTab.classList.remove('active');
+                btnClosedTab.style.background = 'transparent';
+                btnClosedTab.style.color = 'var(--text-secondary)';
+                
+                renderClickupDashboard();
+            });
+            btnClosedTab.addEventListener('click', () => {
+                clickupActiveTab = 'closed';
+                btnClosedTab.classList.add('active');
+                btnClosedTab.style.background = 'var(--accent-primary)';
+                btnClosedTab.style.color = 'white';
+                
+                btnActiveTab.classList.remove('active');
+                btnActiveTab.style.background = 'transparent';
+                btnActiveTab.style.color = 'var(--text-secondary)';
+                
+                renderClickupDashboard();
+            });
+        }
+
+        // ClickUp Modal Active/Closed Tabs
+        const btnModalActiveTab = document.getElementById('btn-clickup-modal-active-tab');
+        const btnModalClosedTab = document.getElementById('btn-clickup-modal-closed-tab');
+        if (btnModalActiveTab && btnModalClosedTab) {
+            btnModalActiveTab.addEventListener('click', () => {
+                clickupModalActiveTab = 'active';
+                btnModalActiveTab.classList.add('active');
+                btnModalActiveTab.style.background = 'var(--accent-primary)';
+                btnModalActiveTab.style.color = 'white';
+                
+                btnModalClosedTab.classList.remove('active');
+                btnModalClosedTab.style.background = 'transparent';
+                btnModalClosedTab.style.color = 'var(--text-secondary)';
+                
+                renderClickupDeepDiveList();
+            });
+            btnModalClosedTab.addEventListener('click', () => {
+                clickupModalActiveTab = 'closed';
+                btnModalClosedTab.classList.add('active');
+                btnModalClosedTab.style.background = 'var(--accent-primary)';
+                btnModalClosedTab.style.color = 'white';
+                
+                btnModalActiveTab.classList.remove('active');
+                btnModalActiveTab.style.background = 'transparent';
+                btnModalActiveTab.style.color = 'var(--text-secondary)';
+                
+                renderClickupDeepDiveList();
             });
         }
     }
@@ -11379,6 +11441,7 @@ function escapeHtml(text) {
 }
 
 window.filterClickupByMember = function(memberName) {
+    clickupModalActiveTab = 'active';
     const searchInput = document.getElementById('clickup-search');
     if (searchInput) {
         searchInput.value = memberName;
@@ -11403,6 +11466,27 @@ function renderClickupDashboard() {
     document.getElementById('clickup-open-tasks').innerText = open;
     document.getElementById('clickup-closed-tasks').innerText = closed;
 
+    // Sync active tab pills styling in renderClickupDashboard
+    const btnActiveTab = document.getElementById('btn-clickup-active-tab');
+    const btnClosedTab = document.getElementById('btn-clickup-closed-tab');
+    if (btnActiveTab && btnClosedTab) {
+        if (clickupActiveTab === 'active') {
+            btnActiveTab.classList.add('active');
+            btnActiveTab.style.background = 'var(--accent-primary)';
+            btnActiveTab.style.color = 'white';
+            btnClosedTab.classList.remove('active');
+            btnClosedTab.style.background = 'transparent';
+            btnClosedTab.style.color = 'var(--text-secondary)';
+        } else {
+            btnClosedTab.classList.add('active');
+            btnClosedTab.style.background = 'var(--accent-primary)';
+            btnClosedTab.style.color = 'white';
+            btnActiveTab.classList.remove('active');
+            btnActiveTab.style.background = 'transparent';
+            btnActiveTab.style.color = 'var(--text-secondary)';
+        }
+    }
+
     // Render task board table
     const tbody = document.getElementById('clickup-tasks-tbody');
     if (tbody) {
@@ -11413,70 +11497,30 @@ function renderClickupDashboard() {
             const activeTasks = clickupTasks.filter(t => t.status && t.status.status.toLowerCase() !== 'closed' && t.status.status.toLowerCase() !== 'archived' && t.status.status.toLowerCase() !== 'cancelled');
             const closedTasks = clickupTasks.filter(t => t.status && (t.status.status.toLowerCase() === 'closed' || t.status.status.toLowerCase() === 'archived' || t.status.status.toLowerCase() === 'cancelled'));
 
-            let html = activeTasks.map(t => {
-                const creatorName = t.creator ? t.creator.username : 'Unknown';
-                const creatorImg = t.creator && t.creator.profilePicture ? `<img src="${t.creator.profilePicture}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; margin-right: 8px;">` : `<div style="width: 24px; height: 24px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; margin-right: 8px;">${creatorName.charAt(0).toUpperCase()}</div>`;
-                const dateStr = t.date_created ? new Date(parseInt(t.date_created)).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'}) : 'N/A';
-                
-                const statusColor = t.status && t.status.color ? t.status.color : '#6b7280';
-                const statusName = t.status ? t.status.status.toUpperCase() : 'UNKNOWN';
+            const tasksToRender = clickupActiveTab === 'active' ? activeTasks : closedTasks;
 
-                return `
-                    <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="openSingleClickupTask('${t.id}')">
-                        <td style="padding: 12px 10px;"><a href="${t.url}" target="_blank" onclick="event.stopPropagation();" style="color: var(--accent-primary); font-family: monospace; font-size: 0.85rem; font-weight: 600;">#${t.id}</a></td>
-                        <td style="padding: 12px 10px; font-weight: 500; color: var(--text-primary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(t.name)}</td>
-                        <td style="padding: 12px 10px; display: flex; align-items: center; height: 44px;">${creatorImg}<span style="font-size: 0.85rem; color: var(--text-secondary);">${creatorName}</span></td>
-                        <td style="padding: 12px 10px; font-size: 0.85rem; color: var(--text-secondary);">${dateStr}</td>
-                        <td style="padding: 12px 10px;"><span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: ${statusColor}22; color: ${statusColor}; font-size: 0.75rem; font-weight: 600; border: 1px solid ${statusColor}44;">${statusName}</span></td>
-                    </tr>
-                `;
-            }).join('');
+            if (tasksToRender.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 20px;">No ${clickupActiveTab} tasks found.</td></tr>`;
+            } else {
+                tbody.innerHTML = tasksToRender.map(t => {
+                    const creatorName = t.creator ? t.creator.username : 'Unknown';
+                    const creatorImg = t.creator && t.creator.profilePicture ? `<img src="${t.creator.profilePicture}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; margin-right: 8px;">` : `<div style="width: 24px; height: 24px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; margin-right: 8px;">${creatorName.charAt(0).toUpperCase()}</div>`;
+                    const dateStr = t.date_created ? new Date(parseInt(t.date_created)).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'}) : 'N/A';
+                    
+                    const statusColor = t.status && t.status.color ? t.status.color : '#6b7280';
+                    const statusName = t.status ? t.status.status.toUpperCase() : 'UNKNOWN';
 
-            // Append closed tasks inside a collapsible row at the end
-            if (closedTasks.length > 0) {
-                html += `
-                    <tr style="background: rgba(0,0,0,0.1); border-top: 2px solid var(--border-color);">
-                        <td colspan="5" style="padding: 10px;">
-                            <details style="width: 100%;">
-                                <summary style="font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); padding: 5px; outline: none; display: flex; align-items: center; gap: 8px;">
-                                    <span>📁 Closed / Archived Tasks (${closedTasks.length})</span>
-                                </summary>
-                                <div style="max-height: 250px; overflow-y: auto; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 10px;">
-                                    <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-                                        <thead>
-                                            <tr style="text-align: left; border-bottom: 1px solid var(--border-color);">
-                                                <th style="padding: 6px; color: var(--text-muted);">ID</th>
-                                                <th style="padding: 6px; color: var(--text-muted);">Title</th>
-                                                <th style="padding: 6px; color: var(--text-muted);">Created By</th>
-                                                <th style="padding: 6px; color: var(--text-muted);">Date Created</th>
-                                                <th style="padding: 6px; color: var(--text-muted);">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${closedTasks.map(t => {
-                                                const creatorName = t.creator ? t.creator.username : 'Unknown';
-                                                const dateStr = t.date_created ? new Date(parseInt(t.date_created)).toLocaleDateString('en-IN', {day: 'numeric', month: 'short'}) : 'N/A';
-                                                const statusColor = t.status && t.status.color ? t.status.color : '#6b7280';
-                                                return `
-                                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;" onclick="openSingleClickupTask('${t.id}')">
-                                                        <td style="padding: 6px;"><a href="${t.url}" target="_blank" onclick="event.stopPropagation();" style="color: var(--accent-primary); font-family: monospace;">#${t.id}</a></td>
-                                                        <td style="padding: 6px; color: var(--text-muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(t.name)}</td>
-                                                        <td style="padding: 6px; color: var(--text-muted);">${creatorName}</td>
-                                                        <td style="padding: 6px; color: var(--text-muted);">${dateStr}</td>
-                                                        <td style="padding: 6px;"><span style="color: ${statusColor}; font-size: 0.7rem;">${t.status.status.toUpperCase()}</span></td>
-                                                    </tr>
-                                                `;
-                                            }).join('')}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </details>
-                        </td>
-                    </tr>
-                `;
+                    return `
+                        <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="openSingleClickupTask('${t.id}')">
+                            <td style="padding: 12px 10px;"><a href="${t.url}" target="_blank" onclick="event.stopPropagation();" style="color: var(--accent-primary); font-family: monospace; font-size: 0.85rem; font-weight: 600;">#${t.id}</a></td>
+                            <td style="padding: 12px 10px; font-weight: 500; color: var(--text-primary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(t.name)}</td>
+                            <td style="padding: 12px 10px; display: flex; align-items: center; height: 44px;">${creatorImg}<span style="font-size: 0.85rem; color: var(--text-secondary);">${creatorName}</span></td>
+                            <td style="padding: 12px 10px; font-size: 0.85rem; color: var(--text-secondary);">${dateStr}</td>
+                            <td style="padding: 12px 10px;"><span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: ${statusColor}22; color: ${statusColor}; font-size: 0.75rem; font-weight: 600; border: 1px solid ${statusColor}44;">${statusName}</span></td>
+                        </tr>
+                    `;
+                }).join('');
             }
-
-            tbody.innerHTML = html;
         }
     }
 
@@ -11647,6 +11691,26 @@ function generateMockClickupTasks() {
 function openClickupDeepdive() {
     const modal = document.getElementById('clickup-deepdive-modal');
     if (modal) {
+        // Sync the tab button styles in openClickupDeepdive
+        const btnActive = document.getElementById('btn-clickup-modal-active-tab');
+        const btnClosed = document.getElementById('btn-clickup-modal-closed-tab');
+        if (btnActive && btnClosed) {
+            if (clickupModalActiveTab === 'active') {
+                btnActive.classList.add('active');
+                btnActive.style.background = 'var(--accent-primary)';
+                btnActive.style.color = 'white';
+                btnClosed.classList.remove('active');
+                btnClosed.style.background = 'transparent';
+                btnClosed.style.color = 'var(--text-secondary)';
+            } else {
+                btnClosed.classList.add('active');
+                btnClosed.style.background = 'var(--accent-primary)';
+                btnClosed.style.color = 'white';
+                btnActive.classList.remove('active');
+                btnActive.style.background = 'transparent';
+                btnActive.style.color = 'var(--text-secondary)';
+            }
+        }
         modal.classList.add('open');
         renderClickupDeepDiveList();
     }
@@ -11661,9 +11725,40 @@ function renderClickupDeepDiveList() {
     const listContainer = document.getElementById('clickup-deepdive-list');
     if (!listContainer) return;
 
+    // Sync tab button styles inside list rendering
+    const btnActive = document.getElementById('btn-clickup-modal-active-tab');
+    const btnClosed = document.getElementById('btn-clickup-modal-closed-tab');
+    if (btnActive && btnClosed) {
+        if (clickupModalActiveTab === 'active') {
+            btnActive.classList.add('active');
+            btnActive.style.background = 'var(--accent-primary)';
+            btnActive.style.color = 'white';
+            btnClosed.classList.remove('active');
+            btnClosed.style.background = 'transparent';
+            btnClosed.style.color = 'var(--text-secondary)';
+        } else {
+            btnClosed.classList.add('active');
+            btnClosed.style.background = 'var(--accent-primary)';
+            btnClosed.style.color = 'white';
+            btnActive.classList.remove('active');
+            btnActive.style.background = 'transparent';
+            btnActive.style.color = 'var(--text-secondary)';
+        }
+    }
+
     const query = document.getElementById('clickup-search') ? document.getElementById('clickup-search').value.toLowerCase().trim() : '';
 
-    const filtered = clickupTasks.filter(t => {
+    // First filter by status according to active tab
+    const tabFiltered = clickupTasks.filter(t => {
+        const isClosed = t.status && (t.status.status.toLowerCase() === 'closed' || t.status.status.toLowerCase() === 'archived' || t.status.status.toLowerCase() === 'cancelled');
+        if (clickupModalActiveTab === 'active') {
+            return !isClosed;
+        } else {
+            return isClosed;
+        }
+    });
+
+    const filtered = tabFiltered.filter(t => {
         if (!query) return true;
         const name = (t.name || '').toLowerCase();
         const desc = (t.description || '').toLowerCase();
@@ -11732,6 +11827,15 @@ function renderClickupDeepDiveList() {
 }
 
 function openSingleClickupTask(taskId) {
+    const task = clickupTasks.find(t => t.id === taskId);
+    if (task && task.status) {
+        const status = task.status.status.toLowerCase();
+        if (status === 'closed' || status === 'archived' || status === 'cancelled') {
+            clickupModalActiveTab = 'closed';
+        } else {
+            clickupModalActiveTab = 'active';
+        }
+    }
     openClickupDeepdive();
     const search = document.getElementById('clickup-search');
     if (search) {
