@@ -773,6 +773,16 @@ function compileRawCache(cache) {
 
     let tickets = [];
     let rm_phone_lookup = {};
+    let rm_contacts_map = {};
+
+    function cleanPhone(num) {
+        if (!num) return "";
+        let clean = String(num).replace(/\D/g, "");
+        if (clean.length > 10) {
+            clean = clean.slice(-10);
+        }
+        return clean;
+    }
 
     // 2. Parse Call Tickets
     if (cache.callTkts && Array.isArray(cache.callTkts)) {
@@ -802,6 +812,18 @@ function compileRawCache(cache) {
             let broker_fam = canonicalBroker(broker_name);
             let norm_branch = normalizeBranch(branch_loc);
             let poc = matchPoc(broker_fam, norm_branch);
+
+            if (rm_name && rm_name !== 'NA' && rm_num) {
+                let cleaned = cleanPhone(rm_num);
+                if (cleaned) {
+                    rm_contacts_map[cleaned] = {
+                        rm_name: rm_name,
+                        broker_family: broker_fam,
+                        branch: norm_branch,
+                        poc: poc
+                    };
+                }
+            }
 
             let title_lower = title.toLowerCase();
             let call_status = "other";
@@ -907,6 +929,18 @@ function compileRawCache(cache) {
             let broker_fam = canonicalBroker(broker_name);
             let norm_branch = normalizeBranch(branch_loc);
             let poc = matchPoc(broker_fam, norm_branch);
+
+            if (rm_name && rm_name !== 'NA' && rm_num) {
+                let cleaned = cleanPhone(rm_num);
+                if (cleaned) {
+                    rm_contacts_map[cleaned] = {
+                        rm_name: rm_name,
+                        broker_family: broker_fam,
+                        branch: norm_branch,
+                        poc: poc
+                    };
+                }
+            }
 
             let sla_frt = null;
             let sla_rt = null;
@@ -1092,10 +1126,21 @@ function compileRawCache(cache) {
             let disposition = cleanStr(row["Disposition"]);
             let call_event = cleanStr(row["Call Event"]);
 
+            let cleaned_caller = cleanPhone(caller_no);
+            let rm_info = rm_contacts_map[cleaned_caller];
+
             let rm_name = "Unknown";
             let broker_fam = "Unknown";
             let branch = "Not shared";
             let poc = "No POC";
+
+            if (rm_info) {
+                rm_name = rm_info.rm_name;
+                broker_fam = rm_info.broker_family;
+                branch = rm_info.branch;
+                poc = rm_info.poc;
+                matched_calls_count++;
+            }
 
             let talk_time = parseHmsToSeconds(row["Talk Time"] || 0);
             let hold_time = parseHmsToSeconds(row["Hold Time"] || 0);
@@ -7088,6 +7133,11 @@ function renderMainDashboard() {
     else if (activeSubTab === 'md-calls') renderCallsDeepDive(data, calls);
     else if (activeSubTab === 'md-whatsapp') renderWhatsAppDeepDive(data);
     else if (activeSubTab === 'md-emails') renderEmailsDeepDive(data);
+    else if (activeSubTab === 'md-productivity') {
+        renderSLAAndQAMatrix(data);
+        renderAutoCallbacksTracker(data);
+        renderAgentBreaksTab(data, calls);
+    }
 }
 
 function renderMainOverview(data, calls) {
@@ -8721,11 +8771,21 @@ function renderMonthlyView() {
         defaultMonth = maxDate.getMonth();
     }
 
+    let currentSelectedYear = yearSelect ? parseInt(yearSelect.value) : null;
+    let currentSelectedMonth = monthSelect ? parseInt(monthSelect.value) : null;
+
     if (yearSelect && !yearSelect._populated) {
         yearSelect._populated = true;
         yearSelect.innerHTML = yearsArr.map(y => `<option value="${y}">${y}</option>`).join('');
-        yearSelect.value = yearsArr.includes(defaultYear) ? defaultYear : (yearsArr[yearsArr.length - 1] || defaultYear);
-        yearSelect.addEventListener('change', () => { yearSelect._populated = false; monthSelect._populated = false; renderMonthlyView(); });
+        if (currentSelectedYear && yearsArr.includes(currentSelectedYear)) {
+            yearSelect.value = currentSelectedYear;
+        } else {
+            yearSelect.value = yearsArr.includes(defaultYear) ? defaultYear : (yearsArr[yearsArr.length - 1] || defaultYear);
+        }
+        if (!yearSelect._hasListener) {
+            yearSelect._hasListener = true;
+            yearSelect.addEventListener('change', () => { renderMonthlyView(); });
+        }
     } else if (yearSelect && yearsArr.length > 0 && !yearsArr.includes(parseInt(yearSelect.value))) {
         // value from previous dataset no longer valid — reset
         yearSelect.innerHTML = yearsArr.map(y => `<option value="${y}">${y}</option>`).join('');
@@ -8734,8 +8794,15 @@ function renderMonthlyView() {
     if (monthSelect && !monthSelect._populated) {
         monthSelect._populated = true;
         monthSelect.innerHTML = monthNames.map((m, i) => `<option value="${i}">${m}</option>`).join('');
-        monthSelect.value = defaultMonth;
-        monthSelect.addEventListener('change', () => { monthSelect._populated = false; renderMonthlyView(); });
+        if (currentSelectedMonth !== null && currentSelectedMonth >= 0 && currentSelectedMonth <= 11) {
+            monthSelect.value = currentSelectedMonth;
+        } else {
+            monthSelect.value = defaultMonth;
+        }
+        if (!monthSelect._hasListener) {
+            monthSelect._hasListener = true;
+            monthSelect.addEventListener('change', () => { renderMonthlyView(); });
+        }
     }
 
     const selectedYear = parseInt(yearSelect.value);
@@ -9172,10 +9239,18 @@ function renderAgentPerformance() {
     const agents = new Set();
     data.forEach(d => { if (d.agent && d.agent !== '-' && d.agent !== 'Unknown') agents.add(d.agent); });
     const agentList = [...agents].sort();
+    let currentSelectedAgent = agentSelect ? agentSelect.value : null;
+
     if (agentSelect && !agentSelect._populated) {
         agentSelect._populated = true;
         agentSelect.innerHTML = '<option value="all">All Agents (Comparison View)</option>' + agentList.map(a => `<option value="${a}">${a}</option>`).join('');
-        agentSelect.addEventListener('change', () => { agentSelect._populated = false; renderAgentPerformance(); });
+        if (currentSelectedAgent && (currentSelectedAgent === 'all' || agentList.includes(currentSelectedAgent))) {
+            agentSelect.value = currentSelectedAgent;
+        }
+        if (!agentSelect._hasListener) {
+            agentSelect._hasListener = true;
+            agentSelect.addEventListener('change', () => { renderAgentPerformance(); });
+        }
     }
     const selectedAgent = agentSelect ? agentSelect.value : 'all';
 

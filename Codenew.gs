@@ -2258,8 +2258,8 @@ function fetchClickupTasksProxy() {
   var page = 0;
   var hasMore = true;
   
-  while (hasMore && page < 3) {
-    var tasksUrl = "https://api.clickup.com/api/v2/team/" + teamId + "/task?include_closed=true&subtasks=true&limit=100&page=" + page;
+  while (hasMore && page < 8) {
+    var tasksUrl = "https://api.clickup.com/api/v2/team/" + teamId + "/task?include_closed=false&subtasks=true&limit=100&page=" + page;
     var tasksResp = UrlFetchApp.fetch(tasksUrl, options);
     if (tasksResp.getResponseCode() === 200) {
       var tasksData = JSON.parse(tasksResp.getContentText());
