@@ -1885,34 +1885,47 @@ var DATE_COLUMNS = {
 };
 
 function fixAllDates() {
-var ss = SpreadsheetApp.getActiveSpreadsheet();
-var totalFixed = 0;
-Object.keys(DATE_COLUMNS).forEach(function(sheetName) {
-var sheet = ss.getSheetByName(sheetName);
-if (!sheet) return;
-var data = sheet.getDataRange().getValues();
-if (data.length < 2) return;
-var headers = data[0].map(function(h) { return String(h).trim(); });
-DATE_COLUMNS[sheetName].forEach(function(colName) {
-var colIdx = headers.indexOf(colName);
-if (colIdx === -1) return;
-var colLetter = columnToLetter(colIdx + 1);
-sheet.getRange(colLetter + "2:" + colLetter + data.length).setNumberFormat("@");
-for (var row = 1; row < data.length; row++) {
-var cell = data[row][colIdx];
-if (!cell || cell === "") continue;
-var parsed = normaliseDateCell(cell);
-if (parsed) {
-sheet.getRange(row + 1, colIdx + 1).setValue(Utilities.formatDate(parsed, "Asia/Kolkata", "yyyy-MM-dd HH:mm:ss"));
-totalFixed++;
-}
-}
-});
-});
-buildDashboardCache();
-var msg = "Fixed " + totalFixed + " date cells and rebuilt cache.";
-Logger.log(msg);
-try { SpreadsheetApp.getUi().alert("Done", msg, SpreadsheetApp.getUi().ButtonSet.OK); } catch(e) {}
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var totalFixed = 0;
+  Object.keys(DATE_COLUMNS).forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+    var range = sheet.getDataRange();
+    var values = range.getValues();
+    if (values.length < 2) return;
+    var headers = values[0].map(function(h) { return String(h).trim(); });
+    DATE_COLUMNS[sheetName].forEach(function(colName) {
+      var colIdx = headers.indexOf(colName);
+      if (colIdx === -1) return;
+      var colLetter = columnToLetter(colIdx + 1);
+      sheet.getRange(colLetter + "2:" + colLetter + values.length).setNumberFormat("@");
+      var writeValues = [];
+      for (var row = 1; row < values.length; row++) {
+        var cell = values[row][colIdx];
+        if (!cell || cell === "") {
+          writeValues.push([""]);
+          continue;
+        }
+        var parsed = normaliseDateCell(cell);
+        if (parsed) {
+          var formatted = Utilities.formatDate(parsed, "Asia/Kolkata", "yyyy-MM-dd HH:mm:ss");
+          writeValues.push([formatted]);
+          if (String(cell) !== formatted) {
+            totalFixed++;
+          }
+        } else {
+          writeValues.push([String(cell)]);
+        }
+      }
+      if (writeValues.length > 0) {
+        sheet.getRange(2, colIdx + 1, writeValues.length, 1).setValues(writeValues);
+      }
+    });
+  });
+  buildDashboardCache();
+  var msg = "Fixed " + totalFixed + " date cells and rebuilt cache.";
+  Logger.log(msg);
+  try { SpreadsheetApp.getUi().alert("Done", msg, SpreadsheetApp.getUi().ButtonSet.OK); } catch(e) {}
 }
 
 function normaliseDateCell(cell) {
@@ -1984,26 +1997,42 @@ if (t.getHandlerFunction() === "autoRebuildAfterPaste") ScriptApp.deleteTrigger(
 }
 
 function fixAllDatesSilent() {
-var ss = SpreadsheetApp.getActiveSpreadsheet();
-var totalFixed = 0;
-Object.keys(DATE_COLUMNS).forEach(function(sheetName) {
-var sheet = ss.getSheetByName(sheetName);
-if (!sheet) return;
-var data = sheet.getDataRange().getValues();
-if (data.length < 2) return;
-var headers = data[0].map(function(h) { return String(h).trim(); });
-DATE_COLUMNS[sheetName].forEach(function(colName) {
-var colIdx = headers.indexOf(colName);
-if (colIdx === -1) return;
-var colLetter = columnToLetter(colIdx + 1);
-sheet.getRange(colLetter + "2:" + colLetter + data.length).setNumberFormat("@");
-for (var row = 1; row < data.length; row++) {
-var cell = data[row][colIdx];
-if (!cell || cell === "") continue;
-var parsed = normaliseDateCell(cell);
-if (parsed) { sheet.getRange(row+1, colIdx+1).setValue(Utilities.formatDate(parsed, "Asia/Kolkata", "yyyy-MM-dd HH:mm:ss")); totalFixed++; }
-}
-});
-});
-Logger.log("fixAllDatesSilent: fixed " + totalFixed + " date cells");
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var totalFixed = 0;
+  Object.keys(DATE_COLUMNS).forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+    var range = sheet.getDataRange();
+    var values = range.getValues();
+    if (values.length < 2) return;
+    var headers = values[0].map(function(h) { return String(h).trim(); });
+    DATE_COLUMNS[sheetName].forEach(function(colName) {
+      var colIdx = headers.indexOf(colName);
+      if (colIdx === -1) return;
+      var colLetter = columnToLetter(colIdx + 1);
+      sheet.getRange(colLetter + "2:" + colLetter + values.length).setNumberFormat("@");
+      var writeValues = [];
+      for (var row = 1; row < values.length; row++) {
+        var cell = values[row][colIdx];
+        if (!cell || cell === "") {
+          writeValues.push([""]);
+          continue;
+        }
+        var parsed = normaliseDateCell(cell);
+        if (parsed) {
+          var formatted = Utilities.formatDate(parsed, "Asia/Kolkata", "yyyy-MM-dd HH:mm:ss");
+          writeValues.push([formatted]);
+          if (String(cell) !== formatted) {
+            totalFixed++;
+          }
+        } else {
+          writeValues.push([String(cell)]);
+        }
+      }
+      if (writeValues.length > 0) {
+        sheet.getRange(2, colIdx + 1, writeValues.length, 1).setValues(writeValues);
+      }
+    });
+  });
+  Logger.log("fixAllDatesSilent: fixed " + totalFixed + " date cells");
 }

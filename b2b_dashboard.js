@@ -746,6 +746,7 @@ function buildViewModel() {
     });
 
     // Filter active raw call logs
+    const ignoredCalls = [];
     const filteredCalls = rawData.calls.filter(call => {
         if (!call.date) return false;
         const callTs = new Date(call.date).getTime();
@@ -756,6 +757,15 @@ function buildViewModel() {
         if (activeFilters.poc !== 'all' && call.poc !== activeFilters.poc) return false;
         if (activeFilters.agent !== 'all' && call.agent !== activeFilters.agent) return false;
         
+        // Exclude ignored dial status calls
+        if (call.dial_status) {
+            const norm = String(call.dial_status).toLowerCase().trim().replace(/[\s\-_]/g, '');
+            if (['userdisconnected', 'normalunspecified', 'invalidnumber', 'interworkingunspecified', 'networkoutoforder'].includes(norm)) {
+                ignoredCalls.push(call);
+                return false;
+            }
+        }
+
         return true;
     });
 
@@ -780,6 +790,7 @@ function buildViewModel() {
     window.viewModel = {
         interactions: filteredInteractions,
         calls: filteredCalls,
+        ignoredCalls: ignoredCalls,
         prevInteractions: prevInteractions,
         fromTs,
         toTs,
@@ -950,31 +961,30 @@ function renderKeyMetricsGrid(interactions, calls) {
             charts.weeklyChannelMix.destroy();
             charts.weeklyChannelMix = null;
         }
-        const mixCtx = mixCanvas.getContext('2d');
         charts.weeklyChannelMix = new Chart(mixCtx, {
-            type: 'bar',
+            type: 'pie',
             data: {
                 labels: ['Calls', 'WA', 'Emails'],
                 datasets: [{
                     data: [tkt, wa, mail],
                     backgroundColor: [THEME_COLORS.purple, THEME_COLORS.green, THEME_COLORS.yellow],
-                    borderRadius: 3,
-                    barThickness: 8
+                    borderColor: 'transparent'
                 }]
             },
-            options: Object.assign(getStandardChartOptions('bar', false), {
-                indexAxis: 'y',
-                scales: {
-                    x: { display: false },
-                    y: {
-                        grid: { display: false },
-                        ticks: {
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
                             color: THEME_COLORS.textSecondary,
-                            font: { family: 'SF Pro Text', size: 8 }
+                            font: { family: 'SF Pro Text', size: 9 },
+                            boxWidth: 10
                         }
                     }
                 }
-            })
+            }
         });
     }
 }

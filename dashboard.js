@@ -2789,6 +2789,7 @@ function buildViewModel() {
     });
 
     // Filter active raw call logs
+    const ignoredCalls = [];
     const filteredCalls = rawData.calls.filter(call => {
         if (!call.date) return false;
         const callTs = safeParseDate(call.date).getTime();
@@ -2812,6 +2813,15 @@ function buildViewModel() {
             const callRm = cleanStr(call.rm_name || call.RM_Name || call.rm || call.agent).trim().toLowerCase();
             const matchesHide = activeFilters.hideSmallcaseRm.some(rm => rm.trim().toLowerCase() === callRm);
             if (cleanStr(call.branch).toLowerCase() === 'smallcase' && matchesHide) return false;
+        }
+
+        // Exclude ignored dial status calls
+        if (call.dial_status) {
+            const norm = String(call.dial_status).toLowerCase().trim().replace(/[\s\-_]/g, '');
+            if (['userdisconnected', 'normalunspecified', 'invalidnumber', 'interworkingunspecified', 'networkoutoforder'].includes(norm)) {
+                ignoredCalls.push(call);
+                return false;
+            }
         }
 
         return true;
@@ -2874,6 +2884,7 @@ function buildViewModel() {
     window.viewModel = {
         interactions: filteredInteractions,
         calls: filteredCalls,
+        ignoredCalls: ignoredCalls,
         breaks: filteredBreaks,
         prevInteractions: prevInteractions,
         fromTs,
@@ -3211,31 +3222,30 @@ function renderKeyMetricsGrid(interactions, calls) {
             charts.weeklyChannelMix.destroy();
             charts.weeklyChannelMix = null;
         }
-        const mixCtx = mixCanvas.getContext('2d');
         charts.weeklyChannelMix = new Chart(mixCtx, {
-            type: 'bar',
+            type: 'pie',
             data: {
                 labels: ['Calls', 'WA', 'Emails'],
                 datasets: [{
                     data: [tkt, wa, mail],
                     backgroundColor: [THEME_COLORS.purple, THEME_COLORS.green, THEME_COLORS.yellow],
-                    borderRadius: 3,
-                    barThickness: 8
+                    borderColor: 'transparent'
                 }]
             },
-            options: Object.assign(getStandardChartOptions('bar', false), {
-                indexAxis: 'y',
-                scales: {
-                    x: { display: false },
-                    y: {
-                        grid: { display: false },
-                        ticks: {
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
                             color: THEME_COLORS.textSecondary,
-                            font: { family: 'SF Pro Text', size: 8 }
+                            font: { family: 'SF Pro Text', size: 9 },
+                            boxWidth: 10
                         }
                     }
                 }
-            })
+            }
         });
     }
 }
@@ -6752,12 +6762,11 @@ function renderMainOverview(data, calls) {
     let inboundAbandonedOther = 0;
 
     inboundAbandonedReal.forEach(c => {
-        const ads = (c.agent_dial_status || '').toLowerCase();
-        const ds = (c.dial_status || '').toLowerCase();
-        const ev = (c.call_event || '').toLowerCase();
-        if (ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded')) {
+        const ads = (c.agent_dial_status || '').toLowerCase().trim().replace(/[\s\-_]/g, '');
+        const cds = (c.customer_dial_status || '').toLowerCase().trim().replace(/[\s\-_]/g, '');
+        if (['noanswer', 'userdisconnected', 'maxdialtimeexceeded'].includes(ads)) {
             inboundAbandonedAgent++;
-        } else if (ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue') {
+        } else if (['userdisconnected', 'normalunspecified', 'noanswer'].includes(cds)) {
             inboundAbandonedUser++;
         } else {
             inboundAbandonedOther++;
@@ -6835,12 +6844,11 @@ function renderMainOverview(data, calls) {
     let progUnansOther = 0;
 
     progUnanswered.forEach(c => {
-        const ads = (c.agent_dial_status || '').toLowerCase();
-        const ds = (c.dial_status || '').toLowerCase();
-        const ev = (c.call_event || '').toLowerCase();
-        if (ads === 'noanswer' || ads === 'normalcallclearing' || ads.includes('exceeded')) {
+        const ads = (c.agent_dial_status || '').toLowerCase().trim().replace(/[\s\-_]/g, '');
+        const cds = (c.customer_dial_status || '').toLowerCase().trim().replace(/[\s\-_]/g, '');
+        if (['noanswer', 'userdisconnected', 'maxdialtimeexceeded'].includes(ads)) {
             progUnansAgent++;
-        } else if (ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue') {
+        } else if (['userdisconnected', 'noanswer'].includes(cds)) {
             progUnansUser++;
         } else {
             progUnansOther++;
@@ -6876,9 +6884,9 @@ function renderMainOverview(data, calls) {
     const elSnapWaChats = document.getElementById('md-snap-wa-chats');
     if (elSnapWaChats) elSnapWaChats.innerText = waCount.toLocaleString();
     const elSnapWaFrt = document.getElementById('md-snap-wa-frt');
-    if (elSnapWaFrt) elSnapWaFrt.innerText = waAvgFrt > 0 ? `${Math.round(waAvgFrt / 60)} min` : '-';
+    if (elSnapWaFrt) elSnapWaFrt.innerText = waAvgFrt > 0 ? formatSecondsUnit(waAvgFrt) : '-';
     const elSnapWaRes = document.getElementById('md-snap-wa-res');
-    if (elSnapWaRes) elSnapWaRes.innerText = waAvgRes > 0 ? `${Math.round(waAvgRes / 60)} min` : '-';
+    if (elSnapWaRes) elSnapWaRes.innerText = waAvgRes > 0 ? formatSecondsUnit(waAvgRes) : '-';
 
     // 6. CARE EMAILS
     const emailTickets = data.filter(d => d.type === 'Care Email');
@@ -6890,7 +6898,7 @@ function renderMainOverview(data, calls) {
     const elSnapMailTickets = document.getElementById('md-snap-mail-tickets');
     if (elSnapMailTickets) elSnapMailTickets.innerText = emailCount.toLocaleString();
     const elSnapMailFrt = document.getElementById('md-snap-mail-frt');
-    if (elSnapMailFrt) elSnapMailFrt.innerText = emailAvgFrt > 0 ? `${Math.round(emailAvgFrt / 60)} min` : '-';
+    if (elSnapMailFrt) elSnapMailFrt.innerText = emailAvgFrt > 0 ? formatSecondsUnit(emailAvgFrt) : '-';
 
     // Badges comparisons
     const prevInboundCalls = window.viewModel.prevInteractions.filter(d => d.type === 'Call Ticket').length;
@@ -8640,6 +8648,9 @@ function renderAgentPerformance() {
 
     // Render QA Coaching Breakdown
     renderAgentQACoaching(selectedAgent);
+
+    // Render new telemetry tables (Dial Status, Ignored Status, Breaks summary)
+    renderAgentTelemetryTables(selectedAgent, data, calls);
 }
 
 const STATUS_CONFIGS = {
@@ -9970,6 +9981,202 @@ function renderAgentQACoaching(selectedAgent) {
                 <td style="text-align:left; font-size:0.78rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${commentsEscaped}">${d.comments || '-'}</td>
             </tr>`;
         }).join('');
+    }
+}
+
+function renderAgentTelemetryTables(selectedAgent, data, calls) {
+    // 1. Dial Status Categorization Table
+    const agentDialStatusBody = document.getElementById('agent-dial-status-body');
+    if (agentDialStatusBody) {
+        const callAgents = new Set();
+        calls.forEach(c => {
+            if (c.agent && c.agent !== '-' && c.agent !== 'Unknown') {
+                callAgents.add(c.agent);
+            }
+        });
+        const sortedCallAgents = [...callAgents].sort();
+
+        let html = '';
+        sortedCallAgents.forEach(agent => {
+            const agentCalls = calls.filter(c => c.agent === agent);
+            let answered = 0;
+            let missedAgent = 0;
+            let missedUser = 0;
+            let missedOther = 0;
+
+            agentCalls.forEach(c => {
+                const stage = (c.stage || c.status || '').toLowerCase();
+                if (stage === 'answered' || stage === 'connected') {
+                    answered++;
+                } else if (stage === 'unanswered' || stage === 'missed' || stage === 'abandoned') {
+                    const ads = (c.agent_dial_status || '').toLowerCase();
+                    const cds = (c.customer_dial_status || '').toLowerCase();
+                    if (ads === 'noanswer' || ads === 'user_disconnected' || ads === 'maxdialtimeexceeded') {
+                        missedAgent++;
+                    } else if (cds === 'user_disconnected' || cds === 'noanswer') {
+                        missedUser++;
+                    } else {
+                        missedOther++;
+                    }
+                }
+            });
+
+            const total = answered + missedAgent + missedUser + missedOther;
+            const isHighlight = agent === selectedAgent;
+            html += `<tr class="${isHighlight ? 'highlight' : ''}">
+                <td><strong>${agent}</strong></td>
+                <td class="text-green">${answered}</td>
+                <td class="text-red">${missedAgent}</td>
+                <td>${missedUser}</td>
+                <td class="text-muted">${missedOther}</td>
+                <td><strong>${total}</strong></td>
+            </tr>`;
+        });
+        agentDialStatusBody.innerHTML = html || '<tr><td colspan="6" class="text-center text-muted">No Ozonetel calls found for active filters</td></tr>';
+    }
+
+    // 2. Ignored Ozonetel Dial Status Table
+    const ignoredBody = document.getElementById('ignored-dial-status-body');
+    if (ignoredBody) {
+        const ignoredCalls = window.viewModel.ignoredCalls || [];
+        const ignoredGroups = {};
+
+        ignoredCalls.forEach(c => {
+            let agent = c.agent;
+            if (!agent || agent === '-' || agent === 'Unknown') {
+                const type = (c.call_type || '').toLowerCase();
+                agent = (type === 'inbound') ? 'Missed in Queue' : 'Unknown';
+            }
+            if (!ignoredGroups[agent]) {
+                ignoredGroups[agent] = {
+                    total: 0,
+                    user_disconnected: 0,
+                    normal_unspecified: 0,
+                    invalid_number: 0,
+                    interworking_unspecified: 0,
+                    network_out_of_order: 0
+                };
+            }
+            const norm = String(c.dial_status || '').toLowerCase().trim().replace(/[\s\-_]/g, '');
+            ignoredGroups[agent].total++;
+            if (norm === 'userdisconnected') ignoredGroups[agent].user_disconnected++;
+            else if (norm === 'normalunspecified') ignoredGroups[agent].normal_unspecified++;
+            else if (norm === 'invalidnumber') ignoredGroups[agent].invalid_number++;
+            else if (norm === 'interworkingunspecified') ignoredGroups[agent].interworking_unspecified++;
+            else if (norm === 'networkoutoforder') ignoredGroups[agent].network_out_of_order++;
+        });
+
+        if (selectedAgent && selectedAgent !== 'all' && !ignoredGroups[selectedAgent]) {
+            ignoredGroups[selectedAgent] = { total: 0, user_disconnected: 0, normal_unspecified: 0, invalid_number: 0, interworking_unspecified: 0, network_out_of_order: 0 };
+        }
+
+        const sortedGroupNames = Object.keys(ignoredGroups).sort((a, b) => {
+            if (a === 'Missed in Queue' || a === 'Unknown') return 1;
+            if (b === 'Missed in Queue' || b === 'Unknown') return -1;
+            return a.localeCompare(b);
+        });
+
+        let html = '';
+        sortedGroupNames.forEach(name => {
+            const g = ignoredGroups[name];
+            const isHighlight = name === selectedAgent;
+            html += `<tr class="${isHighlight ? 'highlight' : ''}">
+                <td><strong>${name}</strong></td>
+                <td><strong>${g.total}</strong></td>
+                <td>${g.user_disconnected || '-'}</td>
+                <td>${g.normal_unspecified || '-'}</td>
+                <td>${g.invalid_number || '-'}</td>
+                <td>${g.interworking_unspecified || '-'}</td>
+                <td>${g.network_out_of_order || '-'}</td>
+            </tr>`;
+        });
+        ignoredBody.innerHTML = html || '<tr><td colspan="7" class="text-center text-muted">No ignored status logs recorded in this period</td></tr>';
+    }
+
+    // 3. Agent Logins & Breaks Telemetry
+    const breaksList = window.viewModel.breaks || [];
+    const activeBreaksAgents = new Set();
+    let totalBreakTimeSec = 0;
+    const agentBreakDurations = {};
+    const agentCategoryBreaks = {};
+
+    breaksList.forEach(b => {
+        const agent = b.agent_name;
+        if (!agent || agent === '-' || agent === 'Unknown') return;
+        activeBreaksAgents.add(agent);
+        totalBreakTimeSec += (b.duration_sec || 0);
+
+        agentBreakDurations[agent] = (agentBreakDurations[agent] || 0) + (b.duration_sec || 0);
+
+        const category = (b.break_type || 'Other').trim();
+        if (!agentCategoryBreaks[agent]) {
+            agentCategoryBreaks[agent] = {};
+        }
+        if (!agentCategoryBreaks[agent][category]) {
+            agentCategoryBreaks[agent][category] = { sumSec: 0, count: 0 };
+        }
+        agentCategoryBreaks[agent][category].sumSec += (b.duration_sec || 0);
+        agentCategoryBreaks[agent][category].count++;
+    });
+
+    const activeBreaksCount = activeBreaksAgents.size;
+    const avgBreakTime = activeBreaksCount > 0 ? Math.round(totalBreakTimeSec / activeBreaksCount) : 0;
+
+    let topAgentName = '-';
+    let topAgentTime = 0;
+    Object.entries(agentBreakDurations).forEach(([agent, sec]) => {
+        if (sec > topAgentTime) {
+            topAgentTime = sec;
+            topAgentName = agent;
+        }
+    });
+
+    const breaksKpiDiv = document.getElementById('agent-breaks-kpis');
+    if (breaksKpiDiv) {
+        breaksKpiDiv.innerHTML = [
+            { label: 'Active Agents on Break', value: activeBreaksCount },
+            { label: 'Total Breaks Logged', value: breaksList.length },
+            { label: 'Avg Break Time / Agent', value: formatSecondsCompact(avgBreakTime) },
+            { label: 'Top Break Agent', value: topAgentName !== '-' ? `${topAgentName} (${formatSecondsCompact(topAgentTime)})` : '-' }
+        ].map(k => `<div class="agent-score-card"><div class="score-label">${k.label}</div><div class="score-value">${k.value}</div></div>`).join('');
+    }
+
+    const breaksTableBody = document.getElementById('agent-breaks-telemetry-body');
+    if (breaksTableBody) {
+        const allAgents = new Set();
+        calls.forEach(c => { if (c.agent && c.agent !== '-' && c.agent !== 'Unknown') allAgents.add(c.agent); });
+        activeBreaksAgents.forEach(a => allAgents.add(a));
+        const sortedAgents = [...allAgents].sort();
+
+        let html = '';
+        sortedAgents.forEach(agent => {
+            const categories = ['Lunch', 'Tea', 'Bio', 'Meeting'];
+            const catVals = {};
+
+            categories.forEach(cat => {
+                const stat = agentCategoryBreaks[agent] && agentCategoryBreaks[agent][cat];
+                if (stat && stat.count > 0) {
+                    const avg = Math.round(stat.sumSec / stat.count);
+                    catVals[cat] = formatSecondsCompact(avg);
+                } else {
+                    catVals[cat] = '-';
+                }
+            });
+
+            const totalSec = agentBreakDurations[agent] || 0;
+            const totalStr = totalSec > 0 ? formatSecondsCompact(totalSec) : '-';
+
+            const isHighlight = agent === selectedAgent;
+            html += `<tr class="${isHighlight ? 'highlight' : ''}">
+                <td><strong>${agent}</strong></td>
+                <td>${catVals['Lunch']}</td>
+                <td>${catVals['Tea']}</td>
+                <td>${catVals['Bio']}</td>
+                <td>${catVals['Meeting']}</td>
+                <td><strong>${totalStr}</strong></td>
+            </tr>`;
+        });
+        breaksTableBody.innerHTML = html || '<tr><td colspan="6" class="text-center text-muted">No breaks telemetry logged in this period</td></tr>';
     }
 }
 

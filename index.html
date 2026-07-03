@@ -254,9 +254,9 @@
                                 <div class="kpi-value" id="pulse-total-interactions">0</div>
                                 <div class="kpi-desc">Chats + Tickets + Emails</div>
                                 <div class="kpi-sub-info" id="pulse-total-sub"></div>
-                                <!-- Channel Mix Mini Bar Chart -->
-                                <div style="margin-top:10px; height:50px;">
-                                    <canvas id="weekly-channel-mix-chart" height="50"></canvas>
+                                <!-- Channel Mix Mini Pie Chart -->
+                                <div style="margin-top:10px; height:80px;">
+                                    <canvas id="weekly-channel-mix-chart" height="80"></canvas>
                                 </div>
                             </div>
                             <div class="kpi-card" id="card-tickets">
@@ -1566,6 +1566,85 @@
                                         <!-- Dynamic rows -->
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                        </div>
+                        
+                        <!-- NEW: Dial Status Categorization Table -->
+                        <div class="dashboard-section-wrapper" style="margin-top: 30px;">
+                            <h2 class="section-heading">📞 Ozonetel Dial Status Categorization</h2>
+                            <div class="agent-comparison-table-wrapper">
+                                <div class="monthly-table-scroll scrollbar-themed" style="max-height: 45vh; overflow-y: auto;">
+                                    <table class="agent-comparison-table" id="agent-dial-status-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Agent Name</th>
+                                                <th>Answered Calls</th>
+                                                <th>Missed by Agent</th>
+                                                <th>Missed by User</th>
+                                                <th>Missed (Other)</th>
+                                                <th>Total Attempted</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="agent-dial-status-body">
+                                            <!-- Dynamic rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Ignored Ozonetel Dial Status by Agent Table -->
+                        <div class="dashboard-section-wrapper" style="margin-top: 30px;">
+                            <h2 class="section-heading">⚠️ Ignored Ozonetel Dial Status by Agent</h2>
+                            <div class="agent-comparison-table-wrapper">
+                                <div class="monthly-table-scroll scrollbar-themed" style="max-height: 45vh; overflow-y: auto;">
+                                    <table class="agent-comparison-table" id="ignored-dial-status-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Agent Name</th>
+                                                <th>Ignored Total</th>
+                                                <th>User Disconnected</th>
+                                                <th>Normal Unspecified</th>
+                                                <th>Invalid Number</th>
+                                                <th>Interworking Unspecified</th>
+                                                <th>Network Out of Order</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ignored-dial-status-body">
+                                            <!-- Dynamic rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Agent Logins & Breaks Telemetry -->
+                        <div class="dashboard-section-wrapper" style="margin-top: 30px;">
+                            <h2 class="section-heading">☕ Agent Logins & Breaks Telemetry</h2>
+                            <div class="agent-scorecard-grid" id="agent-breaks-kpis" style="margin-bottom: 20px;">
+                                <!-- Dynamic KPIs: Active Agents on Break, Total Breaks Logged, Avg Break Time / Agent, Top Break Agent -->
+                            </div>
+                            
+                            <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 20px; margin-bottom: 12px;">Agent Breaks Telemetry Table (Avg Duration per Break Type)</h3>
+                            <div class="agent-comparison-table-wrapper">
+                                <div class="monthly-table-scroll scrollbar-themed" style="max-height: 45vh; overflow-y: auto;">
+                                    <table class="agent-comparison-table" id="agent-breaks-telemetry-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Agent Name</th>
+                                                <th>Lunch</th>
+                                                <th>Tea</th>
+                                                <th>Bio</th>
+                                                <th>Meeting</th>
+                                                <th>Other / Total Breaks</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="agent-breaks-telemetry-body">
+                                            <!-- Dynamic rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
