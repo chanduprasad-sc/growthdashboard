@@ -48,6 +48,10 @@
                     <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 13h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0 8h6c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm10 0h6c.55 0 1-.45 1-1v-8c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1zm0-18v4c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1h-6c-.55 0-1 .45-1 1z"/></svg>
                     Main Dashboard
                 </button>
+                <button class="nav-btn" data-tab="tab-daily-tools">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+                    Daily Tools
+                </button>
                 <button class="nav-btn" data-tab="tab-visual-control">
                     <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2z"/></svg>
                     Visual Control
@@ -483,6 +487,103 @@
                 </div> <!-- Capture Target Container End -->
             </section>
 
+            <!-- SUB-DASHBOARD: DAILY TOOLS (Redash & ClickUp) -->
+            <section id="tab-daily-tools" class="tab-content">
+                <!-- Sub-tab pills for inner navigation -->
+                <div class="sub-tab-pills" id="daily-tools-sub-tabs">
+                    <button class="sub-tab-pill active" data-subtab="dt-redash">📊 Redash Queries</button>
+                    <button class="sub-tab-pill" data-subtab="dt-clickup">✅ ClickUp Tasks & Forms</button>
+                </div>
+
+                <!-- DT Sub-Tab 1: Redash -->
+                <div class="sub-tab-content active" id="dt-redash">
+                    <div class="intel-header-card card" style="padding: 20px; border-radius: 12px; margin-bottom: 25px; background: var(--bg-card); border: 1px solid var(--border-color);">
+                        <h3 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary);">Redash Favorite Queries</h3>
+                        <p style="color: var(--text-secondary); margin-top: 5px; font-size: 0.9rem;">Browse, filter, and copy your team's favorite Redash queries. Queries are synced from the spreadsheet database.</p>
+                        <div class="search-bar-container" style="margin-top: 15px;">
+                            <input type="text" id="redash-search" placeholder="Search queries by name, SQL description, or author..." style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); outline: none; font-size: 0.9rem;">
+                        </div>
+                    </div>
+                    
+                    <div class="queries-grid" id="redash-queries-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+                        <!-- Redash queries will be populated here -->
+                    </div>
+                </div>
+
+                <!-- DT Sub-Tab 2: ClickUp -->
+                <div class="sub-tab-content" id="dt-clickup">
+                    <div class="clickup-kpi-row" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px;">
+                        <div class="metric-card card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                            <span class="metric-label" style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Total Workspace Tasks</span>
+                            <span class="metric-value" id="clickup-total-tasks" style="font-size: 1.8rem; font-weight: 700; color: var(--accent-primary); margin-top: 8px;">-</span>
+                        </div>
+                        <div class="metric-card card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                            <span class="metric-label" style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Active Tasks</span>
+                            <span class="metric-value" id="clickup-open-tasks" style="font-size: 1.8rem; font-weight: 700; color: var(--accent-yellow); margin-top: 8px;">-</span>
+                        </div>
+                        <div class="metric-card card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                            <span class="metric-label" style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Closed Tasks</span>
+                            <span class="metric-value" id="clickup-closed-tasks" style="font-size: 1.8rem; font-weight: 700; color: var(--accent-green); margin-top: 8px;">-</span>
+                        </div>
+                        <div class="metric-card card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: center; align-items: flex-start;">
+                            <span class="metric-label" style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Sync Status</span>
+                            <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                                <button id="btn-clickup-sync" class="action-btn" style="padding: 8px 12px; background: var(--accent-primary); color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600; flex: 1;">🔄 Reload Live</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 30px;">
+                        <!-- ClickUp Task Board -->
+                        <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; height: 500px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Workspace Tasks (All Statuses)</h3>
+                                <button id="btn-clickup-deepdive" class="action-btn" style="padding: 8px 14px; background: var(--accent-primary); color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 5px;">🔍 Deep Dive</button>
+                            </div>
+                            <div style="overflow-y: auto; flex-grow: 1;" class="scrollbar-themed">
+                                <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--border-color); text-align: left;">
+                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Task ID</th>
+                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Task Name</th>
+                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Creator</th>
+                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Assignees</th>
+                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="clickup-tasks-tbody">
+                                        <!-- Will be dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- ClickUp Members Breakdown -->
+                        <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); height: 500px; display: flex; flex-direction: column;">
+                            <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 15px;">Tasks by Member</h3>
+                            <div id="clickup-members-breakdown" style="display: flex; flex-direction: column; gap: 15px; overflow-y: auto; flex-grow: 1;" class="scrollbar-themed">
+                                <!-- User breakdown with avatars -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Embed Forms Container -->
+                    <div style="margin-top: 30px;">
+                        <h3 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary); margin-bottom: 15px;">ClickUp Quick Submission Forms</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div class="card" style="padding: 15px; height: 600px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                                <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; color: var(--accent-primary);">CX ROTA Form</h4>
+                                <iframe src="https://forms.clickup.com/603234/f/jd32-9404/UM47JAM7C8QS7RT2B2" width="100%" height="100%" style="border: none; border-radius: 8px; background: white; flex-grow: 1;"></iframe>
+                            </div>
+                            <div class="card" style="padding: 15px; height: 600px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                                <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; color: var(--orange);">Publisher ROTA request form</h4>
+                                <iframe src="https://forms.clickup.com/603234/f/jd32-25844/2HV47GR6UHDI4L0IX9" width="100%" height="100%" style="border: none; border-radius: 8px; background: white; flex-grow: 1;"></iframe>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- SUB-DASHBOARD 2: MAIN DASHBOARD (PLACEHOLDER) -->
             <section id="tab-main-dashboard" class="tab-content">
                 <div class="placeholder-container">
@@ -613,6 +714,25 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLICKUP DEEP-DIVE MODAL -->
+    <div class="modal-overlay" id="clickup-deepdive-modal">
+        <div class="modal-content glassmorphism scrollbar-themed" style="max-width: 1000px; width: 90%;">
+            <button class="modal-close-btn" id="clickup-deepdive-close">&times;</button>
+            <div class="modal-header">
+                <div>
+                    <h1 class="modal-title">ClickUp Workspace Deep Dive</h1>
+                    <p class="modal-subtitle">Full details of all ClickUp queries and tasks in all statuses</p>
+                </div>
+            </div>
+            <div class="search-bar-container" style="margin-top: 15px; margin-bottom: 20px;">
+                <input type="text" id="clickup-search" placeholder="Search tasks by name, ID, status or creator..." style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.25); color: var(--text-primary); outline: none;">
+            </div>
+            <div id="clickup-deepdive-list" style="display: flex; flex-direction: column; gap: 20px; max-height: 60vh; overflow-y: auto;" class="scrollbar-themed">
+                <!-- Dynamic task detail cards populated here -->
             </div>
         </div>
     </div>

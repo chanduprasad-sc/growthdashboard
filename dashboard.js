@@ -1509,7 +1509,8 @@ function compileRawCache(cache) {
         "top_themes": top_themes,
         "recent_comments": recent_comments,
         "poc_mappings": poc_mappings,
-        "agent_scorecards": agent_scorecards
+        "agent_scorecards": agent_scorecards,
+        "redashQueries": cache.redashQueries || []
     };
 }
 
@@ -1572,6 +1573,39 @@ async function loadDashboardData() {
         }
     }
 
+    async function fetchWithTimeout(url, options = {}, timeout = 8000) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            clearTimeout(id);
+            return response;
+        } catch (error) {
+            clearTimeout(id);
+            throw error;
+        }
+    }
+
+    async function fetchWithRetry(url, options = {}, retries = 2, timeout = 8000) {
+        for (let i = 0; i <= retries; i++) {
+            try {
+                const response = await fetchWithTimeout(url, options, timeout);
+                if (response.ok) return response;
+                console.warn(`Attempt ${i + 1} failed with status: ${response.status}`);
+            } catch (err) {
+                console.warn(`Attempt ${i + 1} connection failed:`, err.message);
+                if (i === retries) throw err;
+            }
+            if (i < retries) {
+                await new Promise(res => setTimeout(res, 500 * Math.pow(2, i)));
+            }
+        }
+        throw new Error("Failed after retries");
+    }
+
     try {
         let data = null;
         let isLive = false;
@@ -1591,21 +1625,16 @@ async function loadDashboardData() {
         }
 
         if (targetUrl) {
-            console.log("Attempting to fetch live data from Google Sheets API: " + targetUrl);
+            console.log("Attempting to fetch live data from Google Sheets API (with timeout & retry): " + targetUrl);
             try {
-                const response = await fetch(targetUrl);
-                if (response.ok) {
-                    data = await response.json();
-                    isLive = true;
-                    console.log("Successfully fetched live dashboard data from Google Sheets API.");
-                    // Save to localStorage cache
-                    localStorage.setItem('b2b_dashboard_raw_payload', JSON.stringify(data));
-                } else {
-                    console.warn(`Live fetch returned status ${response.status}. Falling back to local cache.`);
-                    connectionError = true;
-                }
+                const response = await fetchWithRetry(targetUrl);
+                data = await response.json();
+                isLive = true;
+                console.log("Successfully fetched live dashboard data from Google Sheets API.");
+                // Save to localStorage cache
+                localStorage.setItem('b2b_dashboard_raw_payload', JSON.stringify(data));
             } catch (err) {
-                console.warn("Network or CORS issue fetching from Google Sheets API, falling back to local cache file. Details:", err);
+                console.warn("Network, timeout, or CORS issue fetching from Google Sheets API, falling back to local cache file. Details:", err);
                 connectionError = true;
             }
         }
@@ -1636,7 +1665,8 @@ async function loadDashboardData() {
                 top_themes: [],
                 recent_comments: [],
                 poc_mappings: [],
-                agent_scorecards: []
+                agent_scorecards: [],
+                redashQueries: []
             };
         }
 

@@ -2054,6 +2054,23 @@ function fixAllDatesSilent() {
 // ================================================================
 // REDASH FAVORITE QUERIES SYNC
 // ================================================================
+function getUiSafe() {
+  try {
+    return SpreadsheetApp.getUi();
+  } catch (e) {
+    return null;
+  }
+}
+
+function showAlertSafe(title, message) {
+  var ui = getUiSafe();
+  if (ui) {
+    ui.alert(title, message, ui.ButtonSet.OK);
+  } else {
+    Logger.log("[" + title + "] " + message);
+  }
+}
+
 function syncRedashQueries() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEET_NAMES.redash);
@@ -2065,25 +2082,32 @@ function syncRedashQueries() {
   var baseUrl = props.getProperty("REDASH_BASE_URL") || "";
   
   if (!baseUrl) {
-    var ui = SpreadsheetApp.getUi();
-    var response = ui.prompt(
-      "Redash Configuration Required",
-      "Please enter your Redash Base URL (e.g. https://redash.yourcompany.com):",
-      ui.ButtonSet.OK_CANCEL
-    );
-    if (response.getSelectedButton() == ui.Button.OK) {
-      baseUrl = response.getResponseText().trim();
-      if (baseUrl) {
-        if (baseUrl.slice(-1) === "/") {
-          baseUrl = baseUrl.slice(0, -1);
-        }
-        props.setProperty("REDASH_BASE_URL", baseUrl);
+    var ui = getUiSafe();
+    if (ui) {
+      var response = ui.prompt(
+        "Redash Configuration Required",
+        "Please enter your Redash Base URL (e.g. https://redash.yourcompany.com):",
+        ui.ButtonSet.OK_CANCEL
+      );
+      if (response.getSelectedButton() == ui.Button.OK) {
+        baseUrl = response.getResponseText().trim();
       }
+    } else {
+      // Non-interactive fallback: Default to standard redash URL
+      baseUrl = "https://redash.smallcase.com";
+      Logger.log("getUi() not available. Defaulting Base URL to: " + baseUrl);
+    }
+    
+    if (baseUrl) {
+      if (baseUrl.slice(-1) === "/") {
+        baseUrl = baseUrl.slice(0, -1);
+      }
+      props.setProperty("REDASH_BASE_URL", baseUrl);
     }
   }
   
   if (!baseUrl) {
-    SpreadsheetApp.getUi().alert("Error", "Redash Base URL is required to sync queries.", SpreadsheetApp.getUi().ButtonSet.OK);
+    showAlertSafe("Error", "Redash Base URL is required to sync queries.");
     return;
   }
   
@@ -2108,7 +2132,7 @@ function syncRedashQueries() {
       throw new Error("HTTP Status " + code + ": " + responseText.substring(0, 500));
     }
   } catch (err) {
-    SpreadsheetApp.getUi().alert("Redash API Error", "Failed to connect to Redash. Make sure the Base URL is correct and reachable.\n\nDetails: " + err.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    showAlertSafe("Redash API Error", "Failed to connect to Redash. Make sure the Base URL is correct and reachable.\n\nDetails: " + err.message);
     return;
   }
   
@@ -2116,7 +2140,7 @@ function syncRedashQueries() {
   try {
     data = JSON.parse(responseText);
   } catch (e) {
-    SpreadsheetApp.getUi().alert("Parse Error", "Failed to parse JSON response from Redash: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    showAlertSafe("Parse Error", "Failed to parse JSON response from Redash: " + e.message);
     return;
   }
   
@@ -2158,9 +2182,9 @@ function syncRedashQueries() {
   
   try {
     buildDashboardCache();
-    SpreadsheetApp.getUi().alert("Sync Success", "Successfully synced " + rows.length + " favorite queries from Redash and rebuilt cache.", SpreadsheetApp.getUi().ButtonSet.OK);
+    showAlertSafe("Sync Success", "Successfully synced " + rows.length + " favorite queries from Redash and rebuilt cache.");
   } catch (err) {
-    SpreadsheetApp.getUi().alert("Partial Sync Success", "Queries synced, but failed to rebuild dashboard cache: " + err.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    showAlertSafe("Partial Sync Success", "Queries synced, but failed to rebuild dashboard cache: " + err.message);
   }
 }
 
