@@ -667,6 +667,7 @@ function setDateRangeFromPreset(preset) {
         const currentDay = baseDate.getDay();
         const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
         fromDate.setDate(baseDate.getDate() + distanceToMonday);
+        toDate = new Date(fromDate.getTime());
         toDate.setDate(fromDate.getDate() + 6);
     } else if (preset === 'today') {
         // June 3, 2026
@@ -703,13 +704,69 @@ function setDateRangeFromPreset(preset) {
     document.getElementById('filter-date-to').value = activeFilters.dateTo;
 }
 
+function safeParseDate(dStr) {
+    if (!dStr) return null;
+    let s = String(dStr).trim();
+    if (!s) return null;
+
+    if (s.includes('T')) {
+        let d = new Date(s);
+        if (!isNaN(d.getTime())) return d;
+    }
+
+    let clean = s.replace(' ', 'T');
+    let d = new Date(clean);
+    if (!isNaN(d.getTime())) return d;
+
+    let datePart = s;
+    if (s.includes(' ')) datePart = s.split(' ')[0];
+    else if (s.includes('T')) datePart = s.split('T')[0];
+
+    let year = new Date().getFullYear();
+    let month = 0;
+    let day = 1;
+
+    if (datePart.includes('/')) {
+        const parts = datePart.split('/');
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                year = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                day = parseInt(parts[2], 10);
+            } else {
+                day = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                year = parseInt(parts[2], 10);
+            }
+        }
+    } else if (datePart.includes('-')) {
+        const parts = datePart.split('-');
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                year = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                day = parseInt(parts[2], 10);
+            } else {
+                day = parseInt(parts[0], 10);
+                month = parseInt(parts[1], 10) - 1;
+                year = parseInt(parts[2], 10);
+            }
+        }
+    }
+    const res = new Date(year, month, day);
+    return isNaN(res.getTime()) ? null : res;
+}
+
 // Helper to compute previous comparative period dates
 function getPreviousPeriodDates(fromStr, toStr) {
-    const from = new Date(fromStr + 'T00:00:00');
-    const to = new Date(toStr + 'T23:59:59');
-    const diff = to.getTime() - from.getTime(); // duration of current period
+    const from = safeParseDate(fromStr);
+    const to = safeParseDate(toStr);
+    if (!from || !to || isNaN(from.getTime()) || isNaN(to.getTime())) {
+        return { from: fromStr, to: toStr };
+    }
+    const diff = to.getTime() - from.getTime();
     
-    const prevTo = new Date(from.getTime() - 1000); // 1 sec before current from
+    const prevTo = new Date(from.getTime() - 1000);
     const prevFrom = new Date(prevTo.getTime() - diff);
     
     const pad = (n) => (n < 10 ? '0' : '') + n;
@@ -728,13 +785,18 @@ function getPreviousPeriodDates(fromStr, toStr) {
 function buildViewModel() {
     if (!rawData || currentTab !== 'tab-weekly-pulse') return;
     
-    const fromTs = new Date(activeFilters.dateFrom + 'T00:00:00').getTime();
-    const toTs = new Date(activeFilters.dateTo + 'T23:59:59').getTime();
+    const fromD = safeParseDate(activeFilters.dateFrom);
+    if (fromD) fromD.setHours(0, 0, 0, 0);
+    const fromTs = fromD ? fromD.getTime() : 0;
+
+    const toD = safeParseDate(activeFilters.dateTo);
+    if (toD) toD.setHours(23, 59, 59, 999);
+    const toTs = toD ? toD.getTime() : 0;
     
     // Filter active interactions
     const filteredInteractions = rawData.support_interactions.filter(item => {
         if (!item.date) return false;
-        const itemTs = new Date(item.date).getTime();
+        const itemTs = safeParseDate(item.date).getTime();
         if (itemTs < fromTs || itemTs > toTs) return false;
         
         if (activeFilters.channel !== 'all' && item.type !== activeFilters.channel) return false;
@@ -749,7 +811,7 @@ function buildViewModel() {
     const ignoredCalls = [];
     const filteredCalls = rawData.calls.filter(call => {
         if (!call.date) return false;
-        const callTs = new Date(call.date).getTime();
+        const callTs = safeParseDate(call.date).getTime();
         if (callTs < fromTs || callTs > toTs) return false;
         
         if (activeFilters.channel !== 'all' && activeFilters.channel !== 'Call Ticket' && activeFilters.channel !== 'Voice Call') return false;
@@ -771,12 +833,17 @@ function buildViewModel() {
 
     // Get previous comparative period data
     const prevPeriod = getPreviousPeriodDates(activeFilters.dateFrom, activeFilters.dateTo);
-    const prevFromTs = new Date(prevPeriod.from + 'T00:00:00').getTime();
-    const prevToTs = new Date(prevPeriod.to + 'T23:59:59').getTime();
+    const prevFromD = safeParseDate(prevPeriod.from);
+    if (prevFromD) prevFromD.setHours(0, 0, 0, 0);
+    const prevFromTs = prevFromD ? prevFromD.getTime() : 0;
+
+    const prevToD = safeParseDate(prevPeriod.to);
+    if (prevToD) prevToD.setHours(23, 59, 59, 999);
+    const prevToTs = prevToD ? prevToD.getTime() : 0;
     
     const prevInteractions = rawData.support_interactions.filter(item => {
         if (!item.date) return false;
-        const itemTs = new Date(item.date).getTime();
+        const itemTs = safeParseDate(item.date).getTime();
         if (itemTs < prevFromTs || itemTs > prevToTs) return false;
         
         if (activeFilters.channel !== 'all' && item.type !== activeFilters.channel) return false;
@@ -977,12 +1044,7 @@ function renderKeyMetricsGrid(interactions, calls) {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'bottom',
-                        labels: {
-                            color: THEME_COLORS.textSecondary,
-                            font: { family: 'SF Pro Text', size: 9 },
-                            boxWidth: 10
-                        }
+                        display: false
                     }
                 }
             }
@@ -1970,6 +2032,86 @@ async function generateAISummary() {
         return;
     }
 
+    // Top 3 Brokers by number (volume)
+    const brokerCounts = {};
+    data.forEach(item => {
+        if (item.broker_family && item.broker_family !== 'NA' && item.broker_family !== '-') {
+            brokerCounts[item.broker_family] = (brokerCounts[item.broker_family] || 0) + 1;
+        }
+    });
+    const top3Brokers = Object.entries(brokerCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([name, count]) => `${name} (${count} interactions)`);
+
+    // Top 3 RMs along with their POC, broker, branch
+    const rmGroups = {};
+    data.forEach(item => {
+        if (item.rm_name && item.rm_name !== 'NA' && item.rm_name !== '-') {
+            const rm = item.rm_name;
+            if (!rmGroups[rm]) {
+                rmGroups[rm] = { count: 0, pocs: {}, brokers: {}, branches: {} };
+            }
+            rmGroups[rm].count++;
+            if (item.poc) rmGroups[rm].pocs[item.poc] = (rmGroups[rm].pocs[item.poc] || 0) + 1;
+            if (item.broker_family) rmGroups[rm].brokers[item.broker_family] = (rmGroups[rm].brokers[item.broker_family] || 0) + 1;
+            if (item.branch) rmGroups[rm].branches[item.branch] = (rmGroups[rm].branches[item.branch] || 0) + 1;
+        }
+    });
+    const top3RMs = Object.entries(rmGroups)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 3)
+        .map(([name, g]) => {
+            const topPoc = Object.entries(g.pocs).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            const topBroker = Object.entries(g.brokers).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            const topBranch = Object.entries(g.branches).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            return `${name} (${g.count} interactions) [POC: ${topPoc}, Broker: ${topBroker}, Branch: ${topBranch}]`;
+        });
+
+    // Top 3 Issues
+    const issueGroups = {};
+    data.forEach(item => {
+        if (item.issue && item.issue !== 'NA' && item.issue !== '-') {
+            const iss = item.issue;
+            if (!issueGroups[iss]) {
+                issueGroups[iss] = { count: 0, brokers: {}, branches: {} };
+            }
+            issueGroups[iss].count++;
+            if (item.broker_family) issueGroups[iss].brokers[item.broker_family] = (issueGroups[iss].brokers[item.broker_family] || 0) + 1;
+            if (item.branch) issueGroups[iss].branches[item.branch] = (issueGroups[iss].branches[item.branch] || 0) + 1;
+        }
+    });
+    const top3Issues = Object.entries(issueGroups)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 3)
+        .map(([name, g]) => {
+            const topBroker = Object.entries(g.brokers).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            const topBranch = Object.entries(g.branches).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            return `${name} (${g.count} occurrences) [Broker: ${topBroker}, Branch: ${topBranch}]`;
+        });
+
+    // Top 3 Sub-issues
+    const subIssueGroups = {};
+    data.forEach(item => {
+        if (item.sub_issue && item.sub_issue !== 'NA' && item.sub_issue !== '-') {
+            const sub = item.sub_issue;
+            if (!subIssueGroups[sub]) {
+                subIssueGroups[sub] = { count: 0, brokers: {}, branches: {} };
+            }
+            subIssueGroups[sub].count++;
+            if (item.broker_family) subIssueGroups[sub].brokers[item.broker_family] = (subIssueGroups[sub].brokers[item.broker_family] || 0) + 1;
+            if (item.branch) subIssueGroups[sub].branches[item.branch] = (subIssueGroups[sub].branches[item.branch] || 0) + 1;
+        }
+    });
+    const top3SubIssues = Object.entries(subIssueGroups)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 3)
+        .map(([name, g]) => {
+            const topBroker = Object.entries(g.brokers).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            const topBranch = Object.entries(g.branches).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            return `${name} (${g.count} occurrences) [Broker: ${topBroker}, Branch: ${topBranch}]`;
+        });
+
     // API Setup
     // Key imported directly from Code.gs
     const key = "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";
@@ -1977,10 +2119,18 @@ async function generateAISummary() {
     const prompt = 
         `You are analyzing B2B fintech support ticket logs for smallcase dashboard. Here is a list of raw interaction comments:\n\n` +
         `RECORDS:\n${selectedComments}\n\n` +
+        `MATHEMATICALLY ACCURATE CALCULATED TOP METRICS:\n` +
+        `- Top 3 Brokers: ${top3Brokers.join(', ')}\n` +
+        `- Top 3 RMs (with details): ${top3RMs.join(', ')}\n` +
+        `- Top 3 Issues (with details): ${top3Issues.join(', ')}\n` +
+        `- Top 3 Sub-issues (with details): ${top3SubIssues.join(', ')}\n\n` +
         `TASK:\n` +
-        `Provide a premium summary including key findings, observations, and recommendations. Group the records into clusters.\n` +
+        `Provide a premium summary report in HTML including:\n` +
+        `1. <h4>📊 Executive Summary</h4> — High-level findings and a formatted list of the Top 3 Brokers, Top 3 RMs, Top 3 Issues, and Top 3 Sub-issues (with their associated POCs, brokers, and branches exactly as provided above)\n` +
+        `2. <h4>🔍 Key Observations & Sub-Issue Deep-Dive</h4> — Detailed patterns and a brief write-up about sub-issue types and comment trends, considering broker names and branches as well. Include numbers and cite specific comments where relevant.\n` +
+        `3. <h4>💡 Actionable Recommendations</h4> — Specific, actionable steps ordered by impact\n` +
         `Return ONLY a raw JSON string matching this structure:\n` +
-        `{"narrative": "<h4>🔍 Key Observations</h4><ul><li><strong>Hotspot:</strong> Describe friction...</li></ul><h4>💡 Actionable Recommendations</h4><ul><li>Initiate...</li></ul>"}`;
+        `{"narrative": "...HTML..."}`;
 
     try {
         const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {

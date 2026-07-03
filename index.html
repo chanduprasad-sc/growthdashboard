@@ -17,6 +17,35 @@
     <!-- Favicon / Thumbnail -->
     <link rel="icon" type="image/png" href="https://dl.svgcdn.com/png/arcticons/smallcase-200.png">
     <link rel="apple-touch-icon" href="https://dl.svgcdn.com/png/arcticons/smallcase-200.png">
+    <style>
+        @keyframes pulse-red {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .pulse-indicator-red {
+            animation: pulse-red 1.2s infinite;
+        }
+        .sla-alert-row {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sla-alert-row.flashing {
+            animation: alert-flash 1.8s infinite;
+        }
+        @keyframes alert-flash {
+            0% { border-color: rgba(239, 68, 68, 0.15); }
+            50% { border-color: rgba(239, 68, 68, 0.7); background: rgba(239, 68, 68, 0.03); }
+            100% { border-color: rgba(239, 68, 68, 0.15); }
+        }
+    </style>
 </head>
 <body class="light-mode">
     <!-- Apple-inspired Liquid Glass Background Mesh and Noise Overlay -->
@@ -245,6 +274,25 @@
                 <!-- Capture Target Container (For screenshot purposes) -->
                 <div id="weekly-pulse-dashboard-capture-area">
                     
+                    <!-- Daily Staffing Recommender Alert -->
+                    <div class="intelligence-panel full-width" id="staffing-recommender-banner" style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.06), rgba(139, 92, 246, 0.06)); border-left: 5px solid var(--blue); margin-bottom: 24px; display: none; padding: 16px 20px; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <span style="font-size: 1.4rem;">🧠</span>
+                                <div>
+                                    <div style="font-weight: 800; font-size: 0.92rem; color: var(--blue);">Erlang-C Staffing Recommendation</div>
+                                    <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.4;" id="staffing-recommendation-text">
+                                        Calculating staffing needs for the selected period...
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="text-align: right; min-width: 100px;">
+                                <span style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 2px; letter-spacing: 0.5px;">Recommended Staff</span>
+                                <span style="font-size: 1.5rem; font-weight: 800; color: var(--blue);" id="staffing-recommendation-value">0</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Section 1: Key Metrics Widget -->
                     <div class="dashboard-section-wrapper">
                         <h2 class="section-heading">Key Support Metrics</h2>
@@ -255,8 +303,8 @@
                                 <div class="kpi-desc">Chats + Tickets + Emails</div>
                                 <div class="kpi-sub-info" id="pulse-total-sub"></div>
                                 <!-- Channel Mix Mini Pie Chart -->
-                                <div style="margin-top:10px; height:80px;">
-                                    <canvas id="weekly-channel-mix-chart" height="80"></canvas>
+                                <div style="margin-top:10px; height:100px;">
+                                    <canvas id="weekly-channel-mix-chart" height="100"></canvas>
                                 </div>
                             </div>
                             <div class="kpi-card" id="card-tickets">
@@ -1327,7 +1375,16 @@
                 <div class="dashboard-section-wrapper">
                     <h2 class="section-heading">🧠 Cross-Channel Intelligence</h2>
                 </div>
-                <div class="intelligence-grid" id="intel-grid">
+                
+                <!-- Sub-tab pills for inner navigation -->
+                <div class="sub-tab-pills" id="intel-sub-tabs" style="margin-bottom: 20px;">
+                    <button class="sub-tab-pill active" data-subtab="intel-overview">🔮 Operations Intelligence</button>
+                    <button class="sub-tab-pill" data-subtab="intel-branches">🏥 Branch Activity Monitor</button>
+                </div>
+
+                <!-- Intel Sub-Tab 1: Overview -->
+                <div class="sub-tab-content active" id="intel-overview">
+                    <div class="intelligence-grid" id="intel-grid">
                     <!-- Smart Executive Insights Panel -->
                     <div class="intelligence-panel full-width" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(56, 189, 248, 0.08)); border-left: 5px solid var(--purple);">
                         <div class="panel-title" style="color: var(--purple); font-weight: 800; font-size: 1.05rem;"><span class="panel-icon">💡</span> Executive Operations Intelligence Summary</div>
@@ -1439,6 +1496,74 @@
                         <canvas id="intel-sankey-canvas" height="400" style="width:100%;"></canvas>
                     </div>
                 </div>
+                </div> <!-- End of intel-overview sub-tab-content -->
+
+                <!-- Intel Sub-Tab 2: Branch Activity Monitor -->
+                <div class="sub-tab-content" id="intel-branches">
+                    <div class="intelligence-grid">
+                        <!-- KPI Scorecards -->
+                        <div class="intelligence-panel full-width" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; background: transparent; border: none; padding: 0;">
+                            <div class="agent-score-card">
+                                <div class="score-label">Active Branches</div>
+                                <div class="score-value text-green" id="intel-branch-active-count">0</div>
+                            </div>
+                            <div class="agent-score-card">
+                                <div class="score-label">Inactive/Dormant Branches</div>
+                                <div class="score-value text-red" id="intel-branch-inactive-count">0</div>
+                            </div>
+                            <div class="agent-score-card">
+                                <div class="score-label">Total Registered Branches</div>
+                                <div class="score-value" id="intel-branch-total-count">0</div>
+                            </div>
+                            <div class="agent-score-card">
+                                <div class="score-label">Dormancy Rate</div>
+                                <div class="score-value text-orange" id="intel-branch-dormancy-rate">0%</div>
+                            </div>
+                        </div>
+
+                        <!-- Left Panel: Status Distribution Donut Chart -->
+                        <div class="intelligence-panel" style="grid-column: span 1;">
+                            <div class="panel-title"><span class="panel-icon">📊</span> Branch Health Distribution</div>
+                            <div style="height: 250px; position: relative;">
+                                <canvas id="intel-branch-status-donut"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Top Inactive Branches Alert List -->
+                        <div class="intelligence-panel" style="grid-column: span 1;">
+                            <div class="panel-title"><span class="panel-icon">⚠️</span> High-Risk Inactive Branches</div>
+                            <div class="scrollbar-themed" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;" id="intel-branch-inactive-list">
+                                <!-- Dynamic risk cards -->
+                            </div>
+                        </div>
+
+                        <!-- Full Width: Detailed Branch Activity Matrix -->
+                        <div class="intelligence-panel full-width">
+                            <div class="panel-title"><span class="panel-icon">📋</span> Branch Engagement Matrix</div>
+                            <div class="agent-comparison-table-wrapper">
+                                <div class="monthly-table-scroll scrollbar-themed" style="max-height: 45vh; overflow-y: auto;">
+                                    <table class="agent-comparison-table" id="intel-branch-matrix-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Branch Name</th>
+                                                <th>Status</th>
+                                                <th>Active Calls</th>
+                                                <th>Active WA</th>
+                                                <th>Active Emails</th>
+                                                <th>Total (Active)</th>
+                                                <th>Last Activity Date</th>
+                                                <th>Days Dormant</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="intel-branch-matrix-body">
+                                            <!-- Dynamic rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- SUB-DASHBOARD 5: MONTHLY VIEW -->
@@ -1480,6 +1605,19 @@
                         </select>
                     </div>
                 </div>
+                <!-- SLA At-Risk Warning System Feed -->
+                <div class="dashboard-section-wrapper" id="sla-at-risk-wrapper" style="display: none; margin-bottom: 24px;">
+                    <div style="background: rgba(239, 68, 68, 0.06); border-left: 5px solid var(--red); border-radius: 8px; padding: 16px 20px;">
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 0.95rem; color: var(--red); margin-bottom: 12px;">
+                            <span class="pulse-indicator-red" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--red); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);"></span>
+                            🚨 CRITICAL SLA WARNING: UNRESOLVED / AT-RISK TICKETS
+                        </div>
+                        <div id="sla-at-risk-feed" style="display: flex; flex-direction: column; gap: 10px; max-height: 150px; overflow-y: auto;">
+                            <!-- Dynamic flashing alert rows -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Agent KPI Scorecards -->
                 <div class="agent-scorecard-grid" id="agent-perf-kpis">
                     <!-- Dynamic scorecard cards -->

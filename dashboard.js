@@ -269,6 +269,7 @@ let activeFilters = {
     agent: ['all'],
     hideSmallcaseRm: ['none'],
     branch: 'all',
+    issue: 'all',
     searchQuery: '',
     includeCareEmails: false
 };
@@ -1953,6 +1954,7 @@ function setupEventListeners() {
             agent: ['all'],
             hideSmallcaseRm: ['none'],
             branch: 'all',
+            issue: 'all',
             searchQuery: '',
             includeCareEmails: false
         };
@@ -2661,6 +2663,7 @@ function setDateRangeFromPreset(preset) {
         const currentDay = baseDate.getDay();
         const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
         fromDate.setDate(baseDate.getDate() + distanceToMonday);
+        toDate = new Date(fromDate.getTime());
         toDate.setDate(fromDate.getDate() + 6);
     } else if (preset === 'today') {
         fromDate = new Date(baseDate.getTime());
@@ -2707,8 +2710,11 @@ function setDateRangeFromPreset(preset) {
 
 // Helper to compute previous comparative period dates
 function getPreviousPeriodDates(fromStr, toStr) {
-    const from = new Date(fromStr + 'T00:00:00');
-    const to = new Date(toStr + 'T23:59:59');
+    const from = safeParseDate(fromStr);
+    const to = safeParseDate(toStr);
+    if (!from || !to || isNaN(from.getTime()) || isNaN(to.getTime())) {
+        return { from: fromStr, to: toStr };
+    }
 
     // Check if it's a full calendar month selection
     const isFullMonth = (from.getDate() === 1) && (to.getDate() === new Date(to.getFullYear(), to.getMonth() + 1, 0).getDate());
@@ -2777,6 +2783,7 @@ function buildViewModel() {
             if (!activeFilters.agent.includes(item.agent)) return false;
         }
         if (activeFilters.branch && activeFilters.branch !== 'all' && item.branch !== activeFilters.branch) return false;
+        if (activeFilters.issue && activeFilters.issue !== 'all' && item.issue !== activeFilters.issue) return false;
 
         // smallcase RM hiding filter
         if (activeFilters.hideSmallcaseRm && !activeFilters.hideSmallcaseRm.includes('none')) {
@@ -2913,9 +2920,140 @@ function buildViewModel() {
     }
 }
 
+function updateStaffingRecommendation(interactions, calls) {
+    const banner = document.getElementById('staffing-recommender-banner');
+    const textEl = document.getElementById('staffing-recommendation-text');
+    const valEl = document.getElementById('staffing-recommendation-value');
+    if (!banner || !textEl || !valEl) return;
+
+    const fromD = safeParseDate(activeFilters.dateFrom);
+    const toD = safeParseDate(activeFilters.dateTo);
+    if (!fromD || !toD) return;
+
+    const days = Math.max(1, Math.round((toD.getTime() - fromD.getTime()) / 86400000) + 1);
+
+    // Total volumes in active range
+    const totalCalls = calls.length;
+    const totalChats = interactions.filter(item => item.type === 'WhatsApp Chat').length;
+
+    const dailyCalls = totalCalls / days;
+    const dailyChats = totalChats / days;
+
+    const shiftSec = 32400; // 9 hours
+    let callAHT = 240; // default 4m
+    let chatAHT = 600; // default 10m
+
+    // Use actual call duration if available
+    const answeredCalls = calls.filter(c => c.duration && !isNaN(c.duration));
+    if (answeredCalls.length) {
+        callAHT = answeredCalls.reduce((s, c) => s + c.duration, 0) / answeredCalls.length;
+    }
+
+    const lambdaCalls = dailyCalls / shiftSec;
+    const lambdaChats = dailyChats / shiftSec;
+    const lambda = lambdaCalls + lambdaChats;
+    const totalDailyVolume = dailyCalls + dailyChats;
+    const weightedAHT = totalDailyVolume > 0 ? (dailyCalls * callAHT + dailyChats * chatAHT) / totalDailyVolume : 240;
+
+    const A = lambda * weightedAHT;
+
+    let recommendedN = 1;
+    if (A <= 0) {
+        recommendedN = 1;
+    } else {
+        recommendedN = Math.ceil(A) + 1;
+        let sla = 0;
+        
+        function factorial(n) {
+            let f = 1;
+            for (let i = 2; i <= n; i++) f *= i;
+            return f;
+        }
+
+        for (let N = recommendedN; N < 100; N++) {
+            let sum = 0.0;
+            for (let k = 0; k < N; k++) {
+                sum += Math.pow(A, k) / factorial(k);
+            }
+            let term = Math.pow(A, N) / (factorial(N) * (1 - A / N));
+            let Pq = term / (sum + term);
+
+            const targetSec = 15;
+            const exponent = - (N - A) * targetSec / weightedAHT;
+            let currentSLA = Math.round((1 - Pq * Math.exp(exponent)) * 100);
+
+            if (currentSLA >= 80) {
+                recommendedN = N;
+                sla = currentSLA;
+                break;
+            }
+        }
+    }
+
+    banner.style.display = 'block';
+    valEl.innerText = recommendedN;
+    textEl.innerHTML = `Based on a daily load of <strong>${Math.round(dailyCalls)} calls</strong> and <strong>${Math.round(dailyChats)} chats</strong> with a weighted AHT of <strong>${Math.round(weightedAHT)}s</strong>, we recommend <strong>${recommendedN} agents</strong> on shift to sustain a target SLA of <strong>80% answered within 15s</strong>.`;
+}
+
+function renderSLAAtRiskAlerts() {
+    const wrapper = document.getElementById('sla-at-risk-wrapper');
+    const feed = document.getElementById('sla-at-risk-feed');
+    if (!wrapper || !feed) return;
+
+    const data = rawData.support_interactions;
+    const now = new Date().getTime();
+    const alerts = [];
+
+    data.forEach(item => {
+        const isClosed = ['completed', 'resolved', 'closed'].includes((item.stage || '').toLowerCase());
+        if (isClosed) return;
+
+        if (!item.date) return;
+        const itemTs = safeParseDate(item.date).getTime();
+        if (isNaN(itemTs)) return;
+
+        const elapsedHours = (now - itemTs) / (1000 * 60 * 60);
+
+        if (elapsedHours > 12) {
+            let typeBadge = '📞';
+            if (item.type === 'Care Email') typeBadge = '✉️';
+            else if (item.type === 'WhatsApp Chat') typeBadge = '💬';
+
+            alerts.push({
+                id: item.id || item.ticket_id || 'N/A',
+                type: item.type,
+                typeIcon: typeBadge,
+                broker: item.broker_family || 'N/A',
+                branch: item.branch || 'N/A',
+                agent: item.agent || 'Unassigned',
+                hours: elapsedHours.toFixed(1)
+            });
+        }
+    });
+
+    if (alerts.length > 0) {
+        wrapper.style.display = 'block';
+        feed.innerHTML = alerts.map(a => `
+            <div class="sla-alert-row flashing">
+                <div>
+                    <strong>${a.typeIcon} [${a.type}]</strong> Ticket #${a.id} (Broker: <strong>${a.broker}</strong>, Branch: <strong>${a.branch}</strong>) is unresolved. Agent: <strong>${a.agent}</strong>.
+                </div>
+                <div style="font-weight: 800; color: var(--red); display: flex; align-items: center; gap: 4px;">
+                    ⚠️ Elapsed: ${a.hours} hrs
+                </div>
+            </div>
+        `).join('');
+    } else {
+        wrapper.style.display = 'none';
+    }
+}
+
 function renderWeeklyPulseDashboard() {
     const data = window.viewModel.interactions;
     const calls = window.viewModel.calls;
+
+    // Erlang-C staffing recommendation
+    updateStaffingRecommendation(data, calls);
 
     // 1. Render Key Metrics Grid
     renderKeyMetricsGrid(data, calls);
@@ -3238,12 +3376,14 @@ function renderKeyMetricsGrid(interactions, calls) {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'bottom',
-                        labels: {
-                            color: THEME_COLORS.textSecondary,
-                            font: { family: 'SF Pro Text', size: 9 },
-                            boxWidth: 10
-                        }
+                        display: false
+                    }
+                },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const label = ['Call Ticket', 'WhatsApp Chat', 'Care Email'][index];
+                        applySidebarFilter('channel', label);
                     }
                 }
             }
@@ -3756,7 +3896,12 @@ function renderCallStatusPieChart(calls) {
                     }
                 }
             },
-            cutout: '70%'
+            cutout: '70%',
+            onClick: (e, elements) => {
+                if (elements.length > 0) {
+                    applySidebarFilter('channel', 'Call Ticket');
+                }
+            }
         })
     });
 }
@@ -4803,13 +4948,98 @@ async function generateAITabNarrative() {
         return;
     }
 
+    // Top 3 Brokers by number (volume)
+    const brokerCounts = {};
+    data.forEach(item => {
+        if (item.broker_family && item.broker_family !== 'NA' && item.broker_family !== '-') {
+            brokerCounts[item.broker_family] = (brokerCounts[item.broker_family] || 0) + 1;
+        }
+    });
+    const top3Brokers = Object.entries(brokerCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([name, count]) => `${name} (${count} interactions)`);
+
+    // Top 3 RMs along with their POC, broker, branch
+    const rmGroups = {};
+    data.forEach(item => {
+        if (item.rm_name && item.rm_name !== 'NA' && item.rm_name !== '-') {
+            const rm = item.rm_name;
+            if (!rmGroups[rm]) {
+                rmGroups[rm] = { count: 0, pocs: {}, brokers: {}, branches: {} };
+            }
+            rmGroups[rm].count++;
+            if (item.poc) rmGroups[rm].pocs[item.poc] = (rmGroups[rm].pocs[item.poc] || 0) + 1;
+            if (item.broker_family) rmGroups[rm].brokers[item.broker_family] = (rmGroups[rm].brokers[item.broker_family] || 0) + 1;
+            if (item.branch) rmGroups[rm].branches[item.branch] = (rmGroups[rm].branches[item.branch] || 0) + 1;
+        }
+    });
+    const top3RMs = Object.entries(rmGroups)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 3)
+        .map(([name, g]) => {
+            const topPoc = Object.entries(g.pocs).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            const topBroker = Object.entries(g.brokers).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            const topBranch = Object.entries(g.branches).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            return `${name} (${g.count} interactions) [POC: ${topPoc}, Broker: ${topBroker}, Branch: ${topBranch}]`;
+        });
+
+    // Top 3 Issues
+    const issueGroups = {};
+    data.forEach(item => {
+        if (item.issue && item.issue !== 'NA' && item.issue !== '-') {
+            const iss = item.issue;
+            if (!issueGroups[iss]) {
+                issueGroups[iss] = { count: 0, brokers: {}, branches: {} };
+            }
+            issueGroups[iss].count++;
+            if (item.broker_family) issueGroups[iss].brokers[item.broker_family] = (issueGroups[iss].brokers[item.broker_family] || 0) + 1;
+            if (item.branch) issueGroups[iss].branches[item.branch] = (issueGroups[iss].branches[item.branch] || 0) + 1;
+        }
+    });
+    const top3Issues = Object.entries(issueGroups)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 3)
+        .map(([name, g]) => {
+            const topBroker = Object.entries(g.brokers).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            const topBranch = Object.entries(g.branches).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            return `${name} (${g.count} occurrences) [Broker: ${topBroker}, Branch: ${topBranch}]`;
+        });
+
+    // Top 3 Sub-issues
+    const subIssueGroups = {};
+    data.forEach(item => {
+        if (item.sub_issue && item.sub_issue !== 'NA' && item.sub_issue !== '-') {
+            const sub = item.sub_issue;
+            if (!subIssueGroups[sub]) {
+                subIssueGroups[sub] = { count: 0, brokers: {}, branches: {} };
+            }
+            subIssueGroups[sub].count++;
+            if (item.broker_family) subIssueGroups[sub].brokers[item.broker_family] = (subIssueGroups[sub].brokers[item.broker_family] || 0) + 1;
+            if (item.branch) subIssueGroups[sub].branches[item.branch] = (subIssueGroups[sub].branches[item.branch] || 0) + 1;
+        }
+    });
+    const top3SubIssues = Object.entries(subIssueGroups)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 3)
+        .map(([name, g]) => {
+            const topBroker = Object.entries(g.brokers).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            const topBranch = Object.entries(g.branches).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'NA';
+            return `${name} (${g.count} occurrences) [Broker: ${topBroker}, Branch: ${topBranch}]`;
+        });
+
     const key = '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';
     const prompt =
         `You are a senior B2B fintech support analyst for smallcase. Analyze these ${data.length} interactions (${withComments.length} with detailed comments):\n\n` +
         `RECORDS:\n${selectedComments}\n\n` +
+        `MATHEMATICALLY ACCURATE CALCULATED TOP METRICS:\n` +
+        `- Top 3 Brokers: ${top3Brokers.join(', ')}\n` +
+        `- Top 3 RMs (with details): ${top3RMs.join(', ')}\n` +
+        `- Top 3 Issues (with details): ${top3Issues.join(', ')}\n` +
+        `- Top 3 Sub-issues (with details): ${top3SubIssues.join(', ')}\n\n` +
         `Write a comprehensive HTML analytics report narrative including:\n` +
-        `1. <h4>📊 Executive Summary</h4> — 3-5 high-level findings\n` +
-        `2. <h4>🔍 Key Observations</h4> — Detailed patterns, trends, volume insights\n` +
+        `1. <h4>📊 Executive Summary</h4> — High-level findings and a formatted list of the Top 3 Brokers, Top 3 RMs, Top 3 Issues, and Top 3 Sub-issues (with their associated POCs, brokers, and branches exactly as provided above)\n` +
+        `2. <h4>🔍 Key Observations & Sub-Issue Deep-Dive</h4> — Detailed patterns and a brief write-up about sub-issue types and comment trends, considering broker names and branches as well. Include numbers and cite specific comments where relevant.\n` +
         `3. <h4>🏢 Broker-level Analysis</h4> — Top brokers, their issues, friction patterns with quoted comments\n` +
         `4. <h4>🏛️ Branch Intelligence</h4> — Branch hotspots, geographic friction patterns\n` +
         `5. <h4>📋 Issue Taxonomy</h4> — Systematic issue clustering with root cause hypotheses\n` +
@@ -6129,6 +6359,8 @@ function renderSankeyFlowCanvas(data, canvasId = 'vc-chart-sankey-flow') {
                             applySidebarFilter('broker', node.label);
                         } else if (node.type === 'branch') {
                             applySidebarFilter('branch', node.label);
+                        } else if (node.type === 'issue') {
+                            applySidebarFilter('issue', node.label);
                         } else {
                             showFloatingToast(`Flow focus: ${node.label} (${node.count} entries)`);
                         }
@@ -7647,10 +7879,38 @@ function renderIntelOutliersSquished(dynamicOutliers) {
     AnimatedList.animate(list);
 }
 
+let intelActiveSubTab = 'intel-overview';
+
 function renderIntelligenceDashboard() {
-    destroyChartGroup(intelCharts);
+    const subTabContainer = document.getElementById('intel-sub-tabs');
+    if (subTabContainer && !subTabContainer._listenersSet) {
+        subTabContainer._listenersSet = true;
+        subTabContainer.querySelectorAll('.sub-tab-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                subTabContainer.querySelectorAll('.sub-tab-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                document.querySelectorAll('#tab-intelligence .sub-tab-content').forEach(c => c.classList.remove('active'));
+                const activeSubTab = pill.getAttribute('data-subtab');
+                const contentEl = document.getElementById(activeSubTab);
+                if (contentEl) contentEl.classList.add('active');
+                intelActiveSubTab = activeSubTab;
+                renderIntelligenceDashboard();
+            });
+        });
+    }
+
     const data = window.viewModel.interactions;
     const calls = window.viewModel.calls;
+
+    if (intelActiveSubTab === 'intel-overview') {
+        renderIntelOverview(data, calls);
+    } else if (intelActiveSubTab === 'intel-branches') {
+        renderBranchActivityMonitor(data, calls);
+    }
+}
+
+function renderIntelOverview(data, calls) {
+    destroyChartGroup(intelCharts);
 
     // Dynamically calculate repeat loops & outliers
     const dynamicLoops = getDynamicRepeatLoops(data);
@@ -7992,6 +8252,207 @@ function renderIssueTrendingChart() {
             }
         }
     });
+}
+
+function renderBranchActivityMonitor(data, calls) {
+    destroyChartGroup(intelCharts);
+
+    // Master list of all unique branches ever seen in the history/data
+    const allBranches = new Set();
+    rawData.support_interactions.forEach(d => {
+        if (d.branch && d.branch !== '-' && d.branch !== 'NA' && d.branch !== 'Unknown') {
+            allBranches.add(d.branch);
+        }
+    });
+    rawData.calls.forEach(c => {
+        if (c.branch && c.branch !== '-' && c.branch !== 'NA' && c.branch !== 'Unknown') {
+            allBranches.add(c.branch);
+        }
+    });
+
+    const activeBranchStats = {};
+    const absoluteLastActivity = {};
+
+    // Calculate absolute last activity date from raw data
+    rawData.support_interactions.forEach(d => {
+        const branch = d.branch;
+        if (!branch || branch === '-' || branch === 'NA' || branch === 'Unknown') return;
+        const ts = d.date ? safeParseDate(d.date).getTime() : 0;
+        if (ts && (!absoluteLastActivity[branch] || ts > absoluteLastActivity[branch])) {
+            absoluteLastActivity[branch] = ts;
+        }
+    });
+    rawData.calls.forEach(c => {
+        const branch = c.branch;
+        if (!branch || branch === '-' || branch === 'NA' || branch === 'Unknown') return;
+        const ts = c.date ? safeParseDate(c.date).getTime() : 0;
+        if (ts && (!absoluteLastActivity[branch] || ts > absoluteLastActivity[branch])) {
+            absoluteLastActivity[branch] = ts;
+        }
+    });
+
+    // Populate active counts in the selected range
+    allBranches.forEach(branch => {
+        activeBranchStats[branch] = { calls: 0, wa: 0, emails: 0, total: 0 };
+    });
+
+    data.forEach(d => {
+        const branch = d.branch;
+        if (activeBranchStats[branch]) {
+            if (d.type === 'Call Ticket') activeBranchStats[branch].calls++;
+            else if (d.type === 'WhatsApp Chat') activeBranchStats[branch].wa++;
+            else if (d.type === 'Care Email') activeBranchStats[branch].emails++;
+            activeBranchStats[branch].total++;
+        }
+    });
+    calls.forEach(c => {
+        const branch = c.branch;
+        if (activeBranchStats[branch]) {
+            activeBranchStats[branch].calls++;
+            activeBranchStats[branch].total++;
+        }
+    });
+
+    // Now categorize branches based on days dormant
+    const nowTs = new Date().getTime();
+    let activeCount = 0;
+    let warningCount = 0;
+    let inactiveCount = 0;
+
+    const branchList = [];
+
+    allBranches.forEach(branch => {
+        const stats = activeBranchStats[branch];
+        const lastTs = absoluteLastActivity[branch] || 0;
+        const daysDormant = lastTs ? Math.max(0, Math.floor((nowTs - lastTs) / 86400000)) : 999;
+        
+        let status = 'Inactive';
+        if (lastTs && daysDormant <= 3) {
+            status = 'Active';
+            activeCount++;
+        } else if (lastTs && daysDormant <= 7) {
+            status = 'Warning';
+            warningCount++;
+        } else {
+            status = 'Inactive';
+            inactiveCount++;
+        }
+
+        branchList.push({
+            name: branch,
+            status,
+            calls: stats.calls,
+            wa: stats.wa,
+            emails: stats.emails,
+            totalActive: stats.total,
+            lastDate: lastTs ? new Date(lastTs).toISOString().substring(0, 10) : 'Never',
+            daysDormant
+        });
+    });
+
+    const totalRegistered = allBranches.size;
+    const dormancyRate = totalRegistered > 0 ? Math.round((inactiveCount / totalRegistered) * 100) : 0;
+
+    // Update KPI UI
+    document.getElementById('intel-branch-active-count').innerText = activeCount;
+    document.getElementById('intel-branch-inactive-count').innerText = inactiveCount;
+    document.getElementById('intel-branch-total-count').innerText = totalRegistered;
+    document.getElementById('intel-branch-dormancy-rate').innerText = `${dormancyRate}%`;
+
+    // High-Risk Inactive branches List (Top dormant sorted by daysDormant desc)
+    const inactiveListContainer = document.getElementById('intel-branch-inactive-list');
+    if (inactiveListContainer) {
+        const dormantBranches = branchList
+            .filter(b => b.status === 'Inactive' || b.status === 'Warning')
+            .sort((a, b) => b.daysDormant - a.daysDormant)
+            .slice(0, 6);
+
+        if (dormantBranches.length === 0) {
+            inactiveListContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center; padding:20px;">No at-risk branches identified. All branches are healthy!</div>';
+        } else {
+            inactiveListContainer.innerHTML = dormantBranches.map(b => {
+                const color = b.status === 'Inactive' ? 'var(--red)' : 'var(--yellow)';
+                return `
+                    <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">${b.name}</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Last Active: ${b.lastDate}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: 800; font-size: 0.95rem; color: ${color};">${b.daysDormant === 999 ? 'Never' : b.daysDormant + 'd'}</div>
+                            <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Dormant</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // Branch Engagement Matrix Table
+    const tableBody = document.getElementById('intel-branch-matrix-body');
+    if (tableBody) {
+        const sortedList = [...branchList].sort((a, b) => {
+            if (a.status === 'Inactive' && b.status !== 'Inactive') return -1;
+            if (a.status !== 'Inactive' && b.status === 'Inactive') return 1;
+            return b.daysDormant - a.daysDormant;
+        });
+
+        tableBody.innerHTML = sortedList.map(b => {
+            let statusPill = '';
+            if (b.status === 'Active') {
+                statusPill = '<span class="status-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--green); padding: 4px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">Active</span>';
+            } else if (b.status === 'Warning') {
+                statusPill = '<span class="status-badge" style="background: rgba(249, 115, 22, 0.15); color: var(--yellow); padding: 4px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">At Risk</span>';
+            } else {
+                statusPill = '<span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: var(--red); padding: 4px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">Dormant</span>';
+            }
+
+            return `
+                <tr>
+                    <td><strong>${b.name}</strong></td>
+                    <td>${statusPill}</td>
+                    <td>${b.calls}</td>
+                    <td>${b.wa}</td>
+                    <td>${b.emails}</td>
+                    <td><strong>${b.totalActive}</strong></td>
+                    <td>${b.lastDate}</td>
+                    <td style="font-weight: 700;">${b.daysDormant === 999 ? 'Never' : b.daysDormant + ' days'}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Render Branch Status Donut Chart
+    const canvas = document.getElementById('intel-branch-status-donut');
+    if (canvas) {
+        const donutCtx = canvas.getContext('2d');
+        intelCharts.branchStatus = new Chart(donutCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Active (<=3d)', 'At Risk (4-7d)', 'Dormant (>7d)'],
+                datasets: [{
+                    data: [activeCount, warningCount, inactiveCount],
+                    backgroundColor: [THEME_COLORS.green, THEME_COLORS.yellow, THEME_COLORS.red],
+                    borderColor: 'transparent'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: THEME_COLORS.textSecondary,
+                            font: { family: 'SF Pro Text', size: 9 },
+                            boxWidth: 8
+                        }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+    }
 }
 
 // ----- MONTHLY VIEW -----
@@ -8496,6 +8957,9 @@ function renderAgentPerformance() {
     const data = window.viewModel.interactions;
     const calls = window.viewModel.calls;
     destroyChartGroup(agentPerfCharts);
+
+    // SLA warnings feed
+    renderSLAAtRiskAlerts();
 
     // Populate agent selector
     const agentSelect = document.getElementById('agent-perf-select');
@@ -9047,6 +9511,8 @@ function applySidebarFilter(filterKey, value) {
         activeFilters.agent = Array.isArray(value) ? value : [value];
     } else if (filterKey === 'branch') {
         activeFilters.branch = value;
+    } else if (filterKey === 'issue') {
+        activeFilters.issue = value;
     } else if (filterKey === 'channel') {
         const select = document.getElementById('filter-channel');
         if (select) {
