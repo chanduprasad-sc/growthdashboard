@@ -2302,7 +2302,7 @@ function fetchClickupTasksProxy() {
   var hasMore = true;
   
   while (hasMore && page < 30) {
-    var tasksUrl = "https://api.clickup.com/api/v2/list/43352038/task?include_closed=true&subtasks=true&limit=100&page=" + page;
+    var tasksUrl = "https://api.clickup.com/api/v2/team/603234/task?include_closed=true&subtasks=true&limit=100&space_ids[]=613347&page=" + page;
     var tasksResp = UrlFetchApp.fetch(tasksUrl, options);
     if (tasksResp.getResponseCode() === 200) {
       var tasksData = JSON.parse(tasksResp.getContentText());
