@@ -1515,6 +1515,42 @@ function compileRawCache(cache) {
 }
 
 // -------------------------------------------------------------
+// Resilient Networking Helpers
+// -------------------------------------------------------------
+async function fetchWithTimeout(url, options = {}, timeout = 20000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (error) {
+        clearTimeout(id);
+        throw error;
+    }
+}
+
+async function fetchWithRetry(url, options = {}, retries = 2, timeout = 20000) {
+    for (let i = 0; i <= retries; i++) {
+        try {
+            const response = await fetchWithTimeout(url, options, timeout);
+            if (response.ok) return response;
+            console.warn(`Attempt ${i + 1} failed with status: ${response.status}`);
+        } catch (err) {
+            console.warn(`Attempt ${i + 1} connection failed:`, err.message);
+            if (i === retries) throw err;
+        }
+        if (i < retries) {
+            await new Promise(res => setTimeout(res, 500 * Math.pow(2, i)));
+        }
+    }
+    throw new Error("Failed after retries");
+}
+
+// -------------------------------------------------------------
 // 1. DATA INITIALIZATION & ENTRY
 // -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
@@ -1571,39 +1607,6 @@ async function loadDashboardData() {
         if (syncBtn) {
             syncBtn.style.display = (status === 'online') ? 'inline-flex' : 'none';
         }
-    }
-
-    async function fetchWithTimeout(url, options = {}, timeout = 8000) {
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), timeout);
-        try {
-            const response = await fetch(url, {
-                ...options,
-                signal: controller.signal
-            });
-            clearTimeout(id);
-            return response;
-        } catch (error) {
-            clearTimeout(id);
-            throw error;
-        }
-    }
-
-    async function fetchWithRetry(url, options = {}, retries = 2, timeout = 8000) {
-        for (let i = 0; i <= retries; i++) {
-            try {
-                const response = await fetchWithTimeout(url, options, timeout);
-                if (response.ok) return response;
-                console.warn(`Attempt ${i + 1} failed with status: ${response.status}`);
-            } catch (err) {
-                console.warn(`Attempt ${i + 1} connection failed:`, err.message);
-                if (i === retries) throw err;
-            }
-            if (i < retries) {
-                await new Promise(res => setTimeout(res, 500 * Math.pow(2, i)));
-            }
-        }
-        throw new Error("Failed after retries");
     }
 
     try {
@@ -11243,11 +11246,8 @@ function fetchClickupTasksLive() {
     const targetUrl = `${cleanUrl}?action=fetchClickupTasks`;
 
     console.log("Fetching live tasks from ClickUp secure Google Script Proxy: " + targetUrl);
-    fetch(targetUrl)
-        .then(response => {
-            if (!response.ok) throw new Error("HTTP Status " + response.status);
-            return response.json();
-        })
+    fetchWithRetry(targetUrl)
+        .then(response => response.json())
         .then(data => {
             if (data && data.error) {
                 throw new Error(data.error);
