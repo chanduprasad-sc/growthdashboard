@@ -513,7 +513,7 @@ function hexToRgba(hex, alpha) {
 
 // Google Apps Script Web App Deployment URL Configuration
 // Paste your deployed Google Apps Script Web App URL below (must end with /exec?action=getData)
-const GOOGLE_SCRIPT_API_URL = "https://script.google.com/a/macros/smallcase.com/s/AKfycbzXb1cgZwP2RdEM8xvf9xaNk_ZHkoBAcAdUgZ1cxLWJ-naMBi5ABMvtHJ6s4RUEHsOj/exec";
+const GOOGLE_SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbzXb1cgZwP2RdEM8xvf9xaNk_ZHkoBAcAdUgZ1cxLWJ-naMBi5ABMvtHJ6s4RUEHsOj/exec";
 
 function getCleanApiUrl(url) {
     if (!url) return "";
@@ -1644,6 +1644,15 @@ Dashboard Current State Context:
 `;
 }
 
+window.triggerAiSearchSuggestion = function(text) {
+    const inputEl = document.getElementById('ai-search-input');
+    if (inputEl) {
+        inputEl.value = text;
+        const submitBtn = document.getElementById('ai-search-submit');
+        if (submitBtn) submitBtn.click();
+    }
+};
+
 function initAISearchBar() {
     const submitBtn = document.getElementById('ai-search-submit');
     const inputEl = document.getElementById('ai-search-input');
@@ -1652,6 +1661,21 @@ function initAISearchBar() {
     const closeBtn = document.getElementById('ai-search-close');
 
     if (!submitBtn || !inputEl || !overlay || !contentEl || !closeBtn) return;
+
+    // Smooth focus effects for container
+    const searchBox = inputEl.closest('.ai-search-box');
+    if (searchBox) {
+        inputEl.addEventListener('focus', () => {
+            searchBox.style.borderColor = 'rgba(168, 85, 247, 0.5)';
+            searchBox.style.boxShadow = '0 0 15px rgba(168, 85, 247, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.15)';
+            searchBox.style.background = 'rgba(255, 255, 255, 0.08)';
+        });
+        inputEl.addEventListener('blur', () => {
+            searchBox.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+            searchBox.style.boxShadow = 'inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 8px 24px rgba(0,0,0,0.3)';
+            searchBox.style.background = 'rgba(255, 255, 255, 0.04)';
+        });
+    }
 
     // Close button
     closeBtn.addEventListener('click', (e) => {
@@ -1662,6 +1686,13 @@ function initAISearchBar() {
     // Prevent light-dismiss when clicking inside the overlay
     overlay.addEventListener('click', (e) => {
         e.stopPropagation();
+    });
+
+    // Close overlay on clicking outside the container
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.ai-search-container')) {
+            overlay.style.display = 'none';
+        }
     });
 
     async function handleSearch() {
@@ -1684,9 +1715,7 @@ function initAISearchBar() {
         `;
 
         const context = getDashboardMetricsContext();
-        const key = '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';
-
-        const prompt = `
+        const fullPrompt = `
 You are a helpful and intelligent operations assistant named Nemotron AI for a B2B fintech support dashboard at smallcase.
 You have access to the mathematical summary of the current dashboard slice based on active filters selected by the user.
 
@@ -1699,24 +1728,46 @@ If the question is about operations, give specific recommendations. Format the r
 Answer:
 `;
 
+        const liveUrl = localStorage.getItem('live_google_sheet_url') || (typeof GOOGLE_SCRIPT_API_URL === "string" ? GOOGLE_SCRIPT_API_URL : "");
+        
         try {
-            const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-                method: 'POST',
-                headers: { 
-                    'Authorization': 'Bearer ' + key, 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({ 
-                    model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', 
-                    messages: [{ role: 'user', content: prompt }], 
-                    temperature: 0.5, 
-                    max_tokens: 1000 
-                })
-            });
+            let res;
+            if (liveUrl && !liveUrl.includes("YOUR_DEPLOYED_SCRIPT_WEB_APP_URL")) {
+                const cleanUrl = liveUrl.includes('?') ? liveUrl.split('?')[0] : liveUrl;
+                const targetUrl = `${cleanUrl}?action=askNemotron`;
+                console.log("Calling Nemotron AI via secure Google Script Proxy: " + targetUrl);
+                
+                const response = await fetch(targetUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'prompt=' + encodeURIComponent(fullPrompt)
+                });
+                if (!response.ok) throw new Error('API request failed with status ' + response.status);
+                res = await response.json();
+            } else {
+                console.warn("No active Google Script API URL found for Nemotron sync. Attempting direct call...");
+                const key = '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';
+                const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': 'Bearer ' + key, 
+                        'Content-Type': 'application/json' 
+                    },
+                    body: JSON.stringify({ 
+                        model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', 
+                        messages: [{ role: 'user', content: fullPrompt }], 
+                        temperature: 0.5, 
+                        max_tokens: 1000 
+                    })
+                });
+                if (!response.ok) throw new Error('API request failed with status ' + response.status);
+                res = await response.json();
+            }
 
-            if (!response.ok) throw new Error('API request failed with status ' + response.status);
+            if (res && res.error) {
+                throw new Error(res.error);
+            }
 
-            const res = await response.json();
             let answer = res.choices[0].message.content.trim();
             
             // Clean markdown formatting if AI outputs codeblocks
@@ -1751,11 +1802,6 @@ Answer:
             e.preventDefault();
             handleSearch();
         }
-    });
-
-    // Dismiss overlay on click outside
-    document.addEventListener('click', () => {
-        overlay.style.display = 'none';
     });
 }
 
@@ -1943,6 +1989,11 @@ async function loadDashboardData() {
 
         // Run reactive view model compiler
         buildViewModel();
+
+        // Load ClickUp tasks automatically in the background on startup
+        setTimeout(() => {
+            fetchClickupTasksLive();
+        }, 300);
     } catch (error) {
         console.error("Dashboard Load Error:", error);
         updateStatusUI('error', 'Load Error', 'Check console');
@@ -1972,11 +2023,51 @@ function setupEventListeners() {
                                (GOOGLE_SCRIPT_API_URL.includes("YOUR_DEPLOYED_SCRIPT_WEB_APP_URL") ? "" : GOOGLE_SCRIPT_API_URL);
             const isEnabled = localStorage.getItem('live_sync_enabled') !== 'false';
             
-            if (liveUrlInput) liveUrlInput.value = currentUrl;
+            if (liveUrlInput) {
+                liveUrlInput.value = currentUrl;
+                liveUrlInput.readOnly = true;
+                liveUrlInput.style.background = 'rgba(0,0,0,0.15)';
+                liveUrlInput.style.color = 'var(--text-muted)';
+            }
             if (liveEnabledCheckbox) liveEnabledCheckbox.checked = isEnabled;
             if (testResultDiv) testResultDiv.style.display = 'none';
             
+            const editUrlBtn = document.getElementById('edit-url-btn');
+            if (editUrlBtn) {
+                editUrlBtn.innerHTML = '✏️ Edit URL';
+            }
+            const urlInputTip = document.getElementById('url-input-tip');
+            if (urlInputTip) {
+                urlInputTip.innerHTML = 'URL is loaded from the codebase configuration and is read-only. Click "✏️ Edit URL" to override.';
+            }
+            
             liveModal.classList.add('open');
+        });
+    }
+
+    const editUrlBtn = document.getElementById('edit-url-btn');
+    if (editUrlBtn && liveUrlInput) {
+        editUrlBtn.addEventListener('click', () => {
+            if (liveUrlInput.readOnly) {
+                liveUrlInput.readOnly = false;
+                liveUrlInput.style.background = 'var(--bg-card)';
+                liveUrlInput.style.color = 'var(--text-primary)';
+                liveUrlInput.focus();
+                editUrlBtn.innerHTML = '🔒 Lock URL';
+                const urlInputTip = document.getElementById('url-input-tip');
+                if (urlInputTip) {
+                    urlInputTip.innerHTML = '<span style="color: #e3a008;">⚠️ Override Mode: Please note that custom URL edits are saved locally. You will be prompted to update your codebase file constant upon submission.</span>';
+                }
+            } else {
+                liveUrlInput.readOnly = true;
+                liveUrlInput.style.background = 'rgba(0,0,0,0.15)';
+                liveUrlInput.style.color = 'var(--text-muted)';
+                editUrlBtn.innerHTML = '✏️ Edit URL';
+                const urlInputTip = document.getElementById('url-input-tip');
+                if (urlInputTip) {
+                    urlInputTip.innerHTML = 'URL is loaded from the codebase configuration and is read-only. Click "✏️ Edit URL" to override.';
+                }
+            }
         });
     }
 
@@ -2075,6 +2166,11 @@ function setupEventListeners() {
             
             if (liveModal) {
                 liveModal.classList.remove('open');
+            }
+            
+            // If the URL has been overridden and differs from the constant, prompt the user to update the codebase
+            if (url !== GOOGLE_SCRIPT_API_URL) {
+                alert(`✏️ Custom URL Override Saved!\n\nYou have customized the Sync URL. To make this change permanent for all users, please update the codebase constant:\n\nGOOGLE_SCRIPT_API_URL = "${url}"\n\nin dashboard.js.`);
             }
             
             // Reload dashboard data
@@ -11541,16 +11637,46 @@ function renderClickupDashboard() {
 
         clickupTasks.forEach(t => {
             const creatorId = t.creator ? String(t.creator.id) : "";
+            const counted = new Set();
             if (taskCounts.hasOwnProperty(creatorId)) {
                 taskCounts[creatorId]++;
+                counted.add(creatorId);
+            }
+            if (t.assignees && Array.isArray(t.assignees)) {
+                t.assignees.forEach(a => {
+                    const assigneeId = String(a.id);
+                    if (taskCounts.hasOwnProperty(assigneeId) && !counted.has(assigneeId)) {
+                        taskCounts[assigneeId]++;
+                        counted.add(assigneeId);
+                    }
+                });
             }
         });
 
         breakdownContainer.innerHTML = allowedMembers.map(m => {
             const count = taskCounts[m.id];
             const percent = total > 0 ? Math.round((count / total) * 100) : 0;
-            const taskWithMember = clickupTasks.find(t => t.creator && String(t.creator.id) === m.id);
-            const avatarImg = taskWithMember && taskWithMember.creator.profilePicture ? `<img src="${taskWithMember.creator.profilePicture}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` : `<div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white;">${m.name.charAt(0)}</div>`;
+            
+            // Find any task that has this member either as creator or assignee to get their profile picture
+            const taskWithMember = clickupTasks.find(t => {
+                if (t.creator && String(t.creator.id) === m.id && t.creator.profilePicture) return true;
+                if (t.assignees && Array.isArray(t.assignees)) {
+                    return t.assignees.some(a => String(a.id) === m.id && a.profilePicture);
+                }
+                return false;
+            });
+            
+            let profilePicUrl = null;
+            if (taskWithMember) {
+                if (taskWithMember.creator && String(taskWithMember.creator.id) === m.id) {
+                    profilePicUrl = taskWithMember.creator.profilePicture;
+                } else if (taskWithMember.assignees) {
+                    const assignee = taskWithMember.assignees.find(a => String(a.id) === m.id);
+                    if (assignee) profilePicUrl = assignee.profilePicture;
+                }
+            }
+            
+            const avatarImg = profilePicUrl ? `<img src="${profilePicUrl}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` : `<div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white;">${m.name.charAt(0)}</div>`;
 
             return `
                 <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='rgba(255,255,255,0.02)'; this.style.transform='none';" onclick="filterClickupByMember('${m.name.replace(/'/g, "\\'")}')">
@@ -11765,7 +11891,8 @@ function renderClickupDeepDiveList() {
         const id = (t.id || '').toLowerCase();
         const status = t.status ? t.status.status.toLowerCase() : '';
         const creator = t.creator ? t.creator.username.toLowerCase() : '';
-        return name.includes(query) || desc.includes(query) || id.includes(query) || status.includes(query) || creator.includes(query);
+        const assigneesStr = (t.assignees || []).map(a => (a.username || '').toLowerCase()).join(' ');
+        return name.includes(query) || desc.includes(query) || id.includes(query) || status.includes(query) || creator.includes(query) || assigneesStr.includes(query);
     });
 
     if (filtered.length === 0) {

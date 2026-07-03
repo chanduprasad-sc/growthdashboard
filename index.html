@@ -179,23 +179,49 @@
                 </div>
                 
                 <!-- AI Search Bar in Top Mid -->
-                <div class="ai-search-container" style="flex: 1; max-width: 450px; margin: 0 20px; position: relative;">
-                    <div style="display: flex; align-items: center; background: rgba(0,0,0,0.35); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: border-color 0.3s ease;">
-                        <svg style="width: 16px; height: 16px; color: var(--text-secondary); margin-right: 10px;" viewBox="0 0 24 24"><path fill="currentColor" d="M15.5,14H14.71L14.43,13.73C15.41,12.59 16,11.11 16,9.5A6.5,6.5 0 0,0 9.5,3A6.5,6.5 0 0,0 3,9.5A6.5,6.5 0 0,0 9.5,16C11.11,16 12.59,15.41 13.73,14.43L14,14.71V15.5L19,20.5L20.5,19L15.5,14M9.5,14C7.01,14 5,11.99 5,9.5C5,7.01 7.01,5 9.5,5C11.99,5 14,7.01 14,9.5C14,11.99 11.99,14 9.5,14Z"/></svg>
-                        <input type="text" id="ai-search-input" placeholder="Ask Nemotron AI about dashboard metrics..." style="width: 100%; border: none; background: transparent; color: var(--text-primary); font-size: 0.85rem; outline: none; padding: 6px 0;">
-                        <button id="ai-search-submit" style="background: var(--accent-primary); border: none; color: white; border-radius: 12px; padding: 4px 12px; font-size: 0.75rem; font-weight: bold; cursor: pointer; margin-left: 8px; transition: transform 0.2s ease;">Ask</button>
+                <div class="ai-search-container" style="flex: 1; max-width: 480px; margin: 0 20px; position: relative;">
+                    <div class="ai-search-box" style="display: flex; align-items: center; background: rgba(255, 255, 255, 0.04); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; padding: 4px 6px 4px 16px; box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 8px 24px rgba(0,0,0,0.3); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 100%; box-sizing: border-box;">
+                        <!-- Gradient AI sparkles icon -->
+                        <svg style="width: 18px; height: 18px; margin-right: 12px; flex-shrink: 0;" viewBox="0 0 24 24">
+                            <defs>
+                                <linearGradient id="ai-sparkle-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#a855f7" />
+                                    <stop offset="100%" stop-color="#ec4899" />
+                                </linearGradient>
+                            </defs>
+                            <path fill="url(#ai-sparkle-grad)" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A1,1 0 0,0 11,7V11H7A1,1 0 0,0 7,13H13V7A1,1 0 0,0 12,6Z"/>
+                        </svg>
+                        <input type="text" id="ai-search-input" placeholder="Ask Nemotron AI about dashboard metrics..." style="width: 100%; border: none; background: transparent; color: var(--text-primary); font-size: 0.85rem; outline: none; padding: 8px 0; font-family: inherit;">
+                        <button id="ai-search-submit" style="background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: white; border-radius: 20px; padding: 7px 18px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(168, 85, 247, 0.3); outline: none;">Ask AI</button>
                     </div>
                     <!-- Dropdown result overlay -->
-                    <div id="ai-search-result-overlay" style="display: none; position: absolute; top: 110%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); padding: 15px; z-index: 1000; max-height: 350px; overflow-y: auto; text-align: left; font-size: 0.85rem; line-height: 1.4;" class="scrollbar-themed">
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 10px;">
-                            <span style="font-weight: 700; color: var(--accent-primary); display: flex; align-items: center; gap: 6px;">
-                                <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24"><path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A1,1 0 0,0 11,7V11H7A1,1 0 0,0 7,13H13V7A1,1 0 0,0 12,6Z"/></svg>
-                                Nemotron AI Assistant
+                    <div id="ai-search-result-overlay" style="display: none; position: absolute; top: 120%; left: 0; right: 0; background: rgba(17, 24, 39, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); padding: 18px; z-index: 1000; max-height: 400px; overflow-y: auto; text-align: left; font-size: 0.85rem; line-height: 1.5; transform-origin: top center; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);" class="scrollbar-themed">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 10px; margin-bottom: 14px;">
+                            <span style="font-weight: 700; color: white; display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
+                                <svg style="width: 18px; height: 18px; flex-shrink: 0;" viewBox="0 0 24 24">
+                                    <path fill="url(#ai-sparkle-grad)" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A1,1 0 0,0 11,7V11H7A1,1 0 0,0 7,13H13V7A1,1 0 0,0 12,6Z"/>
+                                </svg>
+                                Nemotron AI Operations Assistant
                             </span>
-                            <button id="ai-search-close" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.1rem; font-weight: bold; line-height: 1;">×</button>
+                            <button id="ai-search-close" style="background: rgba(255, 255, 255, 0.08); border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.15)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,255,255,0.08)'; this.style.color='var(--text-secondary)';">&times;</button>
                         </div>
                         <div id="ai-search-answer-content" style="color: var(--text-primary); white-space: pre-wrap; word-break: break-word;">
-                            Ask a question to see analysis.
+                            Ask a question to analyze metrics.
+                        </div>
+                        <!-- Suggestion Pills -->
+                        <div id="ai-search-suggestions" style="margin-top: 15px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); display: flex; flex-direction: column; gap: 8px;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Suggested Questions</span>
+                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                <div class="suggestion-pill" onclick="triggerAiSearchSuggestion('Summarize overall branch performance and friction points')" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(168, 85, 247, 0.1)'; this.style.borderColor='rgba(168, 85, 247, 0.3)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,255,255,0.04)'; this.style.borderColor='rgba(255,255,255,0.08)'; this.style.color='var(--text-secondary)';">
+                                    💡 Branch performance & friction
+                                </div>
+                                <div class="suggestion-pill" onclick="triggerAiSearchSuggestion('Which issue types are causing the highest resolution times?')" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(168, 85, 247, 0.1)'; this.style.borderColor='rgba(168, 85, 247, 0.3)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,255,255,0.04)'; this.style.borderColor='rgba(255,255,255,0.08)'; this.style.color='var(--text-secondary)';">
+                                    ⏱️ High resolution times
+                                </div>
+                                <div class="suggestion-pill" onclick="triggerAiSearchSuggestion('How many ClickUp tasks are open vs closed?')" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(168, 85, 247, 0.1)'; this.style.borderColor='rgba(168, 85, 247, 0.3)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,255,255,0.04)'; this.style.borderColor='rgba(255,255,255,0.08)'; this.style.color='var(--text-secondary)';">
+                                    📋 ClickUp tasks status
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1194,8 +1220,9 @@
                         </div>
                         <div class="metric-card card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: center; align-items: flex-start;">
                             <span class="metric-label" style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Sync Status</span>
-                            <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                                <button id="btn-clickup-sync" class="action-btn" style="padding: 8px 12px; background: var(--accent-primary); color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600; flex: 1;">🔄 Reload Live</button>
+                            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                                <button id="btn-clickup-sync" class="action-btn" style="width: 100%; padding: 8px 12px; background: var(--accent-primary); color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600;">🔄 Reload Live</button>
+                                <span id="clickup-sync-status" style="font-size: 0.75rem; color: var(--text-muted); text-align: center; display: block;">Not synced</span>
                             </div>
                         </div>
                     </div>
@@ -1204,8 +1231,14 @@
                         <!-- ClickUp Task Board -->
                         <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; height: 500px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Workspace Tasks (All Statuses)</h3>
-                                <button id="btn-clickup-deepdive" class="action-btn" style="padding: 8px 14px; background: var(--accent-primary); color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 5px;">🔍 Deep Dive</button>
+                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Workspace Tasks</h3>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <div class="clickup-tab-container" style="display: flex; background: rgba(0,0,0,0.25); padding: 3px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                        <button class="clickup-tab-btn active" id="btn-clickup-active-tab" style="padding: 6px 12px; border-radius: 6px; border: none; background: var(--accent-primary); color: white; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">Active</button>
+                                        <button class="clickup-tab-btn" id="btn-clickup-closed-tab" style="padding: 6px 12px; border-radius: 6px; border: none; background: transparent; color: var(--text-secondary); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">Closed</button>
+                                    </div>
+                                    <button id="btn-clickup-deepdive" class="action-btn" style="padding: 8px 14px; background: var(--accent-primary); color: white; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 5px;">🔍 Deep Dive</button>
+                                </div>
                             </div>
                             <div style="overflow-y: auto; flex-grow: 1;" class="scrollbar-themed">
                                 <table class="data-table" style="width: 100%; border-collapse: collapse;">
@@ -2219,8 +2252,12 @@
                     <p class="modal-subtitle">Full details of all ClickUp queries and tasks in all statuses</p>
                 </div>
             </div>
-            <div class="search-bar-container" style="margin-top: 15px; margin-bottom: 20px;">
-                <input type="text" id="clickup-search" placeholder="Search tasks by name, ID, status or creator..." style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.25); color: var(--text-primary); outline: none;">
+            <div class="search-bar-container" style="margin-top: 15px; margin-bottom: 20px; display: flex; gap: 15px; align-items: center;">
+                <input type="text" id="clickup-search" placeholder="Search tasks by name, ID, status or creator..." style="flex-grow: 1; padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.25); color: var(--text-primary); outline: none;">
+                <div class="clickup-modal-tab-container" style="display: flex; background: rgba(0,0,0,0.25); padding: 3px; border-radius: 8px; border: 1px solid var(--border-color); flex-shrink: 0;">
+                    <button class="clickup-modal-tab-btn active" id="btn-clickup-modal-active-tab" style="padding: 8px 16px; border-radius: 6px; border: none; background: var(--accent-primary); color: white; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">Active</button>
+                    <button class="clickup-modal-tab-btn" id="btn-clickup-modal-closed-tab" style="padding: 8px 16px; border-radius: 6px; border: none; background: transparent; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">Closed</button>
+                </div>
             </div>
             <div id="clickup-deepdive-list" style="display: flex; flex-direction: column; gap: 20px; max-height: 60vh; overflow-y: auto;" class="scrollbar-themed">
                 <!-- Dynamic task detail cards populated here -->
@@ -2271,13 +2308,18 @@
             <div class="modal-panel" style="margin-top: 16px;">
                 <form id="live-config-form" style="display: flex; flex-direction: column; gap: 16px;">
                     <div style="display: flex; flex-direction: column; gap: 6px;">
-                        <label for="live-script-url" style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">
-                            Apps Script Web App URL
-                        </label>
-                        <input type="url" id="live-script-url" placeholder="https://script.google.com/macros/s/.../exec" required
-                               style="padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.85rem; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
-                        <small style="color: var(--text-muted); font-size: 0.75rem; line-height: 1.4;">
-                            Paste the Web App URL copied from your Google Sheet Apps Script deployment.
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <label for="live-script-url" style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">
+                                Apps Script Web App URL
+                            </label>
+                            <button type="button" id="edit-url-btn" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: var(--text-primary); border-radius: 6px; padding: 3px 8px; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px;" onmouseover="this.style.background='rgba(255,255,255,0.12)';" onmouseout="this.style.background='rgba(255,255,255,0.06)';">
+                                ✏️ Edit URL
+                            </button>
+                        </div>
+                        <input type="url" id="live-script-url" readonly placeholder="https://script.google.com/macros/s/.../exec" required
+                               style="padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.15); color: var(--text-muted); font-family: inherit; font-size: 0.85rem; width: 100%; box-sizing: border-box; outline: none; transition: all 0.2s;">
+                        <small id="url-input-tip" style="color: var(--text-muted); font-size: 0.75rem; line-height: 1.4;">
+                            URL is loaded from the codebase configuration and is read-only. Click "✏️ Edit URL" to override.
                         </small>
                     </div>
 

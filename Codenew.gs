@@ -91,10 +91,54 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify({ error: err.message }))
         .setMimeType(ContentService.MimeType.JSON);
     }
+  } else if (action === 'askNemotron') {
+    try {
+      var prompt = e && e.parameter && e.parameter.prompt;
+      if (!prompt) {
+        throw new Error('Prompt parameter is missing');
+      }
+      var res = askNemotronProxy(prompt);
+      return ContentService.createTextOutput(JSON.stringify(res))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ error: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
   }
 
   return ContentService.createTextOutput("Vercel B2B Dashboard Live Sync API is active. Access data via '?action=getData'")
     .setMimeType(ContentService.MimeType.TEXT);
+}
+
+function doPost(e) {
+  return doGet(e);
+}
+
+function askNemotronProxy(prompt) {
+  var url = 'https://integrate.api.nvidia.com/v1/chat/completions';
+  var apiKey = NVIDIA_API_KEY;
+  var payload = {
+    model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.5,
+    max_tokens: 1000
+  };
+  var options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'Authorization': 'Bearer ' + apiKey
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+  var resp = UrlFetchApp.fetch(url, options);
+  var code = resp.getResponseCode();
+  var content = resp.getContentText();
+  if (code !== 200) {
+    throw new Error('Nvidia API error (status ' + code + '): ' + content);
+  }
+  return JSON.parse(content);
 }
 
 // ================================================================
@@ -2258,8 +2302,8 @@ function fetchClickupTasksProxy() {
   var page = 0;
   var hasMore = true;
   
-  while (hasMore && page < 8) {
-    var tasksUrl = "https://api.clickup.com/api/v2/team/" + teamId + "/task?include_closed=false&subtasks=true&limit=100&page=" + page;
+  while (hasMore && page < 30) {
+    var tasksUrl = "https://api.clickup.com/api/v2/team/" + teamId + "/task?include_closed=true&subtasks=true&limit=100&space_ids[]=613347&page=" + page;
     var tasksResp = UrlFetchApp.fetch(tasksUrl, options);
     if (tasksResp.getResponseCode() === 200) {
       var tasksData = JSON.parse(tasksResp.getContentText());
@@ -2268,25 +2312,22 @@ function fetchClickupTasksProxy() {
         hasMore = false;
       } else {
         tasks.forEach(function(task) {
-          var creatorId = task.creator ? String(task.creator.id) : "";
-          if (allowedCreatorIds.indexOf(creatorId) !== -1) {
-            var exists = allTasks.some(function(t) { return t.id === task.id; });
-            if (!exists) {
-              allTasks.push({
-                id: task.id,
-                custom_id: task.custom_id || null,
-                name: task.name,
-                description: task.description || "",
-                status: task.status ? { status: task.status.status, color: task.status.color } : null,
-                creator: task.creator ? { id: task.creator.id, username: task.creator.username, email: task.creator.email, profilePicture: task.creator.profilePicture } : null,
-                assignees: (task.assignees || []).map(function(assignee) {
-                  return { id: assignee.id, username: assignee.username, email: assignee.email, profilePicture: assignee.profilePicture };
-                }),
-                date_created: task.date_created,
-                date_updated: task.date_updated,
-                url: task.url
-              });
-            }
+          var exists = allTasks.some(function(t) { return t.id === task.id; });
+          if (!exists) {
+            allTasks.push({
+              id: task.id,
+              custom_id: task.custom_id || null,
+              name: task.name,
+              description: task.description || "",
+              status: task.status ? { status: task.status.status, color: task.status.color } : null,
+              creator: task.creator ? { id: task.creator.id, username: task.creator.username, email: task.creator.email, profilePicture: task.creator.profilePicture } : null,
+              assignees: (task.assignees || []).map(function(assignee) {
+                return { id: assignee.id, username: assignee.username, email: assignee.email, profilePicture: assignee.profilePicture };
+              }),
+              date_created: task.date_created,
+              date_updated: task.date_updated,
+              url: task.url
+            });
           }
         });
         if (tasks.length < 100) {
