@@ -102,7 +102,7 @@
                 
                 <!-- AI Search Bar in Top Mid -->
                 <div class="ai-search-container" style="flex: 1; max-width: 480px; margin: 0 20px; position: relative;">
-                    <div class="ai-search-box" style="display: flex; align-items: center; background: rgba(255, 255, 255, 0.04); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; padding: 4px 6px 4px 16px; box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 8px 24px rgba(0,0,0,0.3); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 100%; box-sizing: border-box;">
+                    <div class="ai-search-box" style="display: flex; align-items: center; background: var(--bg-card); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border-color); border-radius: 24px; padding: 4px 6px 4px 16px; box-shadow: var(--card-shadow); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 100%; box-sizing: border-box;">
                         <!-- Gradient AI sparkles icon -->
                         <svg style="width: 18px; height: 18px; margin-right: 12px; flex-shrink: 0;" viewBox="0 0 24 24">
                             <defs>
@@ -117,30 +117,30 @@
                         <button id="ai-search-submit" style="background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: white; border-radius: 20px; padding: 7px 18px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(168, 85, 247, 0.3); outline: none;">Ask AI</button>
                     </div>
                     <!-- Dropdown result overlay -->
-                    <div id="ai-search-result-overlay" style="display: none; position: absolute; top: 120%; left: 0; right: 0; background: rgba(17, 24, 39, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); padding: 18px; z-index: 1000; max-height: 400px; overflow-y: auto; text-align: left; font-size: 0.85rem; line-height: 1.5; transform-origin: top center; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);" class="scrollbar-themed">
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 10px; margin-bottom: 14px;">
-                            <span style="font-weight: 700; color: white; display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
+                    <div id="ai-search-result-overlay" style="display: none; position: absolute; top: 120%; left: 0; right: 0; background: var(--color-cloud); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--color-edge); border-radius: 16px; box-shadow: var(--card-shadow); padding: 18px; z-index: 1000; max-height: 400px; overflow-y: auto; text-align: left; font-size: 0.85rem; line-height: 1.5; transform-origin: top center; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);" class="scrollbar-themed">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 14px;">
+                            <span style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
                                 <svg style="width: 18px; height: 18px; flex-shrink: 0;" viewBox="0 0 24 24">
                                     <path fill="url(#ai-sparkle-grad)" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A1,1 0 0,0 11,7V11H7A1,1 0 0,0 7,13H13V7A1,1 0 0,0 12,6Z"/>
                                 </svg>
                                 Nemotron AI Operations Assistant
                             </span>
-                            <button id="ai-search-close" style="background: rgba(255, 255, 255, 0.08); border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.15)'; this.style.color='white';" onmouseout="this.style.background='rgba(255, 255, 255, 0.08)'; this.style.color='var(--text-secondary)';">&times;</button>
+                            <button id="ai-search-close" style="background: var(--border-color); border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='var(--accent-primary)'; this.style.color='white';" onmouseout="this.style.background='var(--border-color)'; this.style.color='var(--text-secondary)';">&times;</button>
                         </div>
                         <div id="ai-search-answer-content" style="color: var(--text-primary); white-space: pre-wrap; word-break: break-word;">
                             Ask a question to analyze metrics.
                         </div>
                         <!-- Suggestion Pills -->
-                        <div id="ai-search-suggestions" style="margin-top: 15px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); display: flex; flex-direction: column; gap: 8px;">
+                        <div id="ai-search-suggestions" style="margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
                             <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Suggested Questions</span>
                             <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                <div class="suggestion-pill" onclick="triggerAiSearchSuggestion('Summarize overall branch performance and friction points')" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(168, 85, 247, 0.1)'; this.style.borderColor='rgba(168, 85, 247, 0.3)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,255,255,0.04)'; this.style.borderColor='rgba(255,255,255,0.08)'; this.style.color='var(--text-secondary)';">
+                                <div class="suggestion-pill" onclick="triggerAiSearchSuggestion('Summarize overall branch performance and friction points')" style="background: var(--border-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(var(--accent-primary-rgb), 0.1)'; this.style.borderColor='var(--accent-primary)'; this.style.color='var(--accent-primary)';" onmouseout="this.style.background='var(--border-color)'; this.style.borderColor='var(--border-color)'; this.style.color='var(--text-secondary)';">
                                     💡 Branch performance & friction
                                 </div>
-                                <div class="suggestion-pill" onclick="triggerAiSearchSuggestion('Which issue types are causing the highest resolution times?')" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(168, 85, 247, 0.1)'; this.style.borderColor='rgba(168, 85, 247, 0.3)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,255,255,0.04)'; this.style.borderColor='rgba(255,255,255,0.08)'; this.style.color='var(--text-secondary)';">
+                                <div class="suggestion-pill" onclick="triggerAiSearchSuggestion('Which issue types are causing the highest resolution times?')" style="background: var(--border-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(var(--accent-primary-rgb), 0.1)'; this.style.borderColor='var(--accent-primary)'; this.style.color='var(--accent-primary)';" onmouseout="this.style.background='var(--border-color)'; this.style.borderColor='var(--border-color)'; this.style.color='var(--text-secondary)';">
                                     ⏱️ High resolution times
                                 </div>
-                                <div class="suggestion-pill" onclick="triggerAiSearchSuggestion('How many ClickUp tasks are open vs closed?')" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(168, 85, 247, 0.1)'; this.style.borderColor='rgba(168, 85, 247, 0.3)'; this.style.color='white';" onmouseout="this.style.background='rgba(255,255,255,0.04)'; this.style.borderColor='rgba(255,255,255,0.08)'; this.style.color='var(--text-secondary)';">
+                                <div class="suggestion-pill" onclick="triggerAiSearchSuggestion('How many ClickUp tasks are open vs closed?')" style="background: var(--border-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 6px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(var(--accent-primary-rgb), 0.1)'; this.style.borderColor='var(--accent-primary)'; this.style.color='var(--accent-primary)';" onmouseout="this.style.background='var(--border-color)'; this.style.borderColor='var(--border-color)'; this.style.color='var(--text-secondary)';">
                                     📋 ClickUp tasks status
                                 </div>
                             </div>
@@ -541,6 +541,8 @@
                 <div class="sub-tab-pills" id="daily-tools-sub-tabs">
                     <button class="sub-tab-pill active" data-subtab="dt-redash">📊 Redash Queries</button>
                     <button class="sub-tab-pill" data-subtab="dt-clickup">✅ ClickUp Tasks & Forms</button>
+                    <button class="sub-tab-pill" data-subtab="dt-links">🔗 Important Links</button>
+                    <button class="sub-tab-pill" data-subtab="dt-sheets">📝 Important Sheets</button>
                 </div>
 
                 <!-- DT Sub-Tab 1: Redash -->
@@ -634,6 +636,110 @@
                                 <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; color: var(--orange);">Publisher ROTA request form</h4>
                                 <iframe src="https://forms.clickup.com/603234/f/jd32-25844/2HV47GR6UHDI4L0IX9" width="100%" height="100%" style="border: none; border-radius: 8px; background: white; flex-grow: 1;"></iframe>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DT Sub-Tab 3: Important Links -->
+                <div class="sub-tab-content" id="dt-links">
+                    <div class="intel-header-card card" style="padding: 20px; border-radius: 12px; margin-bottom: 25px; background: var(--bg-card); border: 1px solid var(--border-color);">
+                        <h3 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary);">Important Tools & Links</h3>
+                        <p style="color: var(--text-secondary); margin-top: 5px; font-size: 0.9rem;">Quickly access standard tool portals and DevRev Vista boards.</p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+                        <!-- Card 1: PDF to Image Brochures -->
+                        <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
+                            <div>
+                                <div style="font-size: 1.8rem; margin-bottom: 10px;">🖼️</div>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">PDF to Image Brochures</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Convert PDF brochures to high-quality images via Streamlit.</p>
+                            </div>
+                            <a href="https://pdftoimagesc.streamlit.app/" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                Open Application ↗
+                            </a>
+                        </div>
+                        
+                        <!-- Card 2: Devrev Whatsapp -->
+                        <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
+                            <div>
+                                <div style="font-size: 1.8rem; margin-bottom: 10px;">💬</div>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">Devrev Whatsapp</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Monitor and manage live WhatsApp chats Vista board.</p>
+                            </div>
+                            <a href="https://app.devrev.ai/smallcasebp/vistas/vista-530" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                Open DevRev Vista ↗
+                            </a>
+                        </div>
+
+                        <!-- Card 3: B2B Calls -->
+                        <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
+                            <div>
+                                <div style="font-size: 1.8rem; margin-bottom: 10px;">📞</div>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">B2B Calls</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Access call records and logs Vista board on DevRev.</p>
+                            </div>
+                            <a href="https://app.devrev.ai/smallcasebp/vistas/vista-712" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                Open DevRev Vista ↗
+                            </a>
+                        </div>
+
+                        <!-- Card 4: Care Emails -->
+                        <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
+                            <div>
+                                <div style="font-size: 1.8rem; margin-bottom: 10px;">✉️</div>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">Care Emails</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Monitor and support customer care emails Vista board.</p>
+                            </div>
+                            <a href="https://app.devrev.ai/smallcasebp/vistas/vista-216" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                Open DevRev Vista ↗
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DT Sub-Tab 4: Important Sheets -->
+                <div class="sub-tab-content" id="dt-sheets">
+                    <div class="intel-header-card card" style="padding: 20px; border-radius: 12px; margin-bottom: 25px; background: var(--bg-card); border: 1px solid var(--border-color);">
+                        <h3 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary);">Important Spreadsheets</h3>
+                        <p style="color: var(--text-secondary); margin-top: 5px; font-size: 0.9rem;">Access team spreadsheets for user dropoffs, calling logs, and brochures.</p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+                        <!-- Sheet 1: dropoff_users_wcpl -->
+                        <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
+                            <div>
+                                <div style="font-size: 1.8rem; margin-bottom: 10px;">📉</div>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">dropoff_users_wcpl</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Analyze and target dropoff users for WCPL.</p>
+                            </div>
+                            <a href="https://docs.google.com/spreadsheets/d/1tC_MpwGrGfkU270cwkjWYTrn83hZleZzTjNdVYZ58N8/edit?gid=0#gid=0" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                Open Google Sheet ↗
+                            </a>
+                        </div>
+                        
+                        <!-- Sheet 2: Subscription calling -->
+                        <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
+                            <div>
+                                <div style="font-size: 1.8rem; margin-bottom: 10px;">📞</div>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">Subscription Calling</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Calling list and tracker for subscriptions.</p>
+                            </div>
+                            <a href="https://docs.google.com/spreadsheets/d/1dHADGVe0xpQeTXE5SFQUxNRCNguXWS1enEdWrdrNNlg/edit?gid=0#gid=0" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                Open Google Sheet ↗
+                            </a>
+                        </div>
+
+                        <!-- Sheet 3: Brochure Links -->
+                        <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
+                            <div>
+                                <div style="font-size: 1.8rem; margin-bottom: 10px;">🔗</div>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">Brochure Links</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Registry database containing all brochure assets links.</p>
+                            </div>
+                            <a href="https://docs.google.com/spreadsheets/d/15FWsIx-5CpVabu6igIk32WKJB_DnHzwJNbYkKfV0-vc/edit?gid=0#gid=0" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                Open Google Sheet ↗
+                            </a>
                         </div>
                     </div>
                 </div>

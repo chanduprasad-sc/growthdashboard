@@ -1784,7 +1784,7 @@ var file = getCacheFile();
 var content = file.getBlob().getDataAsString();
 if (!content || content === "{}") { Logger.log("Cache empty — reading sheets directly"); return buildAndReturn(); }
 var data = JSON.parse(content);
-if (!data.calls || !data.callTkts) { Logger.log("Cache malformed — rebuilding"); return buildAndReturn(); }
+if (!data.calls || !data.callTkts || !data.redashQueries) { Logger.log("Cache malformed or outdated — rebuilding"); return buildAndReturn(); }
 Logger.log("Serving from cache (built: " + (data.builtAt || "unknown") + ")");
 return data;
 } catch(e) {
@@ -2297,13 +2297,12 @@ function fetchClickupTasksProxy() {
   
   var allowedCreatorIds = ["3430072", "278654124", "100924625", "7217956", "7313853", "278435358"];
   var allTasks = [];
-  var teamId = teams[0].id;
   
   var page = 0;
   var hasMore = true;
   
   while (hasMore && page < 30) {
-    var tasksUrl = "https://api.clickup.com/api/v2/team/" + teamId + "/task?include_closed=true&subtasks=true&limit=100&space_ids[]=613347&page=" + page;
+    var tasksUrl = "https://api.clickup.com/api/v2/list/43352038/task?include_closed=true&subtasks=true&limit=100&page=" + page;
     var tasksResp = UrlFetchApp.fetch(tasksUrl, options);
     if (tasksResp.getResponseCode() === 200) {
       var tasksData = JSON.parse(tasksResp.getContentText());
@@ -2312,22 +2311,25 @@ function fetchClickupTasksProxy() {
         hasMore = false;
       } else {
         tasks.forEach(function(task) {
-          var exists = allTasks.some(function(t) { return t.id === task.id; });
-          if (!exists) {
-            allTasks.push({
-              id: task.id,
-              custom_id: task.custom_id || null,
-              name: task.name,
-              description: task.description || "",
-              status: task.status ? { status: task.status.status, color: task.status.color } : null,
-              creator: task.creator ? { id: task.creator.id, username: task.creator.username, email: task.creator.email, profilePicture: task.creator.profilePicture } : null,
-              assignees: (task.assignees || []).map(function(assignee) {
-                return { id: assignee.id, username: assignee.username, email: assignee.email, profilePicture: assignee.profilePicture };
-              }),
-              date_created: task.date_created,
-              date_updated: task.date_updated,
-              url: task.url
-            });
+          var creatorId = task.creator ? String(task.creator.id) : "";
+          if (allowedCreatorIds.indexOf(creatorId) !== -1) {
+            var exists = allTasks.some(function(t) { return t.id === task.id; });
+            if (!exists) {
+              allTasks.push({
+                id: task.id,
+                custom_id: task.custom_id || null,
+                name: task.name,
+                description: task.description || "",
+                status: task.status ? { status: task.status.status, color: task.status.color } : null,
+                creator: task.creator ? { id: task.creator.id, username: task.creator.username, email: task.creator.email, profilePicture: task.creator.profilePicture } : null,
+                assignees: (task.assignees || []).map(function(assignee) {
+                  return { id: assignee.id, username: assignee.username, email: assignee.email, profilePicture: assignee.profilePicture };
+                }),
+                date_created: task.date_created,
+                date_updated: task.date_updated,
+                url: task.url
+              });
+            }
           }
         });
         if (tasks.length < 100) {
