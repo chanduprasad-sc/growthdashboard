@@ -100,6 +100,28 @@
                     <p class="header-subtitle">Comparative weekly reports & segment hotspot analytics</p>
                 </div>
                 
+                <!-- AI Search Bar in Top Mid -->
+                <div class="ai-search-container" style="flex: 1; max-width: 450px; margin: 0 20px; position: relative;">
+                    <div style="display: flex; align-items: center; background: rgba(0,0,0,0.35); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: border-color 0.3s ease;">
+                        <svg style="width: 16px; height: 16px; color: var(--text-secondary); margin-right: 10px;" viewBox="0 0 24 24"><path fill="currentColor" d="M15.5,14H14.71L14.43,13.73C15.41,12.59 16,11.11 16,9.5A6.5,6.5 0 0,0 9.5,3A6.5,6.5 0 0,0 3,9.5A6.5,6.5 0 0,0 9.5,16C11.11,16 12.59,15.41 13.73,14.43L14,14.71V15.5L19,20.5L20.5,19L15.5,14M9.5,14C7.01,14 5,11.99 5,9.5C5,7.01 7.01,5 9.5,5C11.99,5 14,7.01 14,9.5C14,11.99 11.99,14 9.5,14Z"/></svg>
+                        <input type="text" id="ai-search-input" placeholder="Ask Nemotron AI about dashboard metrics..." style="width: 100%; border: none; background: transparent; color: var(--text-primary); font-size: 0.85rem; outline: none; padding: 6px 0;">
+                        <button id="ai-search-submit" style="background: var(--accent-primary); border: none; color: white; border-radius: 12px; padding: 4px 12px; font-size: 0.75rem; font-weight: bold; cursor: pointer; margin-left: 8px; transition: transform 0.2s ease;">Ask</button>
+                    </div>
+                    <!-- Dropdown result overlay -->
+                    <div id="ai-search-result-overlay" style="display: none; position: absolute; top: 110%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); padding: 15px; z-index: 1000; max-height: 350px; overflow-y: auto; text-align: left; font-size: 0.85rem; line-height: 1.4;" class="scrollbar-themed">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 10px;">
+                            <span style="font-weight: 700; color: var(--accent-primary); display: flex; align-items: center; gap: 6px;">
+                                <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24"><path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A1,1 0 0,0 11,7V11H7A1,1 0 0,0 7,13H13V7A1,1 0 0,0 12,6Z"/></svg>
+                                Nemotron AI Assistant
+                            </span>
+                            <button id="ai-search-close" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.1rem; font-weight: bold; line-height: 1;">×</button>
+                        </div>
+                        <div id="ai-search-answer-content" style="color: var(--text-primary); white-space: pre-wrap; word-break: break-word;">
+                            Ask a question to see analysis.
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Screenshot Trigger & Filters -->
                 <div class="top-utility-bar">
                     <button id="screenshot-btn" class="screenshot-btn" title="Download Weekly Pulse Dashboard Summary">
@@ -545,9 +567,9 @@
                                     <thead>
                                         <tr style="border-bottom: 1px solid var(--border-color); text-align: left;">
                                             <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Task ID</th>
-                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Task Name</th>
-                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Creator</th>
-                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Assignees</th>
+                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Task Title</th>
+                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Created By</th>
+                                            <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Date Created</th>
                                             <th style="padding: 10px; color: var(--text-secondary); font-weight: 500; font-size: 0.85rem;">Status</th>
                                         </tr>
                                     </thead>

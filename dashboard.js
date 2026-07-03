@@ -1551,6 +1551,170 @@ async function fetchWithRetry(url, options = {}, retries = 2, timeout = 20000) {
 }
 
 // -------------------------------------------------------------
+// AI Search Bar Engine (NVIDIA Nemotron AI)
+// -------------------------------------------------------------
+function getDashboardMetricsContext() {
+    if (!window.viewModel) return "No data loaded yet.";
+    
+    const interactions = window.viewModel.interactions || [];
+    const calls = window.viewModel.calls || [];
+    const breaks = window.viewModel.breaks || [];
+    
+    const totalCalls = calls.length;
+    const answeredCalls = calls.filter(c => c.disposition === 'ANSWERED').length;
+    const missedCalls = calls.filter(c => c.disposition === 'MISSED').length;
+    const aohCalls = calls.filter(c => c.disposition === 'AOH').length;
+    
+    const totalWhatsapp = interactions.filter(i => i.channel === 'whatsapp').length;
+    const totalEmails = interactions.filter(i => i.channel === 'care_email' || i.channel === 'email').length;
+    
+    const filterState = JSON.stringify(activeFilters);
+    
+    const brokerCounts = {};
+    const rmCounts = {};
+    const issueCounts = {};
+    
+    interactions.forEach(item => {
+        if (item.broker_family) brokerCounts[item.broker_family] = (brokerCounts[item.broker_family] || 0) + 1;
+        if (item.rm_name) rmCounts[item.rm_name] = (rmCounts[item.rm_name] || 0) + 1;
+        if (item.issue_type) issueCounts[item.issue_type] = (issueCounts[item.issue_type] || 0) + 1;
+    });
+    
+    const topBrokers = Object.entries(brokerCounts).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([k,v]) => `${k}: ${v}`).join(', ');
+    const topRMs = Object.entries(rmCounts).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([k,v]) => `${k}: ${v}`).join(', ');
+    const topIssues = Object.entries(issueCounts).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(([k,v]) => `${k}: ${v}`).join(', ');
+
+    return `
+Dashboard Current State Context:
+- Active Filters: ${filterState}
+- Date Preset: ${activeFilters.datePreset} (From: ${activeFilters.dateFrom || 'N/A'}, To: ${activeFilters.dateTo || 'N/A'})
+- Total Calls: ${totalCalls} (Answered: ${answeredCalls}, Missed: ${missedCalls}, AOH: ${aohCalls})
+- WhatsApp Interactions: ${totalWhatsapp}
+- Care Emails: ${totalEmails}
+- Top 3 Active Brokers: ${topBrokers || 'None'}
+- Top 3 Active RMs: ${topRMs || 'None'}
+- Top 3 Active Issues: ${topIssues || 'None'}
+- Total ClickUp Tasks Loaded: ${typeof clickupTasks !== 'undefined' ? clickupTasks.length : 0}
+- Closed ClickUp Tasks: ${typeof clickupTasks !== 'undefined' ? clickupTasks.filter(t => t.status && t.status.status.toLowerCase() === 'closed').length : 0}
+`;
+}
+
+function initAISearchBar() {
+    const submitBtn = document.getElementById('ai-search-submit');
+    const inputEl = document.getElementById('ai-search-input');
+    const overlay = document.getElementById('ai-search-result-overlay');
+    const contentEl = document.getElementById('ai-search-answer-content');
+    const closeBtn = document.getElementById('ai-search-close');
+
+    if (!submitBtn || !inputEl || !overlay || !contentEl || !closeBtn) return;
+
+    // Close button
+    closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        overlay.style.display = 'none';
+    });
+
+    // Prevent light-dismiss when clicking inside the overlay
+    overlay.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+
+    async function handleSearch() {
+        const query = inputEl.value.trim();
+        if (!query) return;
+
+        // Show loader
+        overlay.style.display = 'block';
+        contentEl.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0;">
+                <div style="width: 18px; height: 18px; border: 2px solid var(--accent-primary); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <span style="font-weight: 500; color: var(--text-secondary);">Nemotron AI is analyzing metrics...</span>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+
+        const context = getDashboardMetricsContext();
+        const key = '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';
+
+        const prompt = `
+You are a helpful and intelligent operations assistant named Nemotron AI for a B2B fintech support dashboard at smallcase.
+You have access to the mathematical summary of the current dashboard slice based on active filters selected by the user.
+
+${context}
+
+User's Question: "${query}"
+
+Provide a concise, professional, and mathematically accurate answer to the user's question. Reference counts and percentages directly based on the context data above where appropriate.
+If the question is about operations, give specific recommendations. Format the response nicely using HTML tags (e.g. <strong>, <ul>, <li>, <span style="...">).
+Answer:
+`;
+
+        try {
+            const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': 'Bearer ' + key, 
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({ 
+                    model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', 
+                    messages: [{ role: 'user', content: prompt }], 
+                    temperature: 0.5, 
+                    max_tokens: 1000 
+                })
+            });
+
+            if (!response.ok) throw new Error('API request failed with status ' + response.status);
+
+            const res = await response.json();
+            let answer = res.choices[0].message.content.trim();
+            
+            // Clean markdown formatting if AI outputs codeblocks
+            if (answer.startsWith('```html')) {
+                answer = answer.replace(/^```html\s*/i, '').replace(/\s*```\s*$/, '');
+            } else if (answer.startsWith('```')) {
+                answer = answer.replace(/^```\s*/, '').replace(/\s*```\s*$/, '');
+            }
+
+            contentEl.innerHTML = `
+                <div style="font-size: 0.85rem; color: var(--text-primary);">
+                    ${answer}
+                </div>
+            `;
+        } catch (err) {
+            console.error('Nemotron AI search call failed:', err);
+            contentEl.innerHTML = `
+                <div style="color: var(--accent-red); font-size: 0.85rem; font-weight: 500;">
+                    ⚠️ Nemotron AI search call failed: ${err.message}. Please verify your network connection and try again.
+                </div>
+            `;
+        }
+    }
+
+    submitBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleSearch();
+    });
+
+    inputEl.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSearch();
+        }
+    });
+
+    // Dismiss overlay on click outside
+    document.addEventListener('click', () => {
+        overlay.style.display = 'none';
+    });
+}
+
+// -------------------------------------------------------------
 // 1. DATA INITIALIZATION & ENTRY
 // -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
@@ -2200,6 +2364,9 @@ function setupEventListeners() {
         captureDashboardScreenshot();
     });
 
+    // Initialize NVIDIA Nemotron AI Search Bar
+    initAISearchBar();
+
     // Modal Close
     document.getElementById('poc-modal-close').addEventListener('click', () => {
         document.getElementById('poc-modal').classList.remove('open');
@@ -2753,22 +2920,24 @@ function getPreviousPeriodDates(fromStr, toStr) {
 
     // Check if it's a full calendar month selection
     const isFullMonth = (from.getDate() === 1) && (to.getDate() === new Date(to.getFullYear(), to.getMonth() + 1, 0).getDate());
+    
+    // Check if it's a full calendar year selection
+    const isFullYear = (from.getMonth() === 0 && from.getDate() === 1) && (to.getMonth() === 11 && to.getDate() === 31);
 
     let prevFrom, prevTo;
-    if (isFullMonth) {
+    if (isFullYear) {
+        prevFrom = new Date(from.getFullYear() - 1, 0, 1);
+        prevTo = new Date(to.getFullYear() - 1, 11, 31);
+    } else if (isFullMonth) {
         const monthsDiff = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()) + 1;
         prevFrom = new Date(from.getFullYear(), from.getMonth() - monthsDiff, 1);
         prevTo = new Date(to.getFullYear(), to.getMonth() - monthsDiff, new Date(to.getFullYear(), to.getMonth() - monthsDiff + 1, 0).getDate());
     } else {
         const diffMs = to.getTime() - from.getTime();
         const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
-        
-        // Align day-of-week by shifting back by multiples of 7 days
-        const weeks = Math.ceil(diffDays / 7);
-        const shiftDays = weeks * 7;
 
-        prevFrom = new Date(from.getTime() - shiftDays * 24 * 60 * 60 * 1000);
-        prevTo = new Date(to.getTime() - shiftDays * 24 * 60 * 60 * 1000);
+        prevFrom = new Date(from.getTime() - diffDays * 24 * 60 * 60 * 1000);
+        prevTo = new Date(to.getTime() - diffDays * 24 * 60 * 60 * 1000);
     }
 
     const pad = (n) => (n < 10 ? '0' : '') + n;
@@ -11155,15 +11324,15 @@ function renderClickupDashboard() {
         if (clickupTasks.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 20px;">No tasks found.</td></tr>`;
         } else {
-            tbody.innerHTML = clickupTasks.map(t => {
+            // Separate active and closed
+            const activeTasks = clickupTasks.filter(t => t.status && t.status.status.toLowerCase() !== 'closed' && t.status.status.toLowerCase() !== 'archived');
+            const closedTasks = clickupTasks.filter(t => t.status && (t.status.status.toLowerCase() === 'closed' || t.status.status.toLowerCase() === 'archived'));
+
+            let html = activeTasks.map(t => {
                 const creatorName = t.creator ? t.creator.username : 'Unknown';
                 const creatorImg = t.creator && t.creator.profilePicture ? `<img src="${t.creator.profilePicture}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; margin-right: 8px;">` : `<div style="width: 24px; height: 24px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; margin-right: 8px;">${creatorName.charAt(0).toUpperCase()}</div>`;
+                const dateStr = t.date_created ? new Date(parseInt(t.date_created)).toLocaleDateString('en-IN', {day: 'numeric', month: 'short', year: 'numeric'}) : 'N/A';
                 
-                const assigneesList = (t.assignees || []).map(a => {
-                    const img = a.profilePicture ? `<img src="${a.profilePicture}" title="${a.username}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; margin-right: -4px; border: 1px solid var(--border-color);">` : `<div title="${a.username}" style="width: 20px; height: 20px; border-radius: 50%; background: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: white; margin-right: -4px; border: 1px solid var(--border-color);">${a.username.charAt(0).toUpperCase()}</div>`;
-                    return img;
-                }).join('');
-
                 const statusColor = t.status && t.status.color ? t.status.color : '#6b7280';
                 const statusName = t.status ? t.status.status.toUpperCase() : 'UNKNOWN';
 
@@ -11172,11 +11341,57 @@ function renderClickupDashboard() {
                         <td style="padding: 12px 10px;"><a href="${t.url}" target="_blank" onclick="event.stopPropagation();" style="color: var(--accent-primary); font-family: monospace; font-size: 0.85rem; font-weight: 600;">#${t.id}</a></td>
                         <td style="padding: 12px 10px; font-weight: 500; color: var(--text-primary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(t.name)}</td>
                         <td style="padding: 12px 10px; display: flex; align-items: center; height: 44px;">${creatorImg}<span style="font-size: 0.85rem; color: var(--text-secondary);">${creatorName}</span></td>
-                        <td style="padding: 12px 10px;"><div style="display: flex; align-items: center;">${assigneesList || '<span style="color: var(--text-muted); font-size: 0.8rem;">None</span>'}</div></td>
+                        <td style="padding: 12px 10px; font-size: 0.85rem; color: var(--text-secondary);">${dateStr}</td>
                         <td style="padding: 12px 10px;"><span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: ${statusColor}22; color: ${statusColor}; font-size: 0.75rem; font-weight: 600; border: 1px solid ${statusColor}44;">${statusName}</span></td>
                     </tr>
                 `;
             }).join('');
+
+            // Append closed tasks inside a collapsible row at the end
+            if (closedTasks.length > 0) {
+                html += `
+                    <tr style="background: rgba(0,0,0,0.1); border-top: 2px solid var(--border-color);">
+                        <td colspan="5" style="padding: 10px;">
+                            <details style="width: 100%;">
+                                <summary style="font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); padding: 5px; outline: none; display: flex; align-items: center; gap: 8px;">
+                                    <span>📁 Closed / Archived Tasks (${closedTasks.length})</span>
+                                </summary>
+                                <div style="max-height: 250px; overflow-y: auto; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                                        <thead>
+                                            <tr style="text-align: left; border-bottom: 1px solid var(--border-color);">
+                                                <th style="padding: 6px; color: var(--text-muted);">ID</th>
+                                                <th style="padding: 6px; color: var(--text-muted);">Title</th>
+                                                <th style="padding: 6px; color: var(--text-muted);">Created By</th>
+                                                <th style="padding: 6px; color: var(--text-muted);">Date Created</th>
+                                                <th style="padding: 6px; color: var(--text-muted);">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${closedTasks.map(t => {
+                                                const creatorName = t.creator ? t.creator.username : 'Unknown';
+                                                const dateStr = t.date_created ? new Date(parseInt(t.date_created)).toLocaleDateString('en-IN', {day: 'numeric', month: 'short'}) : 'N/A';
+                                                const statusColor = t.status && t.status.color ? t.status.color : '#6b7280';
+                                                return `
+                                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;" onclick="openSingleClickupTask('${t.id}')">
+                                                        <td style="padding: 6px;"><a href="${t.url}" target="_blank" onclick="event.stopPropagation();" style="color: var(--accent-primary); font-family: monospace;">#${t.id}</a></td>
+                                                        <td style="padding: 6px; color: var(--text-muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(t.name)}</td>
+                                                        <td style="padding: 6px; color: var(--text-muted);">${creatorName}</td>
+                                                        <td style="padding: 6px; color: var(--text-muted);">${dateStr}</td>
+                                                        <td style="padding: 6px;"><span style="color: ${statusColor}; font-size: 0.7rem;">${t.status.status.toUpperCase()}</span></td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </details>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            tbody.innerHTML = html;
         }
     }
 
