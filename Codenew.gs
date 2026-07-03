@@ -2156,17 +2156,18 @@ function syncRedashQueries() {
   }
   
   sheet.clear();
-  var headers = ["Query ID", "Name", "Description", "Query SQL", "Created At", "Updated At", "Author"];
+  var headers = ["Query ID", "Name", "Description", "Query Link", "Created At", "Updated At", "Author"];
   sheet.appendRow(headers);
   
   var rows = [];
   results.forEach(function(item) {
     var author = item.user ? (item.user.name || item.user.username || "") : "";
+    var queryLink = baseUrl + "/queries/" + (item.id || "");
     rows.push([
       item.id || "",
       item.name || "",
       item.description || "",
-      item.query || "",
+      queryLink,
       item.created_at || "",
       item.updated_at || "",
       author
@@ -2207,7 +2208,7 @@ function readRedashQueries() {
         if (key === "QueryID") key = "id";
         else if (key === "Name") key = "name";
         else if (key === "Description") key = "description";
-        else if (key === "QuerySQL") key = "query";
+        else if (key === "QueryLink") key = "url";
         else if (key === "CreatedAt") key = "created_at";
         else if (key === "UpdatedAt") key = "updated_at";
         else if (key === "Author") key = "author";

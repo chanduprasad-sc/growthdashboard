@@ -11085,10 +11085,9 @@ function renderRedashQueries() {
     const filtered = rawQueries.filter(item => {
         if (!query) return true;
         const name = (item.name || '').toLowerCase();
-        const sql = (item.query || '').toLowerCase();
         const author = (item.author || '').toLowerCase();
         const desc = (item.description || '').toLowerCase();
-        return name.includes(query) || sql.includes(query) || author.includes(query) || desc.includes(query);
+        return name.includes(query) || author.includes(query) || desc.includes(query);
     });
 
     if (filtered.length === 0) {
@@ -11097,8 +11096,8 @@ function renderRedashQueries() {
     }
 
     grid.innerHTML = filtered.map(item => {
-        const sqlEscaped = escapeHtml(item.query || '');
         const desc = item.description ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">${escapeHtml(item.description)}</p>` : '';
+        const queryUrl = item.url || `https://redash.util.smallcase.com/queries/${item.id}`;
         return `
             <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; position: relative;">
                 <div>
@@ -11107,41 +11106,19 @@ function renderRedashQueries() {
                         <span style="font-size: 0.75rem; padding: 2px 6px; background: rgba(31, 122, 224, 0.15); color: var(--accent-primary); border-radius: 4px; font-weight: 500;">ID: ${item.id}</span>
                     </div>
                     ${desc}
-                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 15px;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 20px;">
                         <span>By: <strong>${escapeHtml(item.author || 'System')}</strong></span>
                     </div>
                 </div>
                 <div>
-                    <details style="margin-bottom: 15px;">
-                        <summary style="font-size: 0.85rem; color: var(--accent-primary); cursor: pointer; font-weight: 500; outline: none; margin-bottom: 8px;">View SQL Query</summary>
-                        <pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; overflow-x: auto; font-family: monospace; font-size: 0.8rem; max-height: 200px; color: #a5b4fc; text-align: left; border: 1px solid var(--border-color); white-space: pre-wrap; word-break: break-all;">${sqlEscaped}</pre>
-                    </details>
-                    <button class="action-btn copy-sql-btn" data-sql="${encodeURIComponent(item.query || '')}" style="width: 100%; padding: 8px; font-size: 0.8rem; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: center; gap: 6px;">
-                        <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"/></svg>
-                        Copy SQL Query
-                    </button>
+                    <a href="${queryUrl}" target="_blank" class="action-btn" style="width: 100%; padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; text-align: center; box-shadow: 0 4px 12px rgba(31, 122, 224, 0.25);">
+                        <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24"><path fill="currentColor" d="M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"/></svg>
+                        Open Query in Redash
+                    </a>
                 </div>
             </div>
         `;
     }).join('');
-
-    // Attach copy click listeners
-    grid.querySelectorAll('.copy-sql-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const sql = decodeURIComponent(btn.getAttribute('data-sql'));
-            navigator.clipboard.writeText(sql).then(() => {
-                const origText = btn.innerHTML;
-                btn.innerHTML = `✓ Copied!`;
-                btn.style.background = 'rgba(16, 185, 129, 0.15)';
-                btn.style.color = '#10b981';
-                setTimeout(() => {
-                    btn.innerHTML = origText;
-                    btn.style.background = 'rgba(255,255,255,0.05)';
-                    btn.style.color = 'var(--text-primary)';
-                }, 2000);
-            });
-        });
-    });
 }
 
 function escapeHtml(text) {
