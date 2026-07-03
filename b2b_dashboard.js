@@ -961,6 +961,7 @@ function renderKeyMetricsGrid(interactions, calls) {
             charts.weeklyChannelMix.destroy();
             charts.weeklyChannelMix = null;
         }
+        const mixCtx = mixCanvas.getContext('2d');
         charts.weeklyChannelMix = new Chart(mixCtx, {
             type: 'pie',
             data: {
