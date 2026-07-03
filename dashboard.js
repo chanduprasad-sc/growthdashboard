@@ -1640,7 +1640,7 @@ Dashboard Current State Context:
 - Top 3 Active RMs: ${topRMs || 'None'}
 - Top 3 Active Issues: ${topIssues || 'None'}
 - Total ClickUp Tasks Loaded: ${typeof clickupTasks !== 'undefined' ? clickupTasks.length : 0}
-- Closed ClickUp Tasks: ${typeof clickupTasks !== 'undefined' ? clickupTasks.filter(t => t.status && t.status.status.toLowerCase() === 'closed').length : 0}
+- Closed ClickUp Tasks: ${typeof clickupTasks !== 'undefined' ? clickupTasks.filter(t => t.status && (t.status.status.toLowerCase() === 'closed' || t.status.status.toLowerCase() === 'archived' || t.status.status.toLowerCase() === 'cancelled')).length : 0}
 `;
 }
 
@@ -11378,6 +11378,16 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
+window.filterClickupByMember = function(memberName) {
+    const searchInput = document.getElementById('clickup-search');
+    if (searchInput) {
+        searchInput.value = memberName;
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    openClickupDeepdive();
+    renderClickupDeepDiveList();
+};
+
 function renderClickupDashboard() {
     if (clickupTasks.length === 0) {
         fetchClickupTasksLive();
@@ -11386,7 +11396,7 @@ function renderClickupDashboard() {
 
     // Calculate metrics
     const total = clickupTasks.length;
-    const open = clickupTasks.filter(t => t.status && t.status.status.toLowerCase() !== 'closed').length;
+    const open = clickupTasks.filter(t => t.status && t.status.status.toLowerCase() !== 'closed' && t.status.status.toLowerCase() !== 'archived' && t.status.status.toLowerCase() !== 'cancelled').length;
     const closed = total - open;
 
     document.getElementById('clickup-total-tasks').innerText = total;
@@ -11400,8 +11410,8 @@ function renderClickupDashboard() {
             tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 20px;">No tasks found.</td></tr>`;
         } else {
             // Separate active and closed
-            const activeTasks = clickupTasks.filter(t => t.status && t.status.status.toLowerCase() !== 'closed' && t.status.status.toLowerCase() !== 'archived');
-            const closedTasks = clickupTasks.filter(t => t.status && (t.status.status.toLowerCase() === 'closed' || t.status.status.toLowerCase() === 'archived'));
+            const activeTasks = clickupTasks.filter(t => t.status && t.status.status.toLowerCase() !== 'closed' && t.status.status.toLowerCase() !== 'archived' && t.status.status.toLowerCase() !== 'cancelled');
+            const closedTasks = clickupTasks.filter(t => t.status && (t.status.status.toLowerCase() === 'closed' || t.status.status.toLowerCase() === 'archived' || t.status.status.toLowerCase() === 'cancelled'));
 
             let html = activeTasks.map(t => {
                 const creatorName = t.creator ? t.creator.username : 'Unknown';
@@ -11499,7 +11509,7 @@ function renderClickupDashboard() {
             const avatarImg = taskWithMember && taskWithMember.creator.profilePicture ? `<img src="${taskWithMember.creator.profilePicture}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` : `<div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white;">${m.name.charAt(0)}</div>`;
 
             return `
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.background='rgba(255,255,255,0.02)'; this.style.transform='none';" onclick="filterClickupByMember('${m.name.replace(/'/g, "\\'")}')">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         ${avatarImg}
                         <div>
@@ -11567,7 +11577,7 @@ function generateMockClickupTasks() {
             status: { status: "in progress", color: "#e3a008" },
             creator: { id: 3430072, username: "Chandu Prasad", email: "chandu@smallcase.com", profilePicture: null },
             assignees: [{ id: 278654124, username: "Muskan Jageerdar", email: "muskan@smallcase.com", profilePicture: null }],
-            date_created: String(Date.now() - 3600000 * 24),
+            date_created: String(Date.now() - 3600000 * 24 * 60), // ~60 days ago (May)
             date_updated: String(Date.now() - 3600000 * 2),
             url: "https://app.clickup.com/t/8678xyz1"
         },
@@ -11579,7 +11589,7 @@ function generateMockClickupTasks() {
             status: { status: "open", color: "#31c48d" },
             creator: { id: 278654124, username: "Muskan Jageerdar", email: "muskan@smallcase.com", profilePicture: null },
             assignees: [{ id: 3430072, username: "Chandu Prasad", email: "chandu@smallcase.com", profilePicture: null }],
-            date_created: String(Date.now() - 3600000 * 12),
+            date_created: String(Date.now() - 3600000 * 24 * 30), // ~30 days ago (June)
             date_updated: String(Date.now() - 3600000 * 1),
             url: "https://app.clickup.com/t/8678xyz2"
         },
@@ -11591,7 +11601,7 @@ function generateMockClickupTasks() {
             status: { status: "closed", color: "#6b7280" },
             creator: { id: 100924625, username: "Rahul Modak", email: "rahul@smallcase.com", profilePicture: null },
             assignees: [{ id: 7217956, username: "Soham Malakar", email: "soham@smallcase.com", profilePicture: null }],
-            date_created: String(Date.now() - 3600000 * 48),
+            date_created: String(Date.now() - 3600000 * 24 * 10), // ~10 days ago
             date_updated: String(Date.now() - 3600000 * 24),
             url: "https://app.clickup.com/t/8678xyz3"
         },
@@ -11603,7 +11613,7 @@ function generateMockClickupTasks() {
             status: { status: "open", color: "#31c48d" },
             creator: { id: 7217956, username: "Soham Malakar", email: "soham@smallcase.com", profilePicture: null },
             assignees: [{ id: 7313853, username: "Balaakrishnan SB", email: "bala@smallcase.com", profilePicture: null }],
-            date_created: String(Date.now() - 3600000 * 4),
+            date_created: String(Date.now() - 3600000 * 24 * 2), // ~2 days ago
             date_updated: String(Date.now() - 3600000 * 4),
             url: "https://app.clickup.com/t/8678xyz4"
         },
@@ -11615,9 +11625,21 @@ function generateMockClickupTasks() {
             status: { status: "in progress", color: "#e3a008" },
             creator: { id: 7313853, username: "Balaakrishnan SB", email: "bala@smallcase.com", profilePicture: null },
             assignees: [{ id: 278435358, username: "Rahul Nair", email: "rnair@smallcase.com", profilePicture: null }],
-            date_created: String(Date.now() - 3600000 * 18),
+            date_created: String(Date.now() - 3600000 * 24 * 45), // ~45 days ago (May)
             date_updated: String(Date.now() - 3600000 * 6),
             url: "https://app.clickup.com/t/8678xyz5"
+        },
+        {
+            id: "8678xyz6",
+            custom_id: "CX-107",
+            name: "Decommissioned integration endpoint fallback handler",
+            description: "Old endpoint decommissioned, task cancelled.",
+            status: { status: "cancelled", color: "#f43f5e" },
+            creator: { id: 3430072, username: "Chandu Prasad", email: "chandu@smallcase.com", profilePicture: null },
+            assignees: [],
+            date_created: String(Date.now() - 3600000 * 24 * 7), // ~7 days ago
+            date_updated: String(Date.now() - 3600000 * 24 * 6),
+            url: "https://app.clickup.com/t/8678xyz6"
         }
     ];
 }
