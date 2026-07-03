@@ -26,7 +26,8 @@ callTkts: "Ozonetel DevRev Tickets",
 whatsapp: "WhatsApp Chats",
 careEmails: "Care Emails",
 breaks: "Ozonetel Agent Breaks",
-pocBranches: "POC-Branch"
+pocBranches: "POC-Branch",
+redash: "Redash"
 };
 
 // ── COLUMN DEFINITIONS ────────────────────────────────────────
@@ -76,6 +77,15 @@ function doGet(e) {
     try {
       var data = getAllData();
       return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ error: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  } else if (action === 'fetchClickupTasks') {
+    try {
+      var tasks = fetchClickupTasksProxy();
+      return ContentService.createTextOutput(JSON.stringify(tasks))
         .setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
       return ContentService.createTextOutput(JSON.stringify({ error: err.message }))
@@ -1702,6 +1712,7 @@ whatsapp: compactRowsForCache(readSlimSheet(SHEET_NAMES.whatsapp, CACHE_COLS.wha
 careEmails: compactRowsForCache(readSlimSheet(SHEET_NAMES.careEmails, CACHE_COLS.careEmails), "careEmails"),
 breaks: compactRowsForCache(readSlimSheet(SHEET_NAMES.breaks, CACHE_COLS.breaks), "breaks"),
 pocBranches: readPocBranchSheet(),
+redashQueries: readRedashQueries(),
 builtAt: Utilities.formatDate(new Date(), "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " IST",
 rowCounts: {}
 };
@@ -1711,6 +1722,7 @@ payload.rowCounts.whatsapp = payload.whatsapp.length;
 payload.rowCounts.careEmails = payload.careEmails.length;
 payload.rowCounts.breaks = payload.breaks.length;
 payload.rowCounts.pocBranches = payload.pocBranches.length;
+payload.rowCounts.redashQueries = payload.redashQueries.length;
 
 getCacheFile().setContent(JSON.stringify(payload));
 
@@ -1824,6 +1836,8 @@ SpreadsheetApp.getUi()
 .addItem("🔄 Sync DevRev Now (incremental)", "syncDevRevNow")
 .addItem("📥 Full Backfill from Jan 1 2026", "fullBackfillDevRev")
 .addItem("🔍 Inspect DevRev Fields (debug)", "inspectDevRevFields")
+.addSeparator()
+.addItem("📊 Sync Redash Queries", "syncRedashQueries")
 .addSeparator()
 .addItem("Force Rebuild Cache Now", "forceRebuildCacheFromMenu")
 .addItem("Fix All Dates (manual fallback)", "fixAllDates")
@@ -2035,4 +2049,231 @@ function fixAllDatesSilent() {
     });
   });
   Logger.log("fixAllDatesSilent: fixed " + totalFixed + " date cells");
+}
+
+// ================================================================
+// REDASH FAVORITE QUERIES SYNC
+// ================================================================
+function syncRedashQueries() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAMES.redash);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAMES.redash);
+  }
+  
+  var props = PropertiesService.getScriptProperties();
+  var baseUrl = props.getProperty("REDASH_BASE_URL") || "";
+  
+  if (!baseUrl) {
+    var ui = SpreadsheetApp.getUi();
+    var response = ui.prompt(
+      "Redash Configuration Required",
+      "Please enter your Redash Base URL (e.g. https://redash.yourcompany.com):",
+      ui.ButtonSet.OK_CANCEL
+    );
+    if (response.getSelectedButton() == ui.Button.OK) {
+      baseUrl = response.getResponseText().trim();
+      if (baseUrl) {
+        if (baseUrl.slice(-1) === "/") {
+          baseUrl = baseUrl.slice(0, -1);
+        }
+        props.setProperty("REDASH_BASE_URL", baseUrl);
+      }
+    }
+  }
+  
+  if (!baseUrl) {
+    SpreadsheetApp.getUi().alert("Error", "Redash Base URL is required to sync queries.", SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+  
+  var apiKey = "8TeUvKnL1weQk2TxBZ8GdL7Rv7mwaDQlKVP30m8e";
+  var url = baseUrl + "/api/queries/favorites";
+  
+  Logger.log("Fetching favorite queries from Redash: " + url);
+  var options = {
+    method: "get",
+    headers: {
+      "Authorization": "Key " + apiKey
+    },
+    muteHttpExceptions: true
+  };
+  
+  var responseText = "";
+  try {
+    var resp = UrlFetchApp.fetch(url, options);
+    var code = resp.getResponseCode();
+    responseText = resp.getContentText();
+    if (code !== 200) {
+      throw new Error("HTTP Status " + code + ": " + responseText.substring(0, 500));
+    }
+  } catch (err) {
+    SpreadsheetApp.getUi().alert("Redash API Error", "Failed to connect to Redash. Make sure the Base URL is correct and reachable.\n\nDetails: " + err.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+  
+  var data;
+  try {
+    data = JSON.parse(responseText);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert("Parse Error", "Failed to parse JSON response from Redash: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+  
+  var results = [];
+  if (Array.isArray(data)) {
+    results = data;
+  } else if (data && Array.isArray(data.results)) {
+    results = data.results;
+  } else if (data && data.results && Array.isArray(data.results.rows)) {
+    results = data.results.rows;
+  } else {
+    results = data ? (data.results || []) : [];
+  }
+  
+  sheet.clear();
+  var headers = ["Query ID", "Name", "Description", "Query SQL", "Created At", "Updated At", "Author"];
+  sheet.appendRow(headers);
+  
+  var rows = [];
+  results.forEach(function(item) {
+    var author = item.user ? (item.user.name || item.user.username || "") : "";
+    rows.push([
+      item.id || "",
+      item.name || "",
+      item.description || "",
+      item.query || "",
+      item.created_at || "",
+      item.updated_at || "",
+      author
+    ]);
+  });
+  
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  }
+  
+  sheet.getRange("A1:G1").setFontWeight("bold").setBackground("#f3f4f6");
+  sheet.autoResizeColumns(1, headers.length);
+  
+  try {
+    buildDashboardCache();
+    SpreadsheetApp.getUi().alert("Sync Success", "Successfully synced " + rows.length + " favorite queries from Redash and rebuilt cache.", SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (err) {
+    SpreadsheetApp.getUi().alert("Partial Sync Success", "Queries synced, but failed to rebuild dashboard cache: " + err.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+function readRedashQueries() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NAMES.redash);
+    if (!sheet) return [];
+    var range = sheet.getDataRange();
+    var values = range.getValues();
+    if (values.length < 2) return [];
+    var headers = values[0].map(function(h) { return String(h).trim(); });
+    
+    var list = [];
+    for (var r = 1; r < values.length; r++) {
+      var row = values[r];
+      var item = {};
+      headers.forEach(function(header, idx) {
+        var key = header.replace(/\s+/g, "");
+        if (key === "QueryID") key = "id";
+        else if (key === "Name") key = "name";
+        else if (key === "Description") key = "description";
+        else if (key === "QuerySQL") key = "query";
+        else if (key === "CreatedAt") key = "created_at";
+        else if (key === "UpdatedAt") key = "updated_at";
+        else if (key === "Author") key = "author";
+        item[key] = row[idx];
+      });
+      list.push(item);
+    }
+    return list;
+  } catch (e) {
+    Logger.log("Error reading Redash queries: " + e.message);
+    return [];
+  }
+}
+
+// ================================================================
+// CLICKUP TASKS PROXY FOR CORS BYPASS
+// ================================================================
+function fetchClickupTasksProxy() {
+  var apiKey = "pk_3430072_ZDJJ8449NADRU27T8AP3E52RFK3HPS8H";
+  var headers = {
+    "Authorization": apiKey,
+    "Accept": "application/json"
+  };
+  
+  var options = {
+    method: "get",
+    headers: headers,
+    muteHttpExceptions: true
+  };
+  
+  var teamsUrl = "https://api.clickup.com/api/v2/team";
+  var teamsResp = UrlFetchApp.fetch(teamsUrl, options);
+  if (teamsResp.getResponseCode() !== 200) {
+    throw new Error("Failed to fetch workspaces from ClickUp: " + teamsResp.getContentText());
+  }
+  
+  var teamsData = JSON.parse(teamsResp.getContentText());
+  var teams = teamsData.teams || [];
+  if (teams.length === 0) {
+    return [];
+  }
+  
+  var allowedCreatorIds = ["3430072", "278654124", "100924625", "7217956", "7313853", "278435358"];
+  var allTasks = [];
+  var teamId = teams[0].id;
+  
+  var page = 0;
+  var hasMore = true;
+  
+  while (hasMore && page < 3) {
+    var tasksUrl = "https://api.clickup.com/api/v2/team/" + teamId + "/task?include_closed=true&subtasks=true&limit=100&page=" + page;
+    var tasksResp = UrlFetchApp.fetch(tasksUrl, options);
+    if (tasksResp.getResponseCode() === 200) {
+      var tasksData = JSON.parse(tasksResp.getContentText());
+      var tasks = tasksData.tasks || [];
+      if (tasks.length === 0) {
+        hasMore = false;
+      } else {
+        tasks.forEach(function(task) {
+          var creatorId = task.creator ? String(task.creator.id) : "";
+          if (allowedCreatorIds.indexOf(creatorId) !== -1) {
+            var exists = allTasks.some(function(t) { return t.id === task.id; });
+            if (!exists) {
+              allTasks.push({
+                id: task.id,
+                custom_id: task.custom_id || null,
+                name: task.name,
+                description: task.description || "",
+                status: task.status ? { status: task.status.status, color: task.status.color } : null,
+                creator: task.creator ? { id: task.creator.id, username: task.creator.username, email: task.creator.email, profilePicture: task.creator.profilePicture } : null,
+                assignees: (task.assignees || []).map(function(assignee) {
+                  return { id: assignee.id, username: assignee.username, email: assignee.email, profilePicture: assignee.profilePicture };
+                }),
+                date_created: task.date_created,
+                date_updated: task.date_updated,
+                url: task.url
+              });
+            }
+          }
+        });
+        if (tasks.length < 100) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+  
+  return allTasks;
 }

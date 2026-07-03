@@ -2257,6 +2257,7 @@ function switchTab(tabId) {
     const titleMap = {
         'tab-weekly-pulse': 'Weekly Pulse',
         'tab-main-dashboard': 'Main Dashboard',
+        'tab-daily-tools': 'Daily Tools',
         'tab-visual-control': 'Visual Control',
         'tab-intelligence': 'Intelligence',
         'tab-monthly-view': 'Monthly View',
@@ -2268,6 +2269,7 @@ function switchTab(tabId) {
     const subtitleMap = {
         'tab-weekly-pulse': 'Comparative weekly reports & segment hotspot analytics',
         'tab-main-dashboard': 'Channel metrics overview with deep-dive analytics',
+        'tab-daily-tools': 'Redash favorite queries list & ClickUp workspaces/forms',
         'tab-visual-control': 'Visual analytics control room',
         'tab-intelligence': 'Cross-channel insights & anomaly detection',
         'tab-monthly-view': 'Date-wise monthly metric aggregation',
@@ -2907,6 +2909,8 @@ function buildViewModel() {
         renderVisualControlDashboard();
     } else if (currentTab === 'tab-main-dashboard') {
         renderMainDashboard();
+    } else if (currentTab === 'tab-daily-tools') {
+        renderDailyToolsTab();
     } else if (currentTab === 'tab-intelligence') {
         renderIntelligenceDashboard();
     } else if (currentTab === 'tab-monthly-view') {
@@ -10968,5 +10972,452 @@ function initCustomDropdowns() {
             drp.hidePopover();
         }
     });
+}
+
+// ================================================================
+// DAILY TOOLS — REDASH & CLICKUP DASHBOARD INTEGRATION
+// ================================================================
+let dtActiveSubTab = 'dt-redash';
+let clickupTasks = [];
+
+function renderDailyToolsTab() {
+    // Setup sub-tab event listeners (only once)
+    const subTabContainer = document.getElementById('daily-tools-sub-tabs');
+    if (subTabContainer && !subTabContainer._listenersSet) {
+        subTabContainer._listenersSet = true;
+        subTabContainer.querySelectorAll('.sub-tab-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                subTabContainer.querySelectorAll('.sub-tab-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                document.querySelectorAll('#tab-daily-tools .sub-tab-content').forEach(c => c.classList.remove('active'));
+                const targetId = pill.getAttribute('data-subtab');
+                document.getElementById(targetId).classList.add('active');
+                dtActiveSubTab = targetId;
+                renderDailyToolsTab();
+            });
+        });
+
+        // Search in Redash
+        const redashSearch = document.getElementById('redash-search');
+        if (redashSearch) {
+            redashSearch.addEventListener('input', () => {
+                renderRedashQueries();
+            });
+        }
+
+        // Search in ClickUp Deep Dive
+        const clickupSearch = document.getElementById('clickup-search');
+        if (clickupSearch) {
+            clickupSearch.addEventListener('input', () => {
+                renderClickupDeepDiveList();
+            });
+        }
+
+        // ClickUp Live Reload Button
+        const btnSync = document.getElementById('btn-clickup-sync');
+        if (btnSync) {
+            btnSync.addEventListener('click', () => {
+                fetchClickupTasksLive();
+            });
+        }
+
+        // ClickUp Deep Dive Button
+        const btnDeepDive = document.getElementById('btn-clickup-deepdive');
+        if (btnDeepDive) {
+            btnDeepDive.addEventListener('click', () => {
+                openClickupDeepdive();
+            });
+        }
+
+        // Close ClickUp Deep Dive Modals
+        const btnCloseDeepDive = document.getElementById('clickup-deepdive-close');
+        if (btnCloseDeepDive) {
+            btnCloseDeepDive.addEventListener('click', () => {
+                closeClickupDeepdive();
+            });
+        }
+    }
+
+    if (dtActiveSubTab === 'dt-redash') {
+        renderRedashQueries();
+    } else if (dtActiveSubTab === 'dt-clickup') {
+        renderClickupDashboard();
+    }
+}
+
+function renderRedashQueries() {
+    const grid = document.getElementById('redash-queries-grid');
+    if (!grid) return;
+
+    const query = document.getElementById('redash-search') ? document.getElementById('redash-search').value.toLowerCase().trim() : '';
+    const rawQueries = rawData.redashQueries || [];
+
+    const filtered = rawQueries.filter(item => {
+        if (!query) return true;
+        const name = (item.name || '').toLowerCase();
+        const sql = (item.query || '').toLowerCase();
+        const author = (item.author || '').toLowerCase();
+        const desc = (item.description || '').toLowerCase();
+        return name.includes(query) || sql.includes(query) || author.includes(query) || desc.includes(query);
+    });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px;">No queries found matching the search. Use spreadsheet menu to sync favorite Redash queries.</div>`;
+        return;
+    }
+
+    grid.innerHTML = filtered.map(item => {
+        const sqlEscaped = escapeHtml(item.query || '');
+        const desc = item.description ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">${escapeHtml(item.description)}</p>` : '';
+        return `
+            <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-right: 10px;">${escapeHtml(item.name || 'Unnamed Query')}</h4>
+                        <span style="font-size: 0.75rem; padding: 2px 6px; background: rgba(31, 122, 224, 0.15); color: var(--accent-primary); border-radius: 4px; font-weight: 500;">ID: ${item.id}</span>
+                    </div>
+                    ${desc}
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 15px;">
+                        <span>By: <strong>${escapeHtml(item.author || 'System')}</strong></span>
+                    </div>
+                </div>
+                <div>
+                    <details style="margin-bottom: 15px;">
+                        <summary style="font-size: 0.85rem; color: var(--accent-primary); cursor: pointer; font-weight: 500; outline: none; margin-bottom: 8px;">View SQL Query</summary>
+                        <pre style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; overflow-x: auto; font-family: monospace; font-size: 0.8rem; max-height: 200px; color: #a5b4fc; text-align: left; border: 1px solid var(--border-color); white-space: pre-wrap; word-break: break-all;">${sqlEscaped}</pre>
+                    </details>
+                    <button class="action-btn copy-sql-btn" data-sql="${encodeURIComponent(item.query || '')}" style="width: 100%; padding: 8px; font-size: 0.8rem; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"/></svg>
+                        Copy SQL Query
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Attach copy click listeners
+    grid.querySelectorAll('.copy-sql-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sql = decodeURIComponent(btn.getAttribute('data-sql'));
+            navigator.clipboard.writeText(sql).then(() => {
+                const origText = btn.innerHTML;
+                btn.innerHTML = `✓ Copied!`;
+                btn.style.background = 'rgba(16, 185, 129, 0.15)';
+                btn.style.color = '#10b981';
+                setTimeout(() => {
+                    btn.innerHTML = origText;
+                    btn.style.background = 'rgba(255,255,255,0.05)';
+                    btn.style.color = 'var(--text-primary)';
+                }, 2000);
+            });
+        });
+    });
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function renderClickupDashboard() {
+    if (clickupTasks.length === 0) {
+        fetchClickupTasksLive();
+        return;
+    }
+
+    // Calculate metrics
+    const total = clickupTasks.length;
+    const open = clickupTasks.filter(t => t.status && t.status.status.toLowerCase() !== 'closed').length;
+    const closed = total - open;
+
+    document.getElementById('clickup-total-tasks').innerText = total;
+    document.getElementById('clickup-open-tasks').innerText = open;
+    document.getElementById('clickup-closed-tasks').innerText = closed;
+
+    // Render task board table
+    const tbody = document.getElementById('clickup-tasks-tbody');
+    if (tbody) {
+        if (clickupTasks.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 20px;">No tasks found.</td></tr>`;
+        } else {
+            tbody.innerHTML = clickupTasks.map(t => {
+                const creatorName = t.creator ? t.creator.username : 'Unknown';
+                const creatorImg = t.creator && t.creator.profilePicture ? `<img src="${t.creator.profilePicture}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; margin-right: 8px;">` : `<div style="width: 24px; height: 24px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; margin-right: 8px;">${creatorName.charAt(0).toUpperCase()}</div>`;
+                
+                const assigneesList = (t.assignees || []).map(a => {
+                    const img = a.profilePicture ? `<img src="${a.profilePicture}" title="${a.username}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; margin-right: -4px; border: 1px solid var(--border-color);">` : `<div title="${a.username}" style="width: 20px; height: 20px; border-radius: 50%; background: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: white; margin-right: -4px; border: 1px solid var(--border-color);">${a.username.charAt(0).toUpperCase()}</div>`;
+                    return img;
+                }).join('');
+
+                const statusColor = t.status && t.status.color ? t.status.color : '#6b7280';
+                const statusName = t.status ? t.status.status.toUpperCase() : 'UNKNOWN';
+
+                return `
+                    <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="openSingleClickupTask('${t.id}')">
+                        <td style="padding: 12px 10px;"><a href="${t.url}" target="_blank" onclick="event.stopPropagation();" style="color: var(--accent-primary); font-family: monospace; font-size: 0.85rem; font-weight: 600;">#${t.id}</a></td>
+                        <td style="padding: 12px 10px; font-weight: 500; color: var(--text-primary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(t.name)}</td>
+                        <td style="padding: 12px 10px; display: flex; align-items: center; height: 44px;">${creatorImg}<span style="font-size: 0.85rem; color: var(--text-secondary);">${creatorName}</span></td>
+                        <td style="padding: 12px 10px;"><div style="display: flex; align-items: center;">${assigneesList || '<span style="color: var(--text-muted); font-size: 0.8rem;">None</span>'}</div></td>
+                        <td style="padding: 12px 10px;"><span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: ${statusColor}22; color: ${statusColor}; font-size: 0.75rem; font-weight: 600; border: 1px solid ${statusColor}44;">${statusName}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+
+    // Render Tasks by Member Breakdown
+    const breakdownContainer = document.getElementById('clickup-members-breakdown');
+    if (breakdownContainer) {
+        const allowedMembers = [
+            { id: "3430072", name: "Chandu Prasad" },
+            { id: "278654124", name: "Muskan Jageerdar" },
+            { id: "100924625", name: "Rahul Modak" },
+            { id: "7217956", name: "Soham Malakar" },
+            { id: "7313853", name: "Balaakrishnan SB" },
+            { id: "278435358", name: "Rahul Nair" }
+        ];
+
+        const taskCounts = {};
+        allowedMembers.forEach(m => taskCounts[m.id] = 0);
+
+        clickupTasks.forEach(t => {
+            const creatorId = t.creator ? String(t.creator.id) : "";
+            if (taskCounts.hasOwnProperty(creatorId)) {
+                taskCounts[creatorId]++;
+            }
+        });
+
+        breakdownContainer.innerHTML = allowedMembers.map(m => {
+            const count = taskCounts[m.id];
+            const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+            const taskWithMember = clickupTasks.find(t => t.creator && String(t.creator.id) === m.id);
+            const avatarImg = taskWithMember && taskWithMember.creator.profilePicture ? `<img src="${taskWithMember.creator.profilePicture}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` : `<div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white;">${m.name.charAt(0)}</div>`;
+
+            return `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        ${avatarImg}
+                        <div>
+                            <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">${m.name}</span>
+                            <span style="display: block; font-size: 0.75rem; color: var(--text-muted);">ID: ${m.id}</span>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">${count}</span>
+                        <span style="display: block; font-size: 0.75rem; color: var(--text-muted);">${percent}% of total</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+function fetchClickupTasksLive() {
+    const statusEl = document.getElementById('clickup-sync-status');
+    if (statusEl) {
+        statusEl.innerHTML = `<span style="color: var(--accent-primary); animation: pulse-blue 1.5s infinite;">Syncing...</span>`;
+    }
+
+    const liveUrl = localStorage.getItem('live_google_sheet_url') || (typeof GOOGLE_SCRIPT_API_URL === "string" ? GOOGLE_SCRIPT_API_URL : "");
+    if (!liveUrl || liveUrl.includes("YOUR_DEPLOYED_SCRIPT_WEB_APP_URL")) {
+        console.warn("No active Google Script API URL found for ClickUp sync proxy. Using simulated task data.");
+        if (statusEl) statusEl.innerText = "Fallback Active";
+        generateMockClickupTasks();
+        renderClickupDashboard();
+        return;
+    }
+
+    const cleanUrl = liveUrl.includes('?') ? liveUrl.split('?')[0] : liveUrl;
+    const targetUrl = `${cleanUrl}?action=fetchClickupTasks`;
+
+    console.log("Fetching live tasks from ClickUp secure Google Script Proxy: " + targetUrl);
+    fetch(targetUrl)
+        .then(response => {
+            if (!response.ok) throw new Error("HTTP Status " + response.status);
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.error) {
+                throw new Error(data.error);
+            }
+            clickupTasks = data || [];
+            console.log("Successfully loaded " + clickupTasks.length + " ClickUp tasks.");
+            if (statusEl) statusEl.innerText = "Synced Just Now";
+            renderClickupDashboard();
+        })
+        .catch(err => {
+            console.error("ClickUp Fetch Proxy failed: ", err);
+            if (statusEl) {
+                statusEl.innerHTML = `<span style="color: var(--accent-red); font-size: 12px;">Sync Failed</span>`;
+            }
+            generateMockClickupTasks();
+            renderClickupDashboard();
+        });
+}
+
+function generateMockClickupTasks() {
+    clickupTasks = [
+        {
+            id: "8678xyz1",
+            custom_id: "CX-102",
+            name: "Resolve payout dispute for broker Alice (Zerodha)",
+            description: "Discrepancy in monthly referral payout calculations. Need to verify database transaction records.",
+            status: { status: "in progress", color: "#e3a008" },
+            creator: { id: 3430072, username: "Chandu Prasad", email: "chandu@smallcase.com", profilePicture: null },
+            assignees: [{ id: 278654124, username: "Muskan Jageerdar", email: "muskan@smallcase.com", profilePicture: null }],
+            date_created: String(Date.now() - 3600000 * 24),
+            date_updated: String(Date.now() - 3600000 * 2),
+            url: "https://app.clickup.com/t/8678xyz1"
+        },
+        {
+            id: "8678xyz2",
+            custom_id: "CX-103",
+            name: "Publisher ROTA Setup - July Week 2",
+            description: "Finalize publisher support shift calendar and notify relationship managers.",
+            status: { status: "open", color: "#31c48d" },
+            creator: { id: 278654124, username: "Muskan Jageerdar", email: "muskan@smallcase.com", profilePicture: null },
+            assignees: [{ id: 3430072, username: "Chandu Prasad", email: "chandu@smallcase.com", profilePicture: null }],
+            date_created: String(Date.now() - 3600000 * 12),
+            date_updated: String(Date.now() - 3600000 * 1),
+            url: "https://app.clickup.com/t/8678xyz2"
+        },
+        {
+            id: "8678xyz3",
+            custom_id: "CX-104",
+            name: "Audit API integrations logs for smallboard B2B branches",
+            description: "Check why webhook response is delayed >12h for specific sub-issues.",
+            status: { status: "closed", color: "#6b7280" },
+            creator: { id: 100924625, username: "Rahul Modak", email: "rahul@smallcase.com", profilePicture: null },
+            assignees: [{ id: 7217956, username: "Soham Malakar", email: "soham@smallcase.com", profilePicture: null }],
+            date_created: String(Date.now() - 3600000 * 48),
+            date_updated: String(Date.now() - 3600000 * 24),
+            url: "https://app.clickup.com/t/8678xyz3"
+        },
+        {
+            id: "8678xyz4",
+            custom_id: "CX-105",
+            name: "B2B client onboarding guidelines documentation update",
+            description: "Revise onboarding docs to reflect the new WhatsApp communication mix protocols.",
+            status: { status: "open", color: "#31c48d" },
+            creator: { id: 7217956, username: "Soham Malakar", email: "soham@smallcase.com", profilePicture: null },
+            assignees: [{ id: 7313853, username: "Balaakrishnan SB", email: "bala@smallcase.com", profilePicture: null }],
+            date_created: String(Date.now() - 3600000 * 4),
+            date_updated: String(Date.now() - 3600000 * 4),
+            url: "https://app.clickup.com/t/8678xyz4"
+        },
+        {
+            id: "8678xyz5",
+            custom_id: "CX-106",
+            name: "Resolve pending WhatsApp compliance verification tickets",
+            description: "Verify RM phone registry numbers match official broker records.",
+            status: { status: "in progress", color: "#e3a008" },
+            creator: { id: 7313853, username: "Balaakrishnan SB", email: "bala@smallcase.com", profilePicture: null },
+            assignees: [{ id: 278435358, username: "Rahul Nair", email: "rnair@smallcase.com", profilePicture: null }],
+            date_created: String(Date.now() - 3600000 * 18),
+            date_updated: String(Date.now() - 3600000 * 6),
+            url: "https://app.clickup.com/t/8678xyz5"
+        }
+    ];
+}
+
+function openClickupDeepdive() {
+    const modal = document.getElementById('clickup-deepdive-modal');
+    if (modal) {
+        modal.classList.add('open');
+        renderClickupDeepDiveList();
+    }
+}
+
+function closeClickupDeepdive() {
+    const modal = document.getElementById('clickup-deepdive-modal');
+    if (modal) modal.classList.remove('open');
+}
+
+function renderClickupDeepDiveList() {
+    const listContainer = document.getElementById('clickup-deepdive-list');
+    if (!listContainer) return;
+
+    const query = document.getElementById('clickup-search') ? document.getElementById('clickup-search').value.toLowerCase().trim() : '';
+
+    const filtered = clickupTasks.filter(t => {
+        if (!query) return true;
+        const name = (t.name || '').toLowerCase();
+        const desc = (t.description || '').toLowerCase();
+        const id = (t.id || '').toLowerCase();
+        const status = t.status ? t.status.status.toLowerCase() : '';
+        const creator = t.creator ? t.creator.username.toLowerCase() : '';
+        return name.includes(query) || desc.includes(query) || id.includes(query) || status.includes(query) || creator.includes(query);
+    });
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `<div style="text-align: center; padding: 30px; color: var(--text-secondary);">No tasks found matching your search.</div>`;
+        return;
+    }
+
+    listContainer.innerHTML = filtered.map(t => {
+        const creatorName = t.creator ? t.creator.username : 'Unknown';
+        const creatorImg = t.creator && t.creator.profilePicture ? `<img src="${t.creator.profilePicture}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;">` : `<div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: white;">${creatorName.charAt(0).toUpperCase()}</div>`;
+        
+        const assigneesHTML = (t.assignees || []).map(a => {
+            const img = a.profilePicture ? `<img src="${a.profilePicture}" title="${a.username}" style="width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border-color);">` : `<div title="${a.username}" style="width: 24px; height: 24px; border-radius: 50%; background: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: white; border: 1px solid var(--border-color);">${a.username.charAt(0).toUpperCase()}</div>`;
+            return `<div style="display: flex; align-items: center; gap: 6px;">${img}<span style="font-size: 0.8rem; color: var(--text-secondary);">${a.username}</span></div>`;
+        }).join('');
+
+        const statusColor = t.status && t.status.color ? t.status.color : '#6b7280';
+        const statusName = t.status ? t.status.status.toUpperCase() : 'UNKNOWN';
+
+        const createdDate = t.date_created ? new Date(Number(t.date_created)).toLocaleString() : 'N/A';
+        const updatedDate = t.date_updated ? new Date(Number(t.date_updated)).toLocaleString() : 'N/A';
+
+        return `
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: ${statusColor}22; color: ${statusColor}; font-size: 0.7rem; font-weight: 600; border: 1px solid ${statusColor}44;">${statusName}</span>
+                            <span style="font-family: monospace; font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">#${t.id}</span>
+                        </div>
+                        <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-top: 5px;">${escapeHtml(t.name)}</h4>
+                    </div>
+                    <a href="${t.url}" target="_blank" style="padding: 6px 12px; background: var(--accent-primary); color: white; border-radius: 6px; text-decoration: none; font-size: 0.8rem; font-weight: 600;">Open in ClickUp</a>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">${escapeHtml(t.description || 'No description provided.')}</div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+                    <div>
+                        <span style="display: block; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; margin-bottom: 4px;">Creator</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${creatorImg}
+                            <span style="color: var(--text-primary);">${creatorName}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span style="display: block; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; margin-bottom: 4px;">Assignees</span>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            ${assigneesHTML || '<span style="color: var(--text-muted);">Unassigned</span>'}
+                        </div>
+                    </div>
+                    <div>
+                        <span style="display: block; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; margin-bottom: 4px;">Timestamps</span>
+                        <span style="display: block; color: var(--text-secondary);">Created: ${createdDate}</span>
+                        <span style="display: block; color: var(--text-secondary);">Updated: ${updatedDate}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function openSingleClickupTask(taskId) {
+    openClickupDeepdive();
+    const search = document.getElementById('clickup-search');
+    if (search) {
+        search.value = taskId;
+        renderClickupDeepDiveList();
+    }
 }
 
