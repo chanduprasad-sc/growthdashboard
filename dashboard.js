@@ -1869,7 +1869,12 @@ async function loadDashboardData() {
         let isLive = false;
         let connectionError = false;
 
-        const liveUrl = localStorage.getItem('live_google_sheet_url');
+        // Ensure default URL is saved in localStorage if empty to prevent manual pasting
+        let liveUrl = localStorage.getItem('live_google_sheet_url');
+        if (!liveUrl || liveUrl.trim() === "") {
+            liveUrl = GOOGLE_SCRIPT_API_URL;
+            localStorage.setItem('live_google_sheet_url', GOOGLE_SCRIPT_API_URL);
+        }
         const liveEnabled = localStorage.getItem('live_sync_enabled') !== 'false';
         
         let targetUrl = "";
@@ -1885,7 +1890,8 @@ async function loadDashboardData() {
         if (targetUrl) {
             console.log("Attempting to fetch live data from Google Sheets API (with timeout & retry): " + targetUrl);
             try {
-                const response = await fetchWithRetry(targetUrl);
+                // Increased timeout to 40000ms to tolerate cold starts and reduce failures
+                const response = await fetchWithRetry(targetUrl, {}, 2, 40000);
                 data = await response.json();
                 isLive = true;
                 console.log("Successfully fetched live dashboard data from Google Sheets API.");
@@ -1909,6 +1915,8 @@ async function loadDashboardData() {
                 }
             }
         }
+
+
 
         // Fallback to empty skeleton data structure directly in code to avoid static files
         if (!data) {
@@ -1955,23 +1963,6 @@ async function loadDashboardData() {
         // Detect empty/skeleton data (prompt user to connect)
         const totalInteractions = (rawData.support_interactions || []).length;
         const totalCalls = (rawData.calls || []).length;
-        
-        if (totalInteractions === 0 && totalCalls === 0) {
-            console.warn("No records found in loaded data. Prompting user to link live Sheet.");
-            setTimeout(() => {
-                const modal = document.getElementById('live-config-modal');
-                if (modal) {
-                    modal.classList.add('open');
-                    const testResult = document.getElementById('live-test-result');
-                    if (testResult) {
-                        testResult.style.display = 'block';
-                        testResult.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
-                        testResult.style.color = '#ef4444';
-                        testResult.innerText = "Welcome! Your dashboard is currently empty. Please paste your Google Sheets Apps Script Web App URL below to sync your live data.";
-                    }
-                }
-            }, 800);
-        }
 
         // Populate filter dropdown choices
         populateFilterDropdowns();
