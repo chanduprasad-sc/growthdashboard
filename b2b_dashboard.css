@@ -903,17 +903,36 @@ body.light-mode .badge {
 .meta-metrics-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+    gap: 16px;
     height: 100%;
 }
 .meta-metric-item {
-    background: rgba(255, 255, 255, 0.01);
-    border: 1px solid var(--border-color);
-    border-radius: 18px;
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid var(--border-color) !important;
+    border-left: 4px solid var(--accent-primary) !important;
+    border-radius: 12px !important;
+    padding: 16px 20px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+.meta-metric-item:hover {
+    transform: translateY(-2px) scale(1.02) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+#cohort-rm-item {
+    border-left-color: var(--blue) !important;
+}
+#cohort-broker-item {
+    border-left-color: var(--accent-primary) !important;
+}
+#cohort-branch-item {
+    border-left-color: var(--accent-green) !important;
 }
 .meta-label {
     font-size: 0.74rem;
@@ -924,21 +943,47 @@ body.light-mode .badge {
 .meta-val-row {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
-    margin-top: 8px;
+    align-items: center;
+    margin-top: 10px;
 }
 .meta-value {
     font-family: var(--font-heading);
-    font-size: 1.6rem;
+    font-size: 1.7rem;
     font-weight: 700;
+    color: var(--text-primary);
 }
 .meta-comparison {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    display: inline-block;
+    letter-spacing: 0.2px;
 }
-.meta-comp-up { color: var(--accent-green); }
-.meta-comp-down { color: var(--accent-red); }
-.meta-comp-neutral { color: var(--text-muted); }
+.meta-comp-up {
+    color: var(--accent-green) !important;
+    background: rgba(16, 185, 129, 0.12) !important;
+    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+}
+.meta-comp-down {
+    color: var(--accent-red) !important;
+    background: rgba(239, 68, 68, 0.12) !important;
+    border: 1px solid rgba(239, 68, 68, 0.2) !important;
+}
+.meta-comp-neutral {
+    color: var(--text-muted) !important;
+    background: rgba(156, 163, 175, 0.12) !important;
+    border: 1px solid rgba(156, 163, 175, 0.2) !important;
+}
+
+/* html2canvas text gradient background clipping fix on screenshot */
+.is-capturing-screenshot #card-interactions .kpi-value {
+    background: none !important;
+    -webkit-background-clip: initial !important;
+    background-clip: initial !important;
+    -webkit-text-fill-color: initial !important;
+    color: var(--text-primary) !important;
+}
 
 .repeat-loops-table-wrapper {
     overflow-y: auto;

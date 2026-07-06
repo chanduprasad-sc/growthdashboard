@@ -2224,6 +2224,9 @@ function captureDashboardScreenshot() {
     btn.innerHTML = `<span class="spinner" style="width: 14px; height: 14px; display: inline-block; margin: 0 6px 0 0; vertical-align: middle;"></span> Capturing...`;
     btn.disabled = true;
 
+    // Add screenshot class to disable gradient text clip
+    captureArea.classList.add('is-capturing-screenshot');
+
     // Use html2canvas to capture the DOM segment
     html2canvas(captureArea, {
         useCORS: true,
@@ -2231,6 +2234,9 @@ function captureDashboardScreenshot() {
         backgroundColor: document.body.classList.contains('light-mode') ? '#f8fafc' : '#060a13',
         scale: 2 // High-quality 2x scaling
     }).then(canvas => {
+        // Remove screenshot class
+        captureArea.classList.remove('is-capturing-screenshot');
+
         // Trigger download
         const link = document.createElement('a');
         link.download = `Weekly_Pulse_Dashboard_Report_${activeFilters.dateFrom}_to_${activeFilters.dateTo}.png`;
@@ -2242,6 +2248,8 @@ function captureDashboardScreenshot() {
         btn.disabled = false;
     }).catch(err => {
         console.error("Screenshot capture failed:", err);
+        // Remove screenshot class
+        captureArea.classList.remove('is-capturing-screenshot');
         btn.innerHTML = `<span class="btn-icon">📸</span> Take Dashboard Screenshot`;
         btn.disabled = false;
         alert("Unable to generate screenshot. Ensure all chart objects are fully loaded.");

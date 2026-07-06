@@ -3259,10 +3259,10 @@ function buildViewModel() {
 }
 
 function updateStaffingRecommendation(interactions, calls) {
-    const banner = document.getElementById('staffing-recommender-banner');
-    const textEl = document.getElementById('staffing-recommendation-text');
-    const valEl = document.getElementById('staffing-recommendation-value');
-    if (!banner || !textEl || !valEl) return;
+    const badgeWrap = document.getElementById('staffing-recommender-badge-wrap');
+    const tooltipEl = document.getElementById('staffing-recommendation-tooltip');
+    const valEl = document.getElementById('staffing-recommendation-value-badge');
+    if (!badgeWrap || !tooltipEl || !valEl) return;
 
     const fromD = safeParseDate(activeFilters.dateFrom);
     const toD = safeParseDate(activeFilters.dateTo);
@@ -3300,7 +3300,6 @@ function updateStaffingRecommendation(interactions, calls) {
         recommendedN = 1;
     } else {
         recommendedN = Math.ceil(A) + 1;
-        let sla = 0;
         
         function factorial(n) {
             let f = 1;
@@ -3322,15 +3321,33 @@ function updateStaffingRecommendation(interactions, calls) {
 
             if (currentSLA >= 80) {
                 recommendedN = N;
-                sla = currentSLA;
                 break;
             }
         }
     }
 
-    banner.style.display = 'block';
-    valEl.innerText = recommendedN;
-    textEl.innerHTML = `Based on a daily load of <strong>${Math.round(dailyCalls)} calls</strong> and <strong>${Math.round(dailyChats)} chats</strong> with a weighted AHT of <strong>${Math.round(weightedAHT)}s</strong>, we recommend <strong>${recommendedN} agents</strong> on shift to sustain a target SLA of <strong>80% answered within 15s</strong>.`;
+    // Shrinkage adjustment for scheduled breaks: 30m, 15m, 15m (60m total out of 540m shift)
+    // Scale factor: 9 / 8 (approx 12.5% increase)
+    const adjustedN = Math.ceil(recommendedN * 1.125);
+    
+    // Plus buffer for 2 agents on random adhoc breaks
+    const finalStaffing = adjustedN + 2;
+
+    badgeWrap.style.display = 'flex';
+    valEl.innerText = finalStaffing;
+
+    tooltipEl.innerHTML = `
+        <div style="font-weight: 700; color: var(--accent-primary); margin-bottom: 6px; font-size: 0.82rem;">Erlang-C Staffing Recommendation</div>
+        <div style="margin-bottom: 8px;">Based on a daily load of <strong>${Math.round(dailyCalls)} calls</strong> and <strong>${Math.round(dailyChats)} chats</strong> (weighted AHT: <strong>${Math.round(weightedAHT)}s</strong>):</div>
+        <div style="display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between;"><span>• Raw Erlang-C need (80% SLA / 15s):</span><strong>${recommendedN} agents</strong></div>
+            <div style="display: flex; justify-content: space-between;"><span>• With scheduled breaks (30m+15m+15m):</span><strong>${adjustedN} agents</strong></div>
+            <div style="display: flex; justify-content: space-between; color: var(--accent-primary); font-weight: 600;"><span>• Final (plus 2 adhoc breaks buffer):</span><strong>${finalStaffing} agents</strong></div>
+        </div>
+        <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.35;">
+            * Scheduled breaks subtract 1 hr of productive time per 9 hr shift (11.1% shrinkage). Buffer handles random 2-agent overlapping adhoc breaks.
+        </div>
+    `;
 }
 
 function renderSLAAtRiskAlerts() {
@@ -5415,6 +5432,9 @@ function captureDashboardScreenshot() {
     btn.innerHTML = `<span class="spinner" style="width: 14px; height: 14px; display: inline-block; margin: 0 6px 0 0; vertical-align: middle;"></span> Capturing...`;
     btn.disabled = true;
 
+    // Add screenshot class to disable gradient text clip
+    captureArea.classList.add('is-capturing-screenshot');
+
     // Use html2canvas to capture the DOM segment
     html2canvas(captureArea, {
         useCORS: true,
@@ -5422,6 +5442,9 @@ function captureDashboardScreenshot() {
         backgroundColor: document.body.classList.contains('light-mode') ? '#f8fafc' : '#060a13',
         scale: 2 // High-quality 2x scaling
     }).then(canvas => {
+        // Remove screenshot class
+        captureArea.classList.remove('is-capturing-screenshot');
+
         // Trigger download
         const link = document.createElement('a');
         link.download = `Weekly_Pulse_Dashboard_Report_${activeFilters.dateFrom}_to_${activeFilters.dateTo}.png`;
@@ -5433,6 +5456,8 @@ function captureDashboardScreenshot() {
         btn.disabled = false;
     }).catch(err => {
         console.error("Screenshot capture failed:", err);
+        // Remove screenshot class
+        captureArea.classList.remove('is-capturing-screenshot');
         btn.innerHTML = `<span class="btn-icon">📸</span> Take Dashboard Screenshot`;
         btn.disabled = false;
         alert("Unable to generate screenshot. Ensure all chart objects are fully loaded.");

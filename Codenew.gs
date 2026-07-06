@@ -2296,6 +2296,7 @@ function fetchClickupTasksProxy() {
   }
   
   var allowedCreatorIds = ["3430072", "278654124", "100924625", "7217956", "7313853", "278435358"];
+  var allowedNames = ["chandu prasad", "muskan jageerdar", "rahul modak", "soham malakar", "balaakrishnan sb", "rahul nair", "balaakrishnan"];
   var allTasks = [];
   
   var page = 0;
@@ -2311,8 +2312,79 @@ function fetchClickupTasksProxy() {
         hasMore = false;
       } else {
         tasks.forEach(function(task) {
-          var creatorId = task.creator ? String(task.creator.id) : "";
-          if (allowedCreatorIds.indexOf(creatorId) !== -1) {
+          var isAllowed = false;
+          var customFields = task.custom_fields || [];
+          var hasCustomCreatorField = false;
+          var matchedCreatorObj = null;
+          
+          for (var i = 0; i < customFields.length; i++) {
+            var cf = customFields[i];
+            if (cf.name === "Created By" || cf.name === "Created by") {
+              var val = cf.value;
+              if (val !== undefined && val !== null) {
+                hasCustomCreatorField = true;
+                if (Array.isArray(val)) {
+                  // Type: users list
+                  for (var j = 0; j < val.length; j++) {
+                    var u = val[j];
+                    var uId = u.id ? String(u.id) : "";
+                    var uName = u.username ? String(u.username).toLowerCase() : "";
+                    if (allowedCreatorIds.indexOf(uId) !== -1 || allowedNames.indexOf(uName) !== -1) {
+                      isAllowed = true;
+                      matchedCreatorObj = {
+                        id: u.id,
+                        username: u.username,
+                        email: u.email || "",
+                        profilePicture: u.profilePicture || null
+                      };
+                      break;
+                    }
+                  }
+                } else if (typeof val === "string") {
+                  // Type: text value
+                  var valLower = val.toLowerCase();
+                  for (var k = 0; k < allowedNames.length; k++) {
+                    if (valLower.indexOf(allowedNames[k]) !== -1) {
+                      isAllowed = true;
+                      var matchedName = val;
+                      var matchedId = 0;
+                      if (valLower.indexOf("chandu") !== -1) { matchedId = 3430072; matchedName = "Chandu Prasad"; }
+                      else if (valLower.indexOf("muskan") !== -1) { matchedId = 278654124; matchedName = "Muskan Jageerdar"; }
+                      else if (valLower.indexOf("modak") !== -1) { matchedId = 100924625; matchedName = "Rahul Modak"; }
+                      else if (valLower.indexOf("soham") !== -1) { matchedId = 7217956; matchedName = "Soham Malakar"; }
+                      else if (valLower.indexOf("bala") !== -1) { matchedId = 7313853; matchedName = "Balaakrishnan SB"; }
+                      else if (valLower.indexOf("nair") !== -1) { matchedId = 278435358; matchedName = "Rahul Nair"; }
+                      
+                      matchedCreatorObj = {
+                        id: matchedId,
+                        username: matchedName,
+                        email: "",
+                        profilePicture: null
+                      };
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            if (isAllowed) break;
+          }
+          
+          if (!hasCustomCreatorField) {
+            var creatorId = task.creator ? String(task.creator.id) : "";
+            var creatorName = task.creator && task.creator.username ? String(task.creator.username).toLowerCase() : "";
+            if (allowedCreatorIds.indexOf(creatorId) !== -1 || allowedNames.indexOf(creatorName) !== -1) {
+              isAllowed = true;
+              matchedCreatorObj = task.creator ? {
+                id: task.creator.id,
+                username: task.creator.username,
+                email: task.creator.email || "",
+                profilePicture: task.creator.profilePicture || null
+              } : null;
+            }
+          }
+          
+          if (isAllowed && matchedCreatorObj) {
             var exists = allTasks.some(function(t) { return t.id === task.id; });
             if (!exists) {
               allTasks.push({
@@ -2321,7 +2393,7 @@ function fetchClickupTasksProxy() {
                 name: task.name,
                 description: task.description || "",
                 status: task.status ? { status: task.status.status, color: task.status.color } : null,
-                creator: task.creator ? { id: task.creator.id, username: task.creator.username, email: task.creator.email, profilePicture: task.creator.profilePicture } : null,
+                creator: matchedCreatorObj,
                 assignees: (task.assignees || []).map(function(assignee) {
                   return { id: assignee.id, username: assignee.username, email: assignee.email, profilePicture: assignee.profilePicture };
                 }),
