@@ -614,9 +614,17 @@ function cleanPhone(phoneStr) {
 
 function parseHmsToSeconds(val) {
     if (val === null || val === undefined) return 0;
-    if (typeof val === 'number') return Math.floor(val);
+    if (typeof val === 'number') {
+        if (!Number.isFinite(val)) return 0;
+        // Excel/Sheets time serials are fractions of one day.
+        return Math.round(Math.abs(val) < 1 ? val * 86400 : val);
+    }
     let s = String(val).trim();
     if (!s) return 0;
+    // Legacy dashboard caches serialised time-only Sheets cells as dates and
+    // introduced an 8m50s epoch/timezone offset. Correct those cached values so
+    // the frontend is accurate even before the Apps Script cache is rebuilt.
+    const isLegacySheetsTime = /^1899-12-30[T\s]/.test(s);
     if (s.includes(' ')) {
         s = s.split(' ').pop().trim();
     }
@@ -630,7 +638,8 @@ function parseHmsToSeconds(val) {
         let parts = s.split(':');
         try {
             if (parts.length === 3) {
-                return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseInt(parts[2], 10);
+                const seconds = parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseInt(parts[2], 10);
+                return isLegacySheetsTime ? Math.max(0, seconds - 530) : seconds;
             } else if (parts.length === 2) {
                 return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
             }
@@ -638,6 +647,14 @@ function parseHmsToSeconds(val) {
     }
     let parsed = parseFloat(s);
     return isNaN(parsed) ? 0 : Math.floor(parsed);
+}
+
+function getCallAhtSeconds(call) {
+    return Number(call && call.duration) || Number(call && call.talk_time) || 0;
+}
+
+function getAnsweredQueueSeconds(call) {
+    return Number(call && call.queue_time) || Number(call && call.time_to_answer) || 0;
 }
 
 function cleanDate(val) {
@@ -3508,8 +3525,8 @@ function renderKeyMetricsGrid(interactions, calls) {
         if (!ct || ct === 'inbound') { // inbound or unclassified
             if (st === 'answered' || st === 'connected') {
                 callAns++;
-                totalCallDuration += (call.talk_time || call.duration || 0);
-                totalCallQueue += (call.queue_time || call.time_to_answer || 0);
+                totalCallDuration += getCallAhtSeconds(call);
+                totalCallQueue += getAnsweredQueueSeconds(call);
             }
         }
     });
@@ -3662,7 +3679,7 @@ function renderKeyMetricsGrid(interactions, calls) {
             if (!ct || ct === 'inbound') {
                 if (st === 'answered' || st === 'connected') {
                     prevCallAns++;
-                    prevTotalDur += (c.talk_time || c.duration || 0);
+                    prevTotalDur += getCallAhtSeconds(c);
                 }
             }
         });
@@ -3691,7 +3708,7 @@ function renderKeyMetricsGrid(interactions, calls) {
             if (!ct || ct === 'inbound') {
                 if (st === 'answered' || st === 'connected') {
                     prevQueueAns++;
-                    prevTotalQueue += (c.queue_time || c.time_to_answer || 0);
+                    prevTotalQueue += getAnsweredQueueSeconds(c);
                 }
             }
         });
@@ -5158,7 +5175,7 @@ function renderAISummaryTab() {
             const ct = String(c.call_type||'').toLowerCase();
             const st = String(c.stage||'').toLowerCase();
             if (!ct || ct === 'inbound') {
-                if (st === 'answered' || st === 'connected') { ahtAns++; ahtSum += (c.talk_time || c.duration || 0); }
+                if (st === 'answered' || st === 'connected') { ahtAns++; ahtSum += getCallAhtSeconds(c); }
             }
         });
         const ahtVal = ahtAns > 0 ? formatSeconds(Math.round(ahtSum / ahtAns)) : '—';
@@ -7392,10 +7409,10 @@ function renderMainOverview(data, calls) {
     if (elSnapInboundPct) elSnapInboundPct.innerText = `${inboundAbandonedPct}%`;
 
     // 3. AHT / TIMING (Inbound Answered Calls)
-    const inboundAnsDurations = inboundConnected.map(c => Number(c.duration) || 0);
+    const inboundAnsDurations = inboundConnected.map(getCallAhtSeconds);
     const inboundTalkTimes = inboundConnected.map(c => Number(c.talk_time) || 0);
     const inboundHoldTimes = inboundConnected.map(c => Number(c.hold_time) || 0);
-    const inboundQueueAns = inboundConnected.map(c => Number(c.queue_time) || 0);
+    const inboundQueueAns = inboundConnected.map(getAnsweredQueueSeconds);
     const inboundQueueUnans = inboundAbandonedReal.map(c => Number(c.queue_time) || 0);
 
     const getAverageVal = arr => arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : 0;
@@ -7456,7 +7473,7 @@ function renderMainOverview(data, calls) {
         }
     });
 
-    const progAnsDurations = progressiveAnswered.map(c => Number(c.duration) || 0);
+    const progAnsDurations = progressiveAnswered.map(getCallAhtSeconds);
     const progAvgAht = getAverageVal(progAnsDurations);
 
     const elSnapProgAttempted = document.getElementById('md-snap-prog-attempted');
@@ -7633,8 +7650,8 @@ function renderCallsDeepDive(data, calls) {
         if (!ct || ct === 'inbound') {
             if (st === 'answered' || st === 'connected') {
                 callAns++;
-                totalCallDuration += (call.talk_time || 0);
-                totalCallQueue += (call.queue_time || 0);
+                totalCallDuration += getCallAhtSeconds(call);
+                totalCallQueue += getAnsweredQueueSeconds(call);
             }
         }
     });
@@ -8998,11 +9015,11 @@ function renderMonthlyView() {
         const inboundAbandonedPct = inboundCount > 0 ? (inboundAbandonedCount / inboundCount * 100).toFixed(1) : '0.0';
 
         // AHT / Timing
-        // AHT = talk time (actual handling time, not total call duration which includes ring time)
-        const inboundAnsDurations = inboundConnected.map(c => Number(c.talk_time) || 0);
+        // Match the source report: AHT is the answered call Duration field.
+        const inboundAnsDurations = inboundConnected.map(getCallAhtSeconds);
         const inboundTalkTimes = inboundConnected.map(c => Number(c.talk_time) || 0);
         const inboundHoldTimes = inboundConnected.map(c => Number(c.hold_time) || 0);
-        const inboundQueueAns = inboundConnected.map(c => Number(c.queue_time) || 0);
+        const inboundQueueAns = inboundConnected.map(getAnsweredQueueSeconds);
         const inboundQueueUnans = inboundAbandonedReal.map(c => Number(c.queue_time) || 0);
 
         const getAverageVal = arr => arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : 0;
@@ -9049,7 +9066,7 @@ function renderMonthlyView() {
             }
         });
 
-        const progAnsDurations = progressiveAnswered.map(c => Number(c.duration) || 0);
+        const progAnsDurations = progressiveAnswered.map(getCallAhtSeconds);
         const progAvgAht = getAverageVal(progAnsDurations);
 
         // WhatsApp
@@ -9157,17 +9174,17 @@ function renderMonthlyView() {
             return !isAgent && !isUser;
         }).length,
         inbound_abandoned_pct: mInbound.length ? (mInboundAbandonedReal.length / mInbound.length * 100).toFixed(1) + '%' : '0.0%',
-        // AHT uses talk_time only
-        avg_aht: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.talk_time)||0),0)/mInboundConnected.length) : 0,
+        // Match the source report: AHT is the answered call Duration field.
+        avg_aht: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+getCallAhtSeconds(c),0)/mInboundConnected.length) : 0,
         median_aht: (() => {
-            const durs = mInboundConnected.map(c => Number(c.talk_time)||0);
+            const durs = mInboundConnected.map(getCallAhtSeconds);
             if(!durs.length) return 0;
             durs.sort((a,b)=>a-b);
             const mid = Math.floor(durs.length/2);
             return durs.length % 2 !== 0 ? durs[mid] : (durs[mid-1] + durs[mid]) / 2;
         })(),
         p90_aht: (() => {
-            const durs = mInboundConnected.map(c => Number(c.talk_time)||0);
+            const durs = mInboundConnected.map(getCallAhtSeconds);
             if(!durs.length) return 0;
             durs.sort((a,b)=>a-b);
             const idx = Math.floor(durs.length * 0.9);
@@ -9175,7 +9192,7 @@ function renderMonthlyView() {
         })(),
         avg_talk: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.talk_time)||0),0)/mInboundConnected.length) : 0,
         avg_hold: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.hold_time)||0),0)/mInboundConnected.length) : 0,
-        avg_queue_ans: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.queue_time)||0),0)/mInboundConnected.length) : 0,
+        avg_queue_ans: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+getAnsweredQueueSeconds(c),0)/mInboundConnected.length) : 0,
         avg_queue_unans: mInboundAbandonedReal.length ? Math.round(mInboundAbandonedReal.reduce((s,c)=>s+(Number(c.queue_time)||0),0)/mInboundAbandonedReal.length) : 0,
         prog_attempted: mProg.length,
         prog_answered: mProgAnswered.length,
@@ -9197,7 +9214,7 @@ function renderMonthlyView() {
             const isUser = ads === 'user_disconnected' || ds === 'user_disconnected' || ev === 'queue';
             return !isAgent && !isUser;
         }).length,
-        prog_avg_aht: mProgAnswered.length ? Math.round(mProgAnswered.reduce((s,c)=>s+(Number(c.duration)||0),0)/mProgAnswered.length) : 0,
+        prog_avg_aht: mProgAnswered.length ? Math.round(mProgAnswered.reduce((s,c)=>s+getCallAhtSeconds(c),0)/mProgAnswered.length) : 0,
         wa_chats: mWa.length,
         wa_frt: (() => {
             const items = mWa.filter(d => d.sla_frt && !isNaN(d.sla_frt));
@@ -11986,4 +12003,3 @@ function openSingleClickupTask(taskId) {
         renderClickupDeepDiveList();
     }
 }
-

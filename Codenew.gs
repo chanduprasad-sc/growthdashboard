@@ -912,92 +912,122 @@ Utilities.sleep(75);
 }
 
 function writeDevRevToSheet(ss, sheetName, newRows, colNames) {
-newRows = newRows || [];
+  newRows = newRows || [];
 
-var sheet = ss.getSheetByName(sheetName);
-if (!sheet) {
-sheet = ss.insertSheet(sheetName);
-Logger.log("Created sheet: " + sheetName);
-}
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    Logger.log("Created sheet: " + sheetName);
+  }
 
-var data = sheet.getDataRange().getValues();
+  var data = sheet.getDataRange().getValues();
 
-// Write header row if sheet is empty (also when API returns 0 rows — new sheet stays usable)
-if (data.length === 0) {
-sheet.appendRow(colNames);
-data = [colNames];
-}
+  // Write header row if sheet is empty (also when API returns 0 rows — new sheet stays usable)
+  if (data.length === 0 || (data.length === 1 && data[0][0] === "")) {
+    sheet.appendRow(colNames);
+    data = [colNames];
+  }
 
-var headers = data[0].map(function(h) { return String(h).trim(); });
+  var headers = data[0].map(function(h) { return String(h).trim(); });
 
-// Ensure all required columns exist as headers
-var headersChanged = false;
-colNames.forEach(function(col) {
-if (headers.indexOf(col) === -1) {
-headers.push(col);
-headersChanged = true;
-}
-});
-if (headersChanged) {
-sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-data = sheet.getDataRange().getValues();
-headers = data[0].map(function(h) { return String(h).trim(); });
-}
+  // Ensure all required columns exist as headers
+  var headersChanged = false;
+  colNames.forEach(function(col) {
+    if (headers.indexOf(col) === -1) {
+      headers.push(col);
+      headersChanged = true;
+    }
+  });
+  if (headersChanged) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    data = sheet.getDataRange().getValues();
+    headers = data[0].map(function(h) { return String(h).trim(); });
+  }
 
-if (newRows.length === 0) {
-Logger.log(sheetName + ": 0 new data rows — tab ready with headers");
-return 0;
-}
+  if (newRows.length === 0) {
+    Logger.log(sheetName + ": 0 new data rows — tab ready with headers");
+    return 0;
+  }
 
-var merged = {};
-var existingOrder = [];
+  // Map existing keys to their row number and parsed object (pre-duplicating by latest in-sheet version)
+  var existingRowsMap = {};
+  for (var i = 1; i < data.length; i++) {
+    var existingObj = rowArrayToObject(headers, data[i]);
+    var existingKey = devrevStableKey(sheetName, existingObj);
+    if (existingKey) {
+      if (existingRowsMap[existingKey]) {
+        var prev = existingRowsMap[existingKey];
+        var preferred = choosePreferredDevRevRow(prev.obj, existingObj);
+        if (preferred === existingObj) {
+          existingRowsMap[existingKey] = { rowNumber: i + 1, obj: existingObj };
+        }
+      } else {
+        existingRowsMap[existingKey] = { rowNumber: i + 1, obj: existingObj };
+      }
+    }
+  }
 
-for (var i = 1; i < data.length; i++) {
-var existingObj = rowArrayToObject(headers, data[i]);
-var existingKey = devrevStableKey(sheetName, existingObj);
-if (!existingKey) continue;
-if (!merged[existingKey]) existingOrder.push(existingKey);
-merged[existingKey] = choosePreferredDevRevRow(merged[existingKey], existingObj);
-}
+  // Deduplicate incoming rows
+  var incoming = {};
+  newRows.forEach(function(row) {
+    var key = devrevStableKey(sheetName, row);
+    if (!key) return;
+    incoming[key] = choosePreferredDevRevRow(incoming[key], row);
+  });
 
-var incoming = {};
-newRows.forEach(function(row) {
-var key = devrevStableKey(sheetName, row);
-if (!key) return;
-incoming[key] = choosePreferredDevRevRow(incoming[key], row);
-});
+  var added = 0;
+  var updated = 0;
+  var rowsToAppend = [];
 
-var added = 0, updated = 0;
-Object.keys(incoming).forEach(function(key) {
-if (merged[key]) updated++;
-else { added++; existingOrder.push(key); }
-merged[key] = choosePreferredDevRevRow(merged[key], incoming[key]);
-});
+  Object.keys(incoming).forEach(function(key) {
+    var incomingRow = incoming[key];
+    var existing = existingRowsMap[key];
+    if (existing) {
+      var preferred = choosePreferredDevRevRow(existing.obj, incomingRow);
+      if (preferred === incomingRow) {
+        // Only write to the sheet if there are actual value changes to prevent unnecessary API writes
+        var isDiff = false;
+        for (var colIdx = 0; colIdx < headers.length; colIdx++) {
+          var col = headers[colIdx];
+          var existingVal = String(existing.obj[col] !== undefined ? existing.obj[col] : "").trim();
+          var incomingVal = String(incomingRow[col] !== undefined ? incomingRow[col] : "").trim();
+          if (existingVal !== incomingVal) {
+            isDiff = true;
+            break;
+          }
+        }
+        if (isDiff) {
+          var rowValues = headers.map(function(col) {
+            return sanitizeDevRevSheetValue(col, preferred[col] !== undefined ? preferred[col] : "");
+          });
+          sheet.getRange(existing.rowNumber, 1, 1, headers.length).setValues([rowValues]);
+          updated++;
+        }
+      }
+    } else {
+      var rowValues = headers.map(function(col) {
+        return sanitizeDevRevSheetValue(col, incomingRow[col] !== undefined ? incomingRow[col] : "");
+      });
+      rowsToAppend.push(rowValues);
+      added++;
+    }
+  });
 
-existingOrder = existingOrder.filter(function(key, idx, arr) { return merged[key] && arr.indexOf(key) === idx; });
-existingOrder.sort(function(a, b) {
-var aCreated = normaliseDateCell(merged[a]["Created date"]);
-var bCreated = normaliseDateCell(merged[b]["Created date"]);
-var aCreatedTs = aCreated && !isNaN(aCreated.getTime()) ? aCreated.getTime() : 0;
-var bCreatedTs = bCreated && !isNaN(bCreated.getTime()) ? bCreated.getTime() : 0;
-if (aCreatedTs !== bCreatedTs) return aCreatedTs - bCreatedTs;
-return devrevRowTimestamp(merged[a]) - devrevRowTimestamp(merged[b]);
-});
+  // Batch append all new rows to the bottom of the sheet at once
+  if (rowsToAppend.length > 0) {
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend);
+  }
 
-var outputRows = existingOrder.map(function(key) {
-var row = merged[key];
-return headers.map(function(col) { return sanitizeDevRevSheetValue(col, row[col] !== undefined ? row[col] : ""); });
-});
+  // Sort the data natively on the Google Sheets server side by "Created date"
+  var createdDateColIdx = headers.indexOf("Created date") + 1;
+  if (createdDateColIdx > 0 && sheet.getLastRow() > 2) {
+    var numDataRows = sheet.getLastRow() - 1;
+    sheet.getRange(2, 1, numDataRows, headers.length).sort({column: createdDateColIdx, ascending: true});
+  }
 
-sheet.clearContents();
-sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-if (outputRows.length) {
-Logger.log(sheetName + ": writing " + outputRows.length + " rows x " + headers.length + " cols in chunks of " + DEVREV_WRITE_CHUNK_ROWS);
-setValuesInChunks(sheet, 2, 1, outputRows);
-}
-
-Logger.log(sheetName + ": upserted " + Object.keys(incoming).length + " unique rows — added " + added + ", updated " + updated + ", final sheet rows " + outputRows.length);
-return added;
+  Logger.log(sheetName + ": incremental upsert complete — added " + added + ", updated " + updated + ", total sheet rows " + sheet.getLastRow());
+  return added;
 }
 
 function appendDevRevRowsToSheet(ss, sheetName, newRows, colNames) {
@@ -1507,48 +1537,126 @@ Logger.log("=== DONE — check View > Logs ===");
 }
 
 // ================================================================
-// SHEET READER (Ozonetel — unchanged from v5)
+// SHEET READER (Ozonetel — Optimized)
 // ================================================================
+function formatISTDate(date) {
+  if (!(date instanceof Date) || isNaN(date.getTime())) return "";
+  // Asia/Kolkata is UTC + 5:30
+  var istTime = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+  var yyyy = istTime.getUTCFullYear();
+  var mm = istTime.getUTCMonth() + 1;
+  var dd = istTime.getUTCDate();
+  var hh = istTime.getUTCHours();
+  var mi = istTime.getUTCMinutes();
+  var ss = istTime.getUTCSeconds();
+  
+  var pad = function(n) { return (n < 10 ? "0" : "") + n; };
+  return yyyy + "-" + pad(mm) + "-" + pad(dd) + " " + pad(hh) + ":" + pad(mi) + ":" + pad(ss);
+}
+
 function readSlimSheet(sheetName, neededCols) {
-var ss = SpreadsheetApp.getActiveSpreadsheet();
-var sheet = ss.getSheetByName(sheetName);
-if (!sheet) { Logger.log("Sheet not found: " + sheetName); return []; }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) { Logger.log("Sheet not found: " + sheetName); return []; }
+  
+  var dataRange = sheet.getDataRange();
+  var data = dataRange.getValues();
+  // Sheets returns time-only and duration cells as Date objects. Serialising those
+  // with formatISTDate() adds a timezone offset (historically 00:08:50 for the
+  // sheet's 1899 epoch), which then inflates every dashboard average. Preserve
+  // the exact displayed value for time-only columns instead.
+  var timeOnlyCols = {
+    "Start Time": true,
+    "Queue Time": true,
+    "Time to Answer": true,
+    "Hold Time": true,
+    "Talk Time": true,
+    "Duration": true,
+    "Wrapup Start Time": true,
+    "Wrapup End Time": true,
+    "Break Start Time": true,
+    "Break End Time": true,
+    "Total Break Time": true
+  };
+  if (data.length < 2) return [];
+  
+  var headers = data[0].map(function(h) { return String(h).trim(); });
+  var colMap = {};
+  neededCols.forEach(function(col) {
+    var idx = headers.indexOf(col);
+    if (idx !== -1) colMap[col] = idx;
+  });
+  // Read displayed values only for the small set of time columns. Calling
+  // getDisplayValues() for every column would duplicate the large ticket/email
+  // sheets in memory during each cache build.
+  var displayedTimeCols = {};
+  Object.keys(timeOnlyCols).forEach(function(col) {
+    var idx = colMap[col];
+    if (idx === undefined) return;
+    displayedTimeCols[col] = sheet.getRange(1, idx + 1, data.length, 1)
+      .getDisplayValues()
+      .map(function(cell) { return cell[0]; });
+  });
 
-var data = sheet.getDataRange().getValues();
-if (data.length < 2) return [];
+  // Keep cache light and performant (180 days is enough for comparative presets)
+  var MAX_CACHE_HISTORY_DAYS = 180;
+  var cutOffTime = Date.now() - (MAX_CACHE_HISTORY_DAYS * 24 * 60 * 60 * 1000);
 
-var headers = data[0].map(function(h) { return String(h).trim(); });
-var colMap = {};
-neededCols.forEach(function(col) {
-var idx = headers.indexOf(col);
-if (idx !== -1) colMap[col] = idx;
-});
+  // Find date column for filtering
+  var dateColIdx = -1;
+  var dateColNames = ["Created date", "Call Date", "Date", "Start Time"];
+  for (var k = 0; k < dateColNames.length; k++) {
+    var idx = headers.indexOf(dateColNames[k]);
+    if (idx !== -1) {
+      dateColIdx = idx;
+      break;
+    }
+  }
+  
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    
+    // Quick check for empty rows (scan first few cells instead of entire 80+ columns)
+    var firstCell = row[0];
+    var hasData = (firstCell !== "" && firstCell !== null && firstCell !== undefined);
+    if (!hasData) {
+      for (var j = 1; j < Math.min(row.length, 5); j++) {
+        if (row[j] !== "" && row[j] !== null && row[j] !== undefined) { hasData = true; break; }
+      }
+    }
+    if (!hasData) continue;
 
-var rows = [];
-for (var i = 1; i < data.length; i++) {
-var row = data[i];
-var hasData = false;
-for (var j = 0; j < row.length; j++) {
-if (row[j] !== "" && row[j] !== null && row[j] !== undefined) { hasData = true; break; }
-}
-if (!hasData) continue;
-
-var obj = {};
-neededCols.forEach(function(col) {
-var idx = colMap[col];
-if (idx === undefined) { obj[col] = ""; return; }
-var val = row[idx];
-if (val instanceof Date) {
-obj[col] = Utilities.formatDate(val, "Asia/Kolkata", "yyyy-MM-dd HH:mm:ss");
-} else if (val === null || val === undefined) {
-obj[col] = "";
-} else {
-obj[col] = val;
-}
-});
-rows.push(obj);
-}
-return rows;
+    // Filter out rows older than 180 days to keep cache size performant
+    if (dateColIdx !== -1) {
+      var dateVal = row[dateColIdx];
+      if (dateVal) {
+        var dateObj = (dateVal instanceof Date) ? dateVal : normaliseDateCell(dateVal);
+        if (dateObj && !isNaN(dateObj.getTime()) && dateObj.getTime() < cutOffTime) {
+          continue;
+        }
+      }
+    }
+    
+    var obj = {};
+    neededCols.forEach(function(col) {
+      var idx = colMap[col];
+      if (idx === undefined) { obj[col] = ""; return; }
+      var val = row[idx];
+      if (timeOnlyCols[col]) {
+        obj[col] = (displayedTimeCols[col] && displayedTimeCols[col][i]) || "";
+      } else if (val instanceof Date) {
+        // 1000x faster than Utilities.formatDate
+        obj[col] = formatISTDate(val);
+      } else if (val === null || val === undefined) {
+        obj[col] = "";
+      } else {
+        obj[col] = val;
+      }
+    });
+    rows.push(obj);
+  }
+  return rows;
 }
 
 function truncateCacheText(val, maxLen) {
@@ -1958,6 +2066,7 @@ function fixAllDates() {
       var colLetter = columnToLetter(colIdx + 1);
       sheet.getRange(colLetter + "2:" + colLetter + values.length).setNumberFormat("@");
       var writeValues = [];
+      var hasChanges = false;
       for (var row = 1; row < values.length; row++) {
         var cell = values[row][colIdx];
         if (!cell || cell === "") {
@@ -1966,16 +2075,17 @@ function fixAllDates() {
         }
         var parsed = normaliseDateCell(cell);
         if (parsed) {
-          var formatted = Utilities.formatDate(parsed, "Asia/Kolkata", "yyyy-MM-dd HH:mm:ss");
+          var formatted = formatISTDate(parsed);
           writeValues.push([formatted]);
           if (String(cell) !== formatted) {
             totalFixed++;
+            hasChanges = true;
           }
         } else {
           writeValues.push([String(cell)]);
         }
       }
-      if (writeValues.length > 0) {
+      if (writeValues.length > 0 && hasChanges) {
         sheet.getRange(2, colIdx + 1, writeValues.length, 1).setValues(writeValues);
       }
     });
@@ -2070,6 +2180,7 @@ function fixAllDatesSilent() {
       var colLetter = columnToLetter(colIdx + 1);
       sheet.getRange(colLetter + "2:" + colLetter + values.length).setNumberFormat("@");
       var writeValues = [];
+      var hasChanges = false;
       for (var row = 1; row < values.length; row++) {
         var cell = values[row][colIdx];
         if (!cell || cell === "") {
@@ -2078,16 +2189,17 @@ function fixAllDatesSilent() {
         }
         var parsed = normaliseDateCell(cell);
         if (parsed) {
-          var formatted = Utilities.formatDate(parsed, "Asia/Kolkata", "yyyy-MM-dd HH:mm:ss");
+          var formatted = formatISTDate(parsed);
           writeValues.push([formatted]);
           if (String(cell) !== formatted) {
             totalFixed++;
+            hasChanges = true;
           }
         } else {
           writeValues.push([String(cell)]);
         }
       }
-      if (writeValues.length > 0) {
+      if (writeValues.length > 0 && hasChanges) {
         sheet.getRange(2, colIdx + 1, writeValues.length, 1).setValues(writeValues);
       }
     });

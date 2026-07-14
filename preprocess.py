@@ -122,7 +122,13 @@ def parse_hms_to_seconds(val):
     if val is None or (isinstance(val, float) and math.isnan(val)):
         return 0
     if isinstance(val, (int, float)):
-        return int(val)
+        # Excel stores time-only values as a fraction of a 24-hour day.
+        # Whole/larger numeric values are already elapsed seconds.
+        if -1 < val < 1:
+            return int(round(val * 86400))
+        return int(round(val))
+    if isinstance(val, dt.timedelta):
+        return int(round(val.total_seconds()))
     if isinstance(val, dt.time):
         return val.hour * 3600 + val.minute * 60 + val.second
     if isinstance(val, dt.datetime):
