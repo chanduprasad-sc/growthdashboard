@@ -259,6 +259,9 @@ function addChartExportButtons() {
 // Global State
 let rawData = null;
 let currentTab = 'tab-weekly-pulse';
+let weeklyMetricSource = 'devrev';
+let weeklyOzonetelGroup = 'volume';
+let activityViewMode = 'branch';
 let activeFilters = {
     datePreset: 'week', // default is Current Week (Monday to Sunday)
     dateFrom: '',
@@ -655,6 +658,209 @@ function getCallAhtSeconds(call) {
 
 function getAnsweredQueueSeconds(call) {
     return Number(call && call.queue_time) || Number(call && call.time_to_answer) || 0;
+}
+
+function calculateOzonetelMetrics(calls) {
+    const source = Array.isArray(calls) ? calls : [];
+    const isAnswered = call => ['answered', 'connected'].includes(String(call.stage || '').toLowerCase());
+    const isProgressive = call => {
+        const type = String(call.call_type || '').toLowerCase();
+        return type.includes('progressive') || type.includes('callback');
+    };
+    const isInbound = call => {
+        const type = String(call.call_type || '').toLowerCase();
+        return !type || type === 'inbound';
+    };
+    const inbound = source.filter(isInbound);
+    const progressive = source.filter(isProgressive);
+    const inboundAnswered = inbound.filter(isAnswered);
+    const progressiveAnswered = progressive.filter(isAnswered);
+    const inboundUnanswered = inbound.filter(call => !isAnswered(call));
+    // The source sheet's Abandoned metric is a queue event with at least a
+    // 10-second queue time. Short abandons remain in queue-time averages but
+    // are excluded from the abandoned count/rate.
+    const abandoned = inboundUnanswered.filter(call => {
+        const event = String(call.call_event || '').toLowerCase();
+        const subIssue = String(call.sub_issue || '').toLowerCase();
+        return (event.includes('queue') || subIssue === 'queue') && (Number(call.queue_time) || 0) >= 10;
+    });
+    const average = values => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+    const percentile = (values, fraction) => {
+        if (!values.length) return 0;
+        const sorted = values.slice().sort((a, b) => a - b);
+        const position = (sorted.length - 1) * fraction;
+        const lower = Math.floor(position);
+        const upper = Math.ceil(position);
+        return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
+    };
+    const inboundAht = inboundAnswered.map(getCallAhtSeconds);
+    const unansweredProgressive = progressive.filter(call => !isAnswered(call));
+    let progressiveAgent = 0, progressiveUser = 0, progressiveOther = 0;
+    unansweredProgressive.forEach(call => {
+        const agentStatus = String(call.agent_dial_status || '').toLowerCase();
+        const dialStatus = String(call.dial_status || '').toLowerCase();
+        const event = String(call.call_event || '').toLowerCase();
+        if (agentStatus.includes('user_disconnected') || dialStatus.includes('user_disconnected') || event.includes('queue')) {
+            progressiveUser++;
+        } else if (agentStatus.includes('noanswer') || agentStatus.includes('no answer') || agentStatus.includes('normalcallclearing') || agentStatus.includes('exceeded')) {
+            progressiveAgent++;
+        } else {
+            progressiveOther++;
+        }
+    });
+
+    return {
+        inboundProgressive: inbound.length + progressive.length,
+        inbound: inbound.length,
+        progressive: progressive.length,
+        connected: inboundAnswered.length + progressiveAnswered.length,
+        abandoned: abandoned.length,
+        abandonedRate: inbound.length ? abandoned.length / inbound.length * 100 : 0,
+        averageAht: average(inboundAht),
+        medianAht: percentile(inboundAht, 0.5),
+        p90Aht: percentile(inbound.map(getCallAhtSeconds), 0.9),
+        averageTalk: average(inboundAnswered.map(call => Number(call.talk_time) || 0)),
+        averageHold: average(inboundAnswered.map(call => Number(call.hold_time) || 0)),
+        averageQueueAnswered: average(inboundAnswered.map(getAnsweredQueueSeconds)),
+        averageQueueUnanswered: average(inboundUnanswered.map(call => Number(call.queue_time) || 0)),
+        progressiveAttempted: progressive.length,
+        progressiveAnswered: progressiveAnswered.length,
+        progressiveAgent,
+        progressiveUser,
+        progressiveOther,
+        progressiveAht: average(progressiveAnswered.map(getCallAhtSeconds))
+    };
+}
+
+function buildBranchBrokerActivity(interactions, calls, mappings) {
+    const branchMap = new Map();
+    const cleanLabel = (value, fallback) => {
+        const text = String(value || '').trim();
+        return text && !['na', 'unknown'].includes(text.toLowerCase()) ? text : fallback;
+    };
+    const ensureBranch = (brokerValue, branchValue, pocValue, mapped) => {
+        const broker = cleanLabel(brokerValue, 'Unmapped broker');
+        const normalized = normalizeBranch(branchValue);
+        const branch = normalized === 'Not shared' ? 'Not shared' : cleanLabel(branchValue, normalized);
+        const poc = cleanLabel(pocValue, 'No POC');
+        const key = `${canonicalBroker(broker)}||${normalized}||${poc}`.toLowerCase();
+        if (!branchMap.has(key)) {
+            branchMap.set(key, { broker, branch, poc, mapped: Boolean(mapped), interactions: 0, calls: 0, score: 0 });
+        } else if (mapped) {
+            branchMap.get(key).mapped = true;
+        }
+        return branchMap.get(key);
+    };
+
+    (Array.isArray(mappings) ? mappings : []).forEach(mapping => {
+        ensureBranch(mapping.BrokerFamily || mapping.BrokerRaw, mapping.BranchRaw || mapping.BranchNorm, mapping.POC, true);
+    });
+    (Array.isArray(interactions) ? interactions : []).forEach(item => {
+        ensureBranch(item.broker_family, item.branch, item.poc, false).interactions++;
+    });
+    (Array.isArray(calls) ? calls : []).forEach(call => {
+        ensureBranch(call.broker_family, call.branch, call.poc, false).calls++;
+    });
+
+    const branches = Array.from(branchMap.values());
+    branches.forEach(row => { row.score = row.interactions + row.calls; });
+    const positiveScores = branches.map(row => row.score).filter(Boolean).sort((a, b) => a - b);
+    const quartile = fraction => positiveScores.length
+        ? positiveScores[Math.min(positiveScores.length - 1, Math.ceil(positiveScores.length * fraction) - 1)]
+        : 0;
+    const lowCut = quartile(0.25);
+    const highCut = quartile(0.75);
+    branches.forEach(row => {
+        row.status = row.score === 0 ? 'Inactive' : row.score >= highCut ? 'High' : row.score <= lowCut ? 'Low' : 'Active';
+    });
+
+    const brokerMap = new Map();
+    branches.forEach(branch => {
+        const key = branch.broker.toLowerCase();
+        if (!brokerMap.has(key)) {
+            brokerMap.set(key, { broker: branch.broker, pocs: new Set(), branches: 0, activeBranches: 0, interactions: 0, calls: 0, score: 0 });
+        }
+        const broker = brokerMap.get(key);
+        broker.pocs.add(branch.poc);
+        broker.branches++;
+        if (branch.score > 0) broker.activeBranches++;
+        broker.interactions += branch.interactions;
+        broker.calls += branch.calls;
+        broker.score += branch.score;
+    });
+    const brokers = Array.from(brokerMap.values()).map(row => ({
+        ...row,
+        poc: Array.from(row.pocs).sort().join(', '),
+        status: row.score === 0 ? 'Inactive' : row.activeBranches < row.branches / 2 ? 'Low' : 'Active'
+    }));
+
+    return { branches, brokers };
+}
+
+function renderBranchBrokerActivity() {
+    const body = document.getElementById('activity-table-body');
+    if (!body || !window.viewModel) return;
+    const dataset = buildBranchBrokerActivity(
+        window.viewModel.interactions || [],
+        window.viewModel.calls || [],
+        rawData && rawData.poc_mappings ? rawData.poc_mappings : []
+    );
+    const pocSelect = document.getElementById('activity-poc-filter');
+    const searchInput = document.getElementById('activity-search');
+    const previousPoc = pocSelect.value || 'all';
+    const pocs = Array.from(new Set(dataset.branches.map(row => row.poc))).sort();
+    pocSelect.innerHTML = '<option value="all">All POCs</option>' + pocs.map(poc => `<option value="${escapeHtml(poc)}">${escapeHtml(poc)}</option>`).join('');
+    pocSelect.value = pocs.includes(previousPoc) ? previousPoc : 'all';
+    const selectedPoc = pocSelect.value;
+    const query = String(searchInput.value || '').trim().toLowerCase();
+    const allRows = activityViewMode === 'branch' ? dataset.branches : dataset.brokers;
+    const rows = allRows.filter(row => {
+        const pocMatch = selectedPoc === 'all' || String(row.poc).split(', ').includes(selectedPoc);
+        const searchText = `${row.branch || ''} ${row.broker || ''} ${row.poc || ''}`.toLowerCase();
+        return pocMatch && (!query || searchText.includes(query));
+    }).sort((a, b) => b.score - a.score || String(a.branch || a.broker).localeCompare(String(b.branch || b.broker)));
+
+    const rankedActive = rows.filter(row => row.score > 0);
+    const mostActive = rankedActive[0];
+    const leastActive = rankedActive.length ? rankedActive[rankedActive.length - 1] : null;
+    const inactiveCount = rows.filter(row => row.score === 0).length;
+    const summary = document.getElementById('activity-summary-grid');
+    summary.innerHTML = [
+        ['Most active', mostActive ? (mostActive.branch || mostActive.broker) : 'No activity', mostActive ? `${mostActive.score.toLocaleString()} recorded touches` : '—'],
+        ['Least active', leastActive ? (leastActive.branch || leastActive.broker) : 'No activity', leastActive ? `${leastActive.score.toLocaleString()} recorded touches` : '—'],
+        ['Inactive', inactiveCount.toLocaleString(), activityViewMode === 'branch' ? 'mapped branches with zero activity' : 'brokers with zero activity'],
+        ['Coverage', rows.length ? `${Math.round((rows.length - inactiveCount) / rows.length * 100)}%` : '0%', `${rows.length - inactiveCount} of ${rows.length} active`]
+    ].map(([label, value, detail]) => `<div class="activity-summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(detail)}</small></div>`).join('');
+
+    const head = document.getElementById('activity-table-head');
+    const title = document.getElementById('activity-table-title');
+    if (activityViewMode === 'branch') {
+        title.textContent = 'Branch activity by smallcase POC';
+        head.innerHTML = '<tr><th>Branch</th><th>Broker</th><th>smallcase POC</th><th>DevRev</th><th>Ozonetel</th><th>Total</th><th>Activity</th></tr>';
+        body.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.branch)}</strong>${row.mapped ? '<small class="mapped-label">POC mapped</small>' : ''}</td><td>${escapeHtml(row.broker)}</td><td>${escapeHtml(row.poc)}</td><td>${row.interactions.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No branch activity matches these filters.</td></tr>';
+    } else {
+        title.textContent = 'Broker activity mapped to smallcase POCs';
+        head.innerHTML = '<tr><th>Broker</th><th>smallcase POC(s)</th><th>Active branches</th><th>DevRev</th><th>Ozonetel</th><th>Total</th><th>Activity</th></tr>';
+        body.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.broker)}</strong></td><td>${escapeHtml(row.poc)}</td><td>${row.activeBranches} / ${row.branches}</td><td>${row.interactions.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No broker activity matches these filters.</td></tr>';
+    }
+
+    if (body.closest('#tab-branch-broker-activity').dataset.controlsBound !== 'true') {
+        const section = body.closest('#tab-branch-broker-activity');
+        section.dataset.controlsBound = 'true';
+        section.addEventListener('click', event => {
+            const button = event.target.closest('[data-activity-view]');
+            if (!button) return;
+            activityViewMode = button.dataset.activityView;
+            section.querySelectorAll('[data-activity-view]').forEach(candidate => {
+                const active = candidate === button;
+                candidate.classList.toggle('active', active);
+                candidate.setAttribute('aria-selected', String(active));
+            });
+            renderBranchBrokerActivity();
+        });
+        pocSelect.addEventListener('change', renderBranchBrokerActivity);
+        searchInput.addEventListener('input', renderBranchBrokerActivity);
+    }
 }
 
 function cleanDate(val) {
@@ -2615,6 +2821,7 @@ function switchTab(tabId) {
         'tab-intelligence': 'Intelligence',
         'tab-monthly-view': 'Monthly View',
         'tab-agent-performance': 'Agent Performance',
+        'tab-branch-broker-activity': 'Branch & Broker Activity',
         'tab-tickets-chats': 'Tickets & Chats',
         'tab-ai-summary': 'AI Summary',
         'tab-guide': 'Guide'
@@ -2627,6 +2834,7 @@ function switchTab(tabId) {
         'tab-intelligence': 'Cross-channel insights & anomaly detection',
         'tab-monthly-view': 'Date-wise monthly metric aggregation',
         'tab-agent-performance': 'Agent workload, quality & productivity metrics',
+        'tab-branch-broker-activity': 'POC-mapped branch and broker engagement',
         'tab-tickets-chats': 'Browsable registry of all support interactions',
         'tab-ai-summary': 'AI-powered narrative summaries & focus areas',
         'tab-guide': 'How to use this dashboard'
@@ -3272,6 +3480,8 @@ function buildViewModel() {
         renderMonthlyView();
     } else if (currentTab === 'tab-agent-performance') {
         renderAgentPerformance();
+    } else if (currentTab === 'tab-branch-broker-activity') {
+        renderBranchBrokerActivity();
     } else if (currentTab === 'tab-tickets-chats') {
         renderTicketsChatsView();
     } else if (currentTab === 'tab-ai-summary') {
@@ -3424,6 +3634,78 @@ function renderSLAAtRiskAlerts() {
     }
 }
 
+function syncWeeklyMetricPanels() {
+    document.querySelectorAll('[data-weekly-source-panel]').forEach(panel => {
+        panel.hidden = panel.dataset.weeklySourcePanel !== weeklyMetricSource;
+    });
+    document.querySelectorAll('[data-weekly-source]').forEach(button => {
+        const active = button.dataset.weeklySource === weeklyMetricSource;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+    });
+    document.querySelectorAll('[data-ozonetel-panel]').forEach(panel => {
+        const active = panel.dataset.ozonetelPanel === weeklyOzonetelGroup;
+        panel.hidden = !active;
+        panel.classList.toggle('active', active);
+    });
+    document.querySelectorAll('[data-ozonetel-group]').forEach(button => {
+        const active = button.dataset.ozonetelGroup === weeklyOzonetelGroup;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+    });
+}
+
+function bindWeeklyMetricControls() {
+    const wrapper = document.getElementById('weekly-pulse-dashboard-capture-area');
+    if (!wrapper || wrapper.dataset.metricControlsBound === 'true') return;
+    wrapper.dataset.metricControlsBound = 'true';
+    wrapper.addEventListener('click', event => {
+        const sourceButton = event.target.closest('[data-weekly-source]');
+        if (sourceButton) {
+            weeklyMetricSource = sourceButton.dataset.weeklySource;
+            syncWeeklyMetricPanels();
+            return;
+        }
+        const groupButton = event.target.closest('[data-ozonetel-group]');
+        if (groupButton) {
+            weeklyOzonetelGroup = groupButton.dataset.ozonetelGroup;
+            syncWeeklyMetricPanels();
+        }
+    });
+}
+
+function renderWeeklyOzonetelMetrics(calls) {
+    if (!document.getElementById('weekly-ozonetel-metrics')) return;
+    const metrics = calculateOzonetelMetrics(calls);
+    const values = {
+        'oz-volume-total': metrics.inboundProgressive.toLocaleString(),
+        'oz-volume-inbound': metrics.inbound.toLocaleString(),
+        'oz-volume-progressive': metrics.progressive.toLocaleString(),
+        'oz-volume-connected': metrics.connected.toLocaleString(),
+        'oz-abandoned-count': metrics.abandoned.toLocaleString(),
+        'oz-abandoned-rate': `${metrics.abandonedRate.toFixed(1)}%`,
+        'oz-timing-avg-aht': formatSeconds(metrics.averageAht),
+        'oz-timing-median-aht': formatSeconds(metrics.medianAht),
+        'oz-timing-p90-aht': formatSeconds(metrics.p90Aht),
+        'oz-timing-talk': formatSeconds(metrics.averageTalk),
+        'oz-timing-hold': formatSeconds(metrics.averageHold),
+        'oz-timing-queue-answered': formatSeconds(metrics.averageQueueAnswered),
+        'oz-timing-queue-unanswered': formatSeconds(metrics.averageQueueUnanswered),
+        'oz-progressive-attempted': metrics.progressiveAttempted.toLocaleString(),
+        'oz-progressive-answered': metrics.progressiveAnswered.toLocaleString(),
+        'oz-progressive-agent': metrics.progressiveAgent.toLocaleString(),
+        'oz-progressive-user': metrics.progressiveUser.toLocaleString(),
+        'oz-progressive-other': metrics.progressiveOther.toLocaleString(),
+        'oz-progressive-aht': formatSeconds(metrics.progressiveAht)
+    };
+    Object.entries(values).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    });
+    bindWeeklyMetricControls();
+    syncWeeklyMetricPanels();
+}
+
 function renderWeeklyPulseDashboard() {
     const data = window.viewModel.interactions;
     const calls = window.viewModel.calls;
@@ -3433,6 +3715,7 @@ function renderWeeklyPulseDashboard() {
 
     // 1. Render Key Metrics Grid
     renderKeyMetricsGrid(data, calls);
+    renderWeeklyOzonetelMetrics(calls);
 
     // 2. Render POC Heatmap table
     renderPOCQueryHeatmap(data);
