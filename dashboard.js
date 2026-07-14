@@ -841,6 +841,49 @@ function renderBranchBrokerActivity() {
         ['Coverage', rows.length ? `${Math.round((rows.length - inactiveCount) / rows.length * 100)}%` : '0%', `${rows.length - inactiveCount} of ${rows.length} active`]
     ].map(([label, value, detail]) => `<div class="activity-summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(detail)}</small></div>`).join('');
 
+    const entityName = row => row.branch || row.broker || 'Unknown';
+    const activeRows = filteredRows.filter(row => row.status === 'High' || row.status === 'Active');
+    const lowRows = filteredRows.filter(row => row.status === 'Low');
+    const inactiveRows = filteredRows.filter(row => row.status === 'Inactive');
+    const totalRows = filteredRows.length;
+    const coveragePercent = count => totalRows ? count / totalRows * 100 : 0;
+    const coverageVisual = document.getElementById('activity-coverage-visual');
+    coverageVisual.innerHTML = totalRows ? `
+        <div class="activity-coverage-number"><strong>${Math.round(coveragePercent(activeRows.length))}%</strong><span>currently active</span></div>
+        <div class="activity-coverage-bar" role="img" aria-label="${activeRows.length} active, ${lowRows.length} low activity, ${inactiveRows.length} inactive">
+            <span class="active" style="width:${coveragePercent(activeRows.length)}%"></span>
+            <span class="low" style="width:${coveragePercent(lowRows.length)}%"></span>
+            <span class="inactive" style="width:${coveragePercent(inactiveRows.length)}%"></span>
+        </div>
+        <div class="activity-coverage-legend">
+            <span><i class="active"></i>Active <strong>${activeRows.length}</strong></span>
+            <span><i class="low"></i>Low <strong>${lowRows.length}</strong></span>
+            <span><i class="inactive"></i>Inactive <strong>${inactiveRows.length}</strong></span>
+        </div>
+        <p>${inactiveRows.length ? `${inactiveRows.length} ${activityViewMode === 'branch' ? 'branches' : 'brokers'} need re-engagement from their mapped POC.` : 'Every mapped entity has activity in the selected period.'}</p>
+    ` : '<div class="activity-insight-empty">No mapped activity in this filter.</div>';
+
+    const leaders = filteredRows.filter(row => row.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
+    const leaderMax = leaders.length ? leaders[0].score : 1;
+    document.getElementById('activity-leaders-list').innerHTML = leaders.length ? leaders.map((row, index) => `
+        <div class="activity-leader-row">
+            <span class="activity-leader-rank">${index + 1}</span>
+            <div class="activity-leader-main">
+                <div><strong>${escapeHtml(entityName(row))}</strong><span>${escapeHtml(row.poc)}</span><b>${row.score.toLocaleString()}</b></div>
+                <div class="activity-leader-track"><i style="width:${Math.max(5, row.score / leaderMax * 100)}%"></i></div>
+            </div>
+        </div>
+    `).join('') : '<div class="activity-insight-empty">No active branches in this filter.</div>';
+
+    const attentionRows = [...inactiveRows, ...lowRows.sort((a, b) => a.score - b.score)].slice(0, 6);
+    document.getElementById('activity-attention-list').innerHTML = attentionRows.length ? attentionRows.map(row => `
+        <div class="activity-attention-row">
+            <i class="${row.status.toLowerCase()}"></i>
+            <div><strong>${escapeHtml(entityName(row))}</strong><span>${escapeHtml(row.poc)} · ${activityViewMode === 'branch' ? escapeHtml(row.broker) : `${row.activeBranches || 0}/${row.branches || 0} active branches`}</span></div>
+            <b>${row.score ? row.score.toLocaleString() : 'No activity'}</b>
+        </div>
+    `).join('') : '<div class="activity-insight-empty activity-insight-empty--positive">No low-activity entities. Coverage looks healthy.</div>';
+
     const head = document.getElementById('activity-table-head');
     const title = document.getElementById('activity-table-title');
     const sortableHeading = (label, key) => {
@@ -852,11 +895,11 @@ function renderBranchBrokerActivity() {
     if (activityViewMode === 'branch') {
         title.textContent = 'Branch activity by smallcase POC';
         head.innerHTML = `<tr><th>Branch</th><th>Broker</th><th>smallcase POC</th>${sortableHeading('WhatsApp', 'whatsapp')}${sortableHeading('Calls', 'calls')}${sortableHeading('Total', 'score')}<th>Activity</th></tr>`;
-        body.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.branch)}</strong>${row.mapped ? '<small class="mapped-label">POC mapped</small>' : ''}</td><td>${escapeHtml(row.broker)}</td><td>${escapeHtml(row.poc)}</td><td>${row.whatsapp.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No branch activity matches these filters.</td></tr>';
+        body.innerHTML = rows.length ? rows.map(row => `<tr class="activity-row--${row.status.toLowerCase()}"><td><strong>${escapeHtml(row.branch)}</strong>${row.mapped ? '<small class="mapped-label">POC mapped</small>' : ''}</td><td>${escapeHtml(row.broker)}</td><td>${escapeHtml(row.poc)}</td><td>${row.whatsapp.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No branch activity matches these filters.</td></tr>';
     } else {
         title.textContent = 'Broker activity mapped to smallcase POCs';
         head.innerHTML = `<tr><th>Broker</th><th>smallcase POC(s)</th>${sortableHeading('Active branches', 'activeBranches')}${sortableHeading('WhatsApp', 'whatsapp')}${sortableHeading('Calls', 'calls')}${sortableHeading('Total', 'score')}<th>Activity</th></tr>`;
-        body.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.broker)}</strong></td><td>${escapeHtml(row.poc)}</td><td>${row.activeBranches} / ${row.branches}</td><td>${row.whatsapp.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No broker activity matches these filters.</td></tr>';
+        body.innerHTML = rows.length ? rows.map(row => `<tr class="activity-row--${row.status.toLowerCase()}"><td><strong>${escapeHtml(row.broker)}</strong></td><td>${escapeHtml(row.poc)}</td><td>${row.activeBranches} / ${row.branches}</td><td>${row.whatsapp.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No broker activity matches these filters.</td></tr>';
     }
 
     if (body.closest('#tab-branch-broker-activity').dataset.controlsBound !== 'true') {

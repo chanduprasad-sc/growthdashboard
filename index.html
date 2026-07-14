@@ -2085,9 +2085,14 @@
             <!-- BRANCH & BROKER ACTIVITY -->
             <section id="tab-branch-broker-activity" class="tab-content">
                 <div class="dashboard-section-wrapper activity-dashboard-header">
-                    <div>
-                        <h2 class="section-heading"><span class="section-heading-icon" aria-hidden="true">🏢</span> Branch &amp; Broker Activity</h2>
-                        <p class="activity-dashboard-subtitle">POC-mapped activity for the selected filters and date range, including mapped branches with no activity.</p>
+                    <div class="activity-title-lockup">
+                        <span class="activity-title-mark" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11M8 20v-7h8v7M2 20h20M9 9h.01M15 9h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        <div>
+                            <h2 class="section-heading">Branch &amp; Broker Activity</h2>
+                            <p class="activity-dashboard-subtitle">POC-mapped activity for the selected filters and date range, including mapped branches with no activity.</p>
+                        </div>
                     </div>
                     <div class="activity-view-switch" role="tablist" aria-label="Activity view">
                         <button type="button" class="activity-view-btn active" data-activity-view="branch" aria-selected="true">Branch Activity</button>
@@ -2095,6 +2100,29 @@
                     </div>
                 </div>
                 <div class="activity-summary-grid" id="activity-summary-grid"></div>
+                <div class="activity-insights-grid">
+                    <section class="activity-insight-panel" aria-labelledby="activity-coverage-title">
+                        <div class="activity-insight-heading">
+                            <h3 id="activity-coverage-title">Activity coverage</h3>
+                            <span>Active vs attention</span>
+                        </div>
+                        <div id="activity-coverage-visual"></div>
+                    </section>
+                    <section class="activity-insight-panel" aria-labelledby="activity-leaders-title">
+                        <div class="activity-insight-heading">
+                            <h3 id="activity-leaders-title">Most active</h3>
+                            <span>WhatsApp + calls</span>
+                        </div>
+                        <div class="activity-insight-list" id="activity-leaders-list"></div>
+                    </section>
+                    <section class="activity-insight-panel" aria-labelledby="activity-attention-title">
+                        <div class="activity-insight-heading">
+                            <h3 id="activity-attention-title">Needs attention</h3>
+                            <span>Low or no activity</span>
+                        </div>
+                        <div class="activity-attention-list" id="activity-attention-list"></div>
+                    </section>
+                </div>
                 <div class="activity-table-card">
                     <div class="activity-table-toolbar">
                         <div>
