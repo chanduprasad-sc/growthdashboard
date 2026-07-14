@@ -259,9 +259,9 @@ function addChartExportButtons() {
 // Global State
 let rawData = null;
 let currentTab = 'tab-weekly-pulse';
-let weeklyMetricSource = 'devrev';
-let weeklyOzonetelGroup = 'volume';
 let activityViewMode = 'branch';
+let activitySortKey = 'score';
+let activitySortDirection = 'desc';
 let metricDeepDiveView = 'rm';
 let metricDeepDiveState = null;
 let activeFilters = {
@@ -747,7 +747,7 @@ function buildBranchBrokerActivity(interactions, calls, mappings) {
         const poc = cleanLabel(pocValue, 'No POC');
         const key = `${canonicalBroker(broker)}||${normalized}||${poc}`.toLowerCase();
         if (!branchMap.has(key)) {
-            branchMap.set(key, { broker, branch, poc, mapped: Boolean(mapped), interactions: 0, calls: 0, score: 0 });
+            branchMap.set(key, { broker, branch, poc, mapped: Boolean(mapped), whatsapp: 0, calls: 0, score: 0 });
         } else if (mapped) {
             branchMap.get(key).mapped = true;
         }
@@ -757,15 +757,15 @@ function buildBranchBrokerActivity(interactions, calls, mappings) {
     (Array.isArray(mappings) ? mappings : []).forEach(mapping => {
         ensureBranch(mapping.BrokerFamily || mapping.BrokerRaw, mapping.BranchRaw || mapping.BranchNorm, mapping.POC, true);
     });
-    (Array.isArray(interactions) ? interactions : []).forEach(item => {
-        ensureBranch(item.broker_family, item.branch, item.poc, false).interactions++;
+    (Array.isArray(interactions) ? interactions : []).filter(item => item.type === 'WhatsApp Chat').forEach(item => {
+        ensureBranch(item.broker_family, item.branch, item.poc, false).whatsapp++;
     });
     (Array.isArray(calls) ? calls : []).forEach(call => {
         ensureBranch(call.broker_family, call.branch, call.poc, false).calls++;
     });
 
     const branches = Array.from(branchMap.values());
-    branches.forEach(row => { row.score = row.interactions + row.calls; });
+    branches.forEach(row => { row.score = row.whatsapp + row.calls; });
     const positiveScores = branches.map(row => row.score).filter(Boolean).sort((a, b) => a - b);
     const quartile = fraction => positiveScores.length
         ? positiveScores[Math.min(positiveScores.length - 1, Math.ceil(positiveScores.length * fraction) - 1)]
@@ -780,13 +780,13 @@ function buildBranchBrokerActivity(interactions, calls, mappings) {
     branches.forEach(branch => {
         const key = branch.broker.toLowerCase();
         if (!brokerMap.has(key)) {
-            brokerMap.set(key, { broker: branch.broker, pocs: new Set(), branches: 0, activeBranches: 0, interactions: 0, calls: 0, score: 0 });
+            brokerMap.set(key, { broker: branch.broker, pocs: new Set(), branches: 0, activeBranches: 0, whatsapp: 0, calls: 0, score: 0 });
         }
         const broker = brokerMap.get(key);
         broker.pocs.add(branch.poc);
         broker.branches++;
         if (branch.score > 0) broker.activeBranches++;
-        broker.interactions += branch.interactions;
+        broker.whatsapp += branch.whatsapp;
         broker.calls += branch.calls;
         broker.score += branch.score;
     });
@@ -816,13 +816,20 @@ function renderBranchBrokerActivity() {
     const selectedPoc = pocSelect.value;
     const query = String(searchInput.value || '').trim().toLowerCase();
     const allRows = activityViewMode === 'branch' ? dataset.branches : dataset.brokers;
-    const rows = allRows.filter(row => {
+    const filteredRows = allRows.filter(row => {
         const pocMatch = selectedPoc === 'all' || String(row.poc).split(', ').includes(selectedPoc);
         const searchText = `${row.branch || ''} ${row.broker || ''} ${row.poc || ''}`.toLowerCase();
         return pocMatch && (!query || searchText.includes(query));
-    }).sort((a, b) => b.score - a.score || String(a.branch || a.broker).localeCompare(String(b.branch || b.broker)));
+    });
+    const direction = activitySortDirection === 'asc' ? 1 : -1;
+    const rows = filteredRows.slice().sort((a, b) => {
+        const numericDifference = (Number(a[activitySortKey]) || 0) - (Number(b[activitySortKey]) || 0);
+        return numericDifference !== 0
+            ? numericDifference * direction
+            : String(a.branch || a.broker).localeCompare(String(b.branch || b.broker));
+    });
 
-    const rankedActive = rows.filter(row => row.score > 0);
+    const rankedActive = filteredRows.filter(row => row.score > 0).sort((a, b) => b.score - a.score);
     const mostActive = rankedActive[0];
     const leastActive = rankedActive.length ? rankedActive[rankedActive.length - 1] : null;
     const inactiveCount = rows.filter(row => row.score === 0).length;
@@ -836,29 +843,51 @@ function renderBranchBrokerActivity() {
 
     const head = document.getElementById('activity-table-head');
     const title = document.getElementById('activity-table-title');
+    const sortableHeading = (label, key) => {
+        const active = activitySortKey === key;
+        const arrow = active ? (activitySortDirection === 'asc' ? '↑' : '↓') : '↕';
+        const ariaSort = active ? (activitySortDirection === 'asc' ? 'ascending' : 'descending') : 'none';
+        return `<th aria-sort="${ariaSort}"><button type="button" class="activity-sort-btn${active ? ' active' : ''}" data-activity-sort="${key}">${label}<span aria-hidden="true">${arrow}</span></button></th>`;
+    };
     if (activityViewMode === 'branch') {
         title.textContent = 'Branch activity by smallcase POC';
-        head.innerHTML = '<tr><th>Branch</th><th>Broker</th><th>smallcase POC</th><th>DevRev</th><th>Ozonetel</th><th>Total</th><th>Activity</th></tr>';
-        body.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.branch)}</strong>${row.mapped ? '<small class="mapped-label">POC mapped</small>' : ''}</td><td>${escapeHtml(row.broker)}</td><td>${escapeHtml(row.poc)}</td><td>${row.interactions.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No branch activity matches these filters.</td></tr>';
+        head.innerHTML = `<tr><th>Branch</th><th>Broker</th><th>smallcase POC</th>${sortableHeading('WhatsApp', 'whatsapp')}${sortableHeading('Calls', 'calls')}${sortableHeading('Total', 'score')}<th>Activity</th></tr>`;
+        body.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.branch)}</strong>${row.mapped ? '<small class="mapped-label">POC mapped</small>' : ''}</td><td>${escapeHtml(row.broker)}</td><td>${escapeHtml(row.poc)}</td><td>${row.whatsapp.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No branch activity matches these filters.</td></tr>';
     } else {
         title.textContent = 'Broker activity mapped to smallcase POCs';
-        head.innerHTML = '<tr><th>Broker</th><th>smallcase POC(s)</th><th>Active branches</th><th>DevRev</th><th>Ozonetel</th><th>Total</th><th>Activity</th></tr>';
-        body.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.broker)}</strong></td><td>${escapeHtml(row.poc)}</td><td>${row.activeBranches} / ${row.branches}</td><td>${row.interactions.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No broker activity matches these filters.</td></tr>';
+        head.innerHTML = `<tr><th>Broker</th><th>smallcase POC(s)</th>${sortableHeading('Active branches', 'activeBranches')}${sortableHeading('WhatsApp', 'whatsapp')}${sortableHeading('Calls', 'calls')}${sortableHeading('Total', 'score')}<th>Activity</th></tr>`;
+        body.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.broker)}</strong></td><td>${escapeHtml(row.poc)}</td><td>${row.activeBranches} / ${row.branches}</td><td>${row.whatsapp.toLocaleString()}</td><td>${row.calls.toLocaleString()}</td><td><strong>${row.score.toLocaleString()}</strong></td><td><span class="activity-status activity-status--${row.status.toLowerCase()}">${row.status}</span></td></tr>`).join('') : '<tr><td colspan="7" class="activity-empty">No broker activity matches these filters.</td></tr>';
     }
 
     if (body.closest('#tab-branch-broker-activity').dataset.controlsBound !== 'true') {
         const section = body.closest('#tab-branch-broker-activity');
         section.dataset.controlsBound = 'true';
         section.addEventListener('click', event => {
-            const button = event.target.closest('[data-activity-view]');
-            if (!button) return;
-            activityViewMode = button.dataset.activityView;
-            section.querySelectorAll('[data-activity-view]').forEach(candidate => {
-                const active = candidate === button;
-                candidate.classList.toggle('active', active);
-                candidate.setAttribute('aria-selected', String(active));
-            });
-            renderBranchBrokerActivity();
+            const viewButton = event.target.closest('[data-activity-view]');
+            if (viewButton) {
+                activityViewMode = viewButton.dataset.activityView;
+                if (activityViewMode === 'branch' && activitySortKey === 'activeBranches') {
+                    activitySortKey = 'score';
+                    activitySortDirection = 'desc';
+                }
+                section.querySelectorAll('[data-activity-view]').forEach(candidate => {
+                    const active = candidate === viewButton;
+                    candidate.classList.toggle('active', active);
+                    candidate.setAttribute('aria-selected', String(active));
+                });
+                renderBranchBrokerActivity();
+                return;
+            }
+            const sortButton = event.target.closest('[data-activity-sort]');
+            if (sortButton) {
+                const nextKey = sortButton.dataset.activitySort;
+                if (activitySortKey === nextKey) activitySortDirection = activitySortDirection === 'desc' ? 'asc' : 'desc';
+                else {
+                    activitySortKey = nextKey;
+                    activitySortDirection = 'desc';
+                }
+                renderBranchBrokerActivity();
+            }
         });
         pocSelect.addEventListener('change', renderBranchBrokerActivity);
         searchInput.addEventListener('input', renderBranchBrokerActivity);
@@ -3637,76 +3666,47 @@ function renderSLAAtRiskAlerts() {
     }
 }
 
-function syncWeeklyMetricPanels() {
-    document.querySelectorAll('[data-weekly-source-panel]').forEach(panel => {
-        panel.hidden = panel.dataset.weeklySourcePanel !== weeklyMetricSource;
-    });
-    document.querySelectorAll('[data-weekly-source]').forEach(button => {
-        const active = button.dataset.weeklySource === weeklyMetricSource;
-        button.classList.toggle('active', active);
-        button.setAttribute('aria-selected', String(active));
-    });
-    document.querySelectorAll('[data-ozonetel-panel]').forEach(panel => {
-        const active = panel.dataset.ozonetelPanel === weeklyOzonetelGroup;
-        panel.hidden = !active;
-        panel.classList.toggle('active', active);
-    });
-    document.querySelectorAll('[data-ozonetel-group]').forEach(button => {
-        const active = button.dataset.ozonetelGroup === weeklyOzonetelGroup;
-        button.classList.toggle('active', active);
-        button.setAttribute('aria-selected', String(active));
-    });
-}
-
-function bindWeeklyMetricControls() {
-    const wrapper = document.getElementById('weekly-pulse-dashboard-capture-area');
-    if (!wrapper || wrapper.dataset.metricControlsBound === 'true') return;
-    wrapper.dataset.metricControlsBound = 'true';
-    wrapper.addEventListener('click', event => {
-        const sourceButton = event.target.closest('[data-weekly-source]');
-        if (sourceButton) {
-            weeklyMetricSource = sourceButton.dataset.weeklySource;
-            syncWeeklyMetricPanels();
-            return;
-        }
-        const groupButton = event.target.closest('[data-ozonetel-group]');
-        if (groupButton) {
-            weeklyOzonetelGroup = groupButton.dataset.ozonetelGroup;
-            syncWeeklyMetricPanels();
-        }
-    });
-}
-
 function renderWeeklyOzonetelMetrics(calls) {
-    if (!document.getElementById('weekly-ozonetel-metrics')) return;
+    if (!document.getElementById('hero-oz-total')) return;
     const metrics = calculateOzonetelMetrics(calls);
+    const progressiveUnanswered = metrics.progressiveAgent + metrics.progressiveUser + metrics.progressiveOther;
     const values = {
-        'oz-volume-total': metrics.inboundProgressive.toLocaleString(),
-        'oz-volume-inbound': metrics.inbound.toLocaleString(),
-        'oz-volume-progressive': metrics.progressive.toLocaleString(),
-        'oz-volume-connected': metrics.connected.toLocaleString(),
-        'oz-abandoned-count': metrics.abandoned.toLocaleString(),
-        'oz-abandoned-rate': `${metrics.abandonedRate.toFixed(1)}%`,
-        'oz-timing-avg-aht': formatSeconds(metrics.averageAht),
-        'oz-timing-median-aht': formatSeconds(metrics.medianAht),
-        'oz-timing-p90-aht': formatSeconds(metrics.p90Aht),
-        'oz-timing-talk': formatSeconds(metrics.averageTalk),
-        'oz-timing-hold': formatSeconds(metrics.averageHold),
-        'oz-timing-queue-answered': formatSeconds(metrics.averageQueueAnswered),
-        'oz-timing-queue-unanswered': formatSeconds(metrics.averageQueueUnanswered),
-        'oz-progressive-attempted': metrics.progressiveAttempted.toLocaleString(),
-        'oz-progressive-answered': metrics.progressiveAnswered.toLocaleString(),
-        'oz-progressive-agent': metrics.progressiveAgent.toLocaleString(),
-        'oz-progressive-user': metrics.progressiveUser.toLocaleString(),
-        'oz-progressive-other': metrics.progressiveOther.toLocaleString(),
-        'oz-progressive-aht': formatSeconds(metrics.progressiveAht)
+        'hero-oz-total': metrics.inboundProgressive.toLocaleString(),
+        'hero-oz-inbound': metrics.inbound.toLocaleString(),
+        'hero-oz-progressive': metrics.progressive.toLocaleString(),
+        'hero-oz-connected': metrics.connected.toLocaleString(),
+        'hero-oz-abandoned': metrics.abandoned.toLocaleString(),
+        'hero-oz-abandoned-rate': `${metrics.abandonedRate.toFixed(1)}%`,
+        'hero-oz-aht': formatSeconds(metrics.averageAht),
+        'hero-oz-median': formatSeconds(metrics.medianAht),
+        'hero-oz-p90': formatSeconds(metrics.p90Aht),
+        'hero-oz-talk': formatSeconds(metrics.averageTalk),
+        'hero-oz-hold': formatSeconds(metrics.averageHold),
+        'hero-oz-queue-ans': formatSeconds(metrics.averageQueueAnswered),
+        'hero-oz-queue-unans': formatSeconds(metrics.averageQueueUnanswered),
+        'hero-oz-prog-attempted': metrics.progressiveAttempted.toLocaleString(),
+        'hero-oz-prog-answered': metrics.progressiveAnswered.toLocaleString(),
+        'hero-oz-prog-agent': metrics.progressiveAgent.toLocaleString(),
+        'hero-oz-prog-user': metrics.progressiveUser.toLocaleString(),
+        'hero-oz-prog-other': metrics.progressiveOther.toLocaleString(),
+        'hero-oz-prog-aht': formatSeconds(metrics.progressiveAht),
+        'pulse-oz-inbound': metrics.inbound.toLocaleString(),
+        'pulse-oz-progressive': metrics.progressive.toLocaleString(),
+        'pulse-oz-connected': metrics.connected.toLocaleString(),
+        'pulse-oz-abandoned': metrics.abandoned.toLocaleString(),
+        'pulse-oz-abandoned-rate': `${metrics.abandonedRate.toFixed(1)}%`,
+        'pulse-oz-prog-answered': metrics.progressiveAnswered.toLocaleString(),
+        'pulse-oz-prog-unanswered': progressiveUnanswered.toLocaleString(),
+        'pulse-oz-median-aht': formatSeconds(metrics.medianAht),
+        'pulse-oz-p90-aht': formatSeconds(metrics.p90Aht),
+        'pulse-oz-queue-unanswered': formatSeconds(metrics.averageQueueUnanswered),
+        'pulse-oz-talk': formatSeconds(metrics.averageTalk),
+        'pulse-oz-hold': formatSeconds(metrics.averageHold)
     };
     Object.entries(values).forEach(([id, value]) => {
         const element = document.getElementById(id);
         if (element) element.textContent = value;
     });
-    bindWeeklyMetricControls();
-    syncWeeklyMetricPanels();
 }
 
 function renderWeeklyPulseDashboard() {
