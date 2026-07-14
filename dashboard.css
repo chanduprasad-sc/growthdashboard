@@ -2220,6 +2220,116 @@ body.light-mode .agent-breaks-breakdown-wrapper {
 .sub-tab-content { display: none; }
 .sub-tab-content.active { display: block; }
 
+.daily-tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.daily-tool-card {
+    min-height: 154px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.daily-tool-card__body {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+}
+
+.daily-tool-card__icon {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: rgba(var(--accent-primary-rgb), 0.12);
+    color: var(--accent-primary);
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.daily-tool-card h4 {
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+}
+
+.daily-tool-card p {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+}
+
+.daily-tool-card__action {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 0;
+    border-radius: 8px;
+    background: #1d4ed8;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 650;
+    text-decoration: none;
+}
+
+#important-sheets-grid .daily-tool-card__icon {
+    background: rgba(var(--accent-green-rgb), 0.12);
+    color: var(--accent-green);
+}
+
+#important-sheets-grid .daily-tool-card__action {
+    background: #047857;
+}
+
+.daily-tool-card__action:hover {
+    filter: brightness(0.92);
+}
+
+.daily-tool-card__action:focus-visible {
+    outline: 3px solid rgba(var(--accent-primary-rgb), 0.3);
+    outline-offset: 2px;
+}
+
+.daily-tools-empty {
+    grid-column: 1 / -1;
+    min-height: 130px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px dashed var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.daily-tools-empty strong {
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.daily-tools-empty span {
+    max-width: 58ch;
+    font-size: 0.82rem;
+}
+
 /* --- Channel Summary Cards (Main Dashboard Overview) --- */
 .channel-summary-grid {
     display: grid;
@@ -5434,5 +5544,3 @@ body.light-mode .modal-badge-info {
     background: rgba(31, 122, 224, 0.06) !important;
     border: 1px solid rgba(31, 122, 224, 0.15) !important;
 }
-
-

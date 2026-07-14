@@ -1210,6 +1210,60 @@ for call in calls:
         "call_type": call.get("call_type", "")
     })
 
+# -------------------------------------------------------------
+# DAILY TOOLS — SHEET-BACKED LINKS
+# -------------------------------------------------------------
+def read_named_url_pairs(sheet_name, label_index, url_index):
+    try:
+        df = pd.read_excel(excel_path, sheet_name=sheet_name, header=None)
+    except Exception as exc:
+        print(f"Warning: unable to read {sheet_name}: {exc}")
+        return []
+
+    items = []
+    seen = set()
+    for row in df.itertuples(index=False, name=None):
+        if len(row) <= max(label_index, url_index):
+            continue
+        label = clean_str(row[label_index])
+        url = clean_str(row[url_index])
+        if not label or not re.match(r'^https?://', url, re.IGNORECASE):
+            continue
+        key = (label.lower(), url.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append({"name": label, "url": url})
+    return items
+
+important_links = read_named_url_pairs("Important links", 0, 1)
+important_sheets = read_named_url_pairs("Important links", 6, 7)
+
+redash_queries = []
+try:
+    redash_df = pd.read_excel(excel_path, sheet_name="Redash")
+    redash_columns = {str(col).strip().lower().replace(" ", ""): col for col in redash_df.columns}
+    for _, row in redash_df.iterrows():
+        def redash_value(key):
+            column = redash_columns.get(key)
+            return clean_str(row.get(column)) if column is not None else ""
+        query_id = redash_value("queryid")
+        name = redash_value("name")
+        url = redash_value("querylink")
+        if not name and not query_id:
+            continue
+        redash_queries.append({
+            "id": query_id,
+            "name": name,
+            "description": redash_value("description"),
+            "url": url,
+            "created_at": redash_value("createdat"),
+            "updated_at": redash_value("updatedat"),
+            "author": redash_value("author")
+        })
+except Exception as exc:
+    print(f"Warning: unable to read Redash: {exc}")
+
 # Structure the output file
 dashboard_data = {
     "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -1221,7 +1275,10 @@ dashboard_data = {
     "top_themes": top_themes,
     "recent_comments": recent_comments,
     "poc_mappings": poc_mappings,
-    "agent_scorecards": agent_scorecards
+    "agent_scorecards": agent_scorecards,
+    "redashQueries": redash_queries,
+    "importantLinks": important_links,
+    "importantSheets": important_sheets
 }
 
 with open(output_json_path, 'w', encoding='utf-8') as f:

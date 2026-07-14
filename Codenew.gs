@@ -18,6 +18,7 @@ var DEVREV_INTERNAL_CONVERSATIONS_LIST = "https://app.devrev.ai/api/gateway/inte
 // ── CACHE FILE ────────────────────────────────────────────────
 var CACHE_FILE_NAME = "smallcase_dashboard_cache.json";
 var BACKFILL_PROGRESS_KEY = "devrev_backfill_last_completed_date";
+var IMPORTANT_LINKS_SHEET_NAME = "Important links";
 
 // ── SHEET NAMES ───────────────────────────────────────────────
 var SHEET_NAMES = {
@@ -1865,6 +1866,8 @@ careEmails: compactRowsForCache(readSlimSheet(SHEET_NAMES.careEmails, CACHE_COLS
 breaks: compactRowsForCache(readSlimSheet(SHEET_NAMES.breaks, CACHE_COLS.breaks), "breaks"),
 pocBranches: readPocBranchSheet(),
 redashQueries: readRedashQueries(),
+importantLinks: readNamedUrlPairs(IMPORTANT_LINKS_SHEET_NAME, 1, 2),
+importantSheets: readNamedUrlPairs(IMPORTANT_LINKS_SHEET_NAME, 7, 8),
 builtAt: Utilities.formatDate(new Date(), "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " IST",
 rowCounts: {}
 };
@@ -1875,6 +1878,8 @@ payload.rowCounts.careEmails = payload.careEmails.length;
 payload.rowCounts.breaks = payload.breaks.length;
 payload.rowCounts.pocBranches = payload.pocBranches.length;
 payload.rowCounts.redashQueries = payload.redashQueries.length;
+payload.rowCounts.importantLinks = payload.importantLinks.length;
+payload.rowCounts.importantSheets = payload.importantSheets.length;
 
 getCacheFile().setContent(JSON.stringify(payload));
 
@@ -1892,7 +1897,7 @@ var file = getCacheFile();
 var content = file.getBlob().getDataAsString();
 if (!content || content === "{}") { Logger.log("Cache empty — reading sheets directly"); return buildAndReturn(); }
 var data = JSON.parse(content);
-if (!data.calls || !data.callTkts || !data.redashQueries) { Logger.log("Cache malformed or outdated — rebuilding"); return buildAndReturn(); }
+if (!data.calls || !data.callTkts || !data.redashQueries || !data.importantLinks || !data.importantSheets) { Logger.log("Cache malformed or outdated — rebuilding"); return buildAndReturn(); }
 Logger.log("Serving from cache (built: " + (data.builtAt || "unknown") + ")");
 return data;
 } catch(e) {
@@ -1924,7 +1929,7 @@ var existing = ScriptApp.getProjectTriggers();
 var deleted = 0;
 existing.forEach(function(t) {
 var fn = t.getHandlerFunction();
-if (["buildDashboardCache","onChangeHandler","autoRebuildAfterPaste","syncDevRevNow","syncDevRevHourly","syncDevRevYesterdayIST","syncDevRevDayWindowIST"].indexOf(fn) !== -1) {
+if (["buildDashboardCache","refreshDailyToolsCache","onChangeHandler","autoRebuildAfterPaste","syncDevRevNow","syncDevRevHourly","syncDevRevYesterdayIST","syncDevRevDayWindowIST"].indexOf(fn) !== -1) {
 ScriptApp.deleteTrigger(t); deleted++;
 }
 });
@@ -1944,6 +1949,10 @@ ScriptApp.newTrigger("onChangeHandler")
 .onChange()
 .create();
 
+// 4. Daily Tools: refresh Redash, Important Links, and Important Sheets cache daily.
+ScriptApp.newTrigger("refreshDailyToolsCache").timeBased().everyDays(1).atHour(7).nearMinute(30).create();
+Logger.log("Daily Tools cache refresh trigger created (7:30)");
+
 Logger.log("All triggers created successfully. Check View > Logs for confirmation.");
 
 // Try to show UI alert — works when run from sheet menu, silently skips when run from editor
@@ -1953,6 +1962,7 @@ SpreadsheetApp.getUi().alert(
 "Active schedule (project time zone — set to Asia/Kolkata for IST):\n\n" +
 " 8:00 AM daily — DevRev: yesterday created + yesterday modified open items\n" +
 " 4:30 PM daily — DevRev: today 8:00 to 4:30 window + modified open items\n" +
+" 7:30 AM daily — Daily Tools: Redash, Important Links and Important Sheets\n" +
 " On Ozonetel paste (~15s) — Auto date-fix + cache rebuild\n\n" +
 "Next: Open Support Dashboard menu → 📥 Full Backfill from Jan 1 2026",
 SpreadsheetApp.getUi().ButtonSet.OK
@@ -1964,6 +1974,12 @@ Logger.log("Triggers created. (UI alert skipped — run from Sheet menu for the 
 
 function setupDailyTriggers() { setupAllTriggers(); }
 function setupDailyTrigger() { setupAllTriggers(); }
+
+function refreshDailyToolsCache() {
+  var result = buildDashboardCache();
+  Logger.log("Daily Tools cache refreshed: " + result.builtAt);
+  return result;
+}
 
 function listTriggers() {
 var triggers = ScriptApp.getProjectTriggers();
@@ -2005,7 +2021,10 @@ var msg = "Built at: " + result.builtAt + "\n\n" +
 " Calls: " + result.rowCounts.calls + "\n" +
 " Call Tickets: " + result.rowCounts.callTkts + "\n" +
 " WhatsApp: " + result.rowCounts.whatsapp + "\n" +
-" Care Emails: " + result.rowCounts.careEmails + "\n\n" +
+" Care Emails: " + result.rowCounts.careEmails + "\n" +
+" Redash Queries: " + result.rowCounts.redashQueries + "\n" +
+" Important Links: " + result.rowCounts.importantLinks + "\n" +
+" Important Sheets: " + result.rowCounts.importantSheets + "\n\n" +
 "Built in " + result.elapsed + "s.\nReload the dashboard to see new data.";
 Logger.log(msg);
 try { SpreadsheetApp.getUi().alert("Cache Rebuilt", msg, SpreadsheetApp.getUi().ButtonSet.OK); } catch(e) {}
@@ -2135,15 +2154,15 @@ var REBUILD_LOCK_KEY = "rebuildQueued";
 
 function onChangeHandler(e) {
 try {
-if (e && e.changeType !== "INSERT_ROWS" && e.changeType !== "OTHER") return;
+if (e && ["EDIT", "INSERT_ROWS", "OTHER"].indexOf(e.changeType) === -1) return;
 var ss = SpreadsheetApp.getActiveSpreadsheet();
 var sheetName = ss.getActiveSheet().getName();
-var watched = [SHEET_NAMES.calls, SHEET_NAMES.callTkts, SHEET_NAMES.whatsapp, SHEET_NAMES.careEmails, SHEET_NAMES.breaks];
+var watched = [SHEET_NAMES.calls, SHEET_NAMES.callTkts, SHEET_NAMES.whatsapp, SHEET_NAMES.careEmails, SHEET_NAMES.breaks, SHEET_NAMES.redash, IMPORTANT_LINKS_SHEET_NAME];
 if (watched.indexOf(sheetName) === -1) return;
 var cache = CacheService.getScriptCache();
 if (cache.get(REBUILD_LOCK_KEY)) { Logger.log("Rebuild already queued — skipping"); return; }
 cache.put(REBUILD_LOCK_KEY, "1", 60);
-Logger.log("Paste detected in " + sheetName + " — scheduling rebuild in 15s");
+Logger.log("Source-sheet change detected in " + sheetName + " — scheduling rebuild in 15s");
 ScriptApp.newTrigger("autoRebuildAfterPaste").timeBased().after(15 * 1000).create();
 } catch(err) { Logger.log("onChangeHandler error: " + err.message); }
 }
@@ -2210,6 +2229,41 @@ function fixAllDatesSilent() {
 // ================================================================
 // REDASH FAVORITE QUERIES SYNC
 // ================================================================
+function readNamedUrlPairs(sheetName, labelColumn, urlColumn) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() < 1) return [];
+
+    var lastRow = sheet.getLastRow();
+    var labels = sheet.getRange(1, labelColumn, lastRow, 1).getDisplayValues();
+    var urlRange = sheet.getRange(1, urlColumn, lastRow, 1);
+    var urlValues = urlRange.getDisplayValues();
+    var richUrlValues = urlRange.getRichTextValues();
+    var list = [];
+    var seen = {};
+
+    for (var r = 0; r < lastRow; r++) {
+      var label = String(labels[r][0] || "").trim();
+      var url = String(urlValues[r][0] || "").trim();
+      var richValue = richUrlValues[r][0];
+      var richUrl = richValue ? richValue.getLinkUrl() : "";
+      if (richUrl) url = richUrl;
+
+      // Header rows, notes, and incomplete pairs are intentionally ignored.
+      if (!label || !/^https?:\/\//i.test(url)) continue;
+      var key = (label + "||" + url).toLowerCase();
+      if (seen[key]) continue;
+      seen[key] = true;
+      list.push({ name: label, url: url });
+    }
+    return list;
+  } catch (e) {
+    Logger.log("Error reading " + sheetName + " columns " + labelColumn + "/" + urlColumn + ": " + e.message);
+    return [];
+  }
+}
+
 function getUiSafe() {
   try {
     return SpreadsheetApp.getUi();

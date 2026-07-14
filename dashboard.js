@@ -1572,7 +1572,9 @@ function compileRawCache(cache) {
         "recent_comments": recent_comments,
         "poc_mappings": poc_mappings,
         "agent_scorecards": agent_scorecards,
-        "redashQueries": cache.redashQueries || []
+        "redashQueries": cache.redashQueries || [],
+        "importantLinks": cache.importantLinks || [],
+        "importantSheets": cache.importantSheets || []
     };
 }
 
@@ -1949,7 +1951,9 @@ async function loadDashboardData() {
                 recent_comments: [],
                 poc_mappings: [],
                 agent_scorecards: [],
-                redashQueries: []
+                redashQueries: [],
+                importantLinks: [],
+                importantSheets: []
             };
         }
 
@@ -11506,6 +11510,11 @@ function renderDailyToolsTab() {
         }
     }
 
+    // Keep the sheet-backed panels current even while they are hidden so stale
+    // hardcoded fallback cards never flash when a sub-tab is opened.
+    renderNamedLinks('important-links-grid', rawData.importantLinks || [], 'link');
+    renderNamedLinks('important-sheets-grid', rawData.importantSheets || [], 'sheet');
+
     if (dtActiveSubTab === 'dt-redash') {
         renderRedashQueries();
     } else if (dtActiveSubTab === 'dt-clickup') {
@@ -11535,13 +11544,13 @@ function renderRedashQueries() {
 
     grid.innerHTML = filtered.map(item => {
         const desc = item.description ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">${escapeHtml(item.description)}</p>` : '';
-        const queryUrl = item.url || `https://redash.util.smallcase.com/queries/${item.id}`;
+        const queryUrl = getSafeExternalUrl(item.url) || `https://redash.util.smallcase.com/queries/${encodeURIComponent(item.id || '')}`;
         return `
             <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; position: relative;">
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                         <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-right: 10px;">${escapeHtml(item.name || 'Unnamed Query')}</h4>
-                        <span style="font-size: 0.75rem; padding: 2px 6px; background: rgba(31, 122, 224, 0.15); color: var(--accent-primary); border-radius: 4px; font-weight: 500;">ID: ${item.id}</span>
+                        <span style="font-size: 0.75rem; padding: 2px 6px; background: rgba(31, 122, 224, 0.15); color: var(--accent-primary); border-radius: 4px; font-weight: 500;">ID: ${escapeHtml(item.id)}</span>
                     </div>
                     ${desc}
                     <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 20px;">
@@ -11549,13 +11558,61 @@ function renderRedashQueries() {
                     </div>
                 </div>
                 <div>
-                    <a href="${queryUrl}" target="_blank" class="action-btn" style="width: 100%; padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; text-align: center; box-shadow: 0 4px 12px rgba(31, 122, 224, 0.25);">
+                    <a href="${escapeHtml(queryUrl)}" target="_blank" rel="noopener noreferrer" class="action-btn" style="width: 100%; padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; text-align: center; box-shadow: 0 4px 12px rgba(31, 122, 224, 0.25);">
                         <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24"><path fill="currentColor" d="M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"/></svg>
                         Open Query in Redash
                     </a>
                 </div>
             </div>
         `;
+    }).join('');
+}
+
+function getSafeExternalUrl(value) {
+    try {
+        const url = new URL(String(value || '').trim());
+        return (url.protocol === 'https:' || url.protocol === 'http:') ? url.href : '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function renderNamedLinks(targetId, items, kind) {
+    const grid = document.getElementById(targetId);
+    if (!grid) return;
+
+    const sourceRange = kind === 'sheet' ? 'G:H' : 'A:B';
+    const validItems = (Array.isArray(items) ? items : []).map(item => ({
+        name: String(item && (item.name || item.label || item.title) || '').trim(),
+        url: getSafeExternalUrl(item && (item.url || item.link))
+    })).filter(item => item.name && item.url);
+
+    if (!validItems.length) {
+        grid.innerHTML = `
+            <div class="daily-tools-empty">
+                <strong>No ${kind === 'sheet' ? 'important sheets' : 'important links'} found</strong>
+                <span>Add a name and URL in the “Important links” subsheet columns ${sourceRange}.</span>
+            </div>`;
+        return;
+    }
+
+    const icon = kind === 'sheet' ? '▦' : '↗';
+    const actionLabel = kind === 'sheet' ? 'Open sheet' : 'Open link';
+    grid.innerHTML = validItems.map(item => {
+        const hostname = new URL(item.url).hostname.replace(/^www\./, '');
+        return `
+            <article class="daily-tool-card card">
+                <div class="daily-tool-card__body">
+                    <span class="daily-tool-card__icon" aria-hidden="true">${icon}</span>
+                    <div>
+                        <h4>${escapeHtml(item.name)}</h4>
+                        <p>${escapeHtml(hostname)}</p>
+                    </div>
+                </div>
+                <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="action-btn daily-tool-card__action" aria-label="${escapeHtml(actionLabel + ': ' + item.name)}">
+                    ${actionLabel}<span aria-hidden="true">↗</span>
+                </a>
+            </article>`;
     }).join('');
 }
 
