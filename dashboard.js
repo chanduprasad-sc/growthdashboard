@@ -262,6 +262,8 @@ let currentTab = 'tab-weekly-pulse';
 let weeklyMetricSource = 'devrev';
 let weeklyOzonetelGroup = 'volume';
 let activityViewMode = 'branch';
+let metricDeepDiveView = 'rm';
+let metricDeepDiveState = null;
 let activeFilters = {
     datePreset: 'week', // default is Current Week (Monday to Sunday)
     dateFrom: '',
@@ -3589,10 +3591,11 @@ function renderSLAAtRiskAlerts() {
     const data = rawData.support_interactions;
     const now = new Date().getTime();
     const alerts = [];
+    const terminalStages = new Set(['completed', 'resolved', 'closed', 'cancelled', 'canceled', 'archived', 'done']);
 
     data.forEach(item => {
-        const isClosed = ['completed', 'resolved', 'closed'].includes((item.stage || '').toLowerCase());
-        if (isClosed) return;
+        const stage = String(item.stage || item.status || '').trim().toLowerCase();
+        if (terminalStages.has(stage)) return;
 
         if (!item.date) return;
         const itemTs = safeParseDate(item.date).getTime();
@@ -5917,193 +5920,174 @@ function openPocDeepDiveModal(pocName) {
     modal.classList.add('open');
 }
 
-function openMetricDeepDiveModal(type, title) {
-    const modal = document.getElementById('metrics-modal');
-    if (!modal) return;
+function getDeepDiveCallStatus(item) {
+    let status = String(item.call_status || item.stage || '').toLowerCase();
+    if (!status || status === 'other') {
+        const title = String(item.title || '').toLowerCase();
+        if (title.includes('missed call')) status = 'missed';
+        else if (title.includes('aoh call')) status = 'aoh';
+        else if (title.includes('answered call')) status = 'answered';
+    }
+    return status;
+}
 
-    // Set Title and Subtitle
-    document.getElementById('metrics-modal-title').innerText = title;
-    
-    // We will build the table head and body dynamically
+function getMostFrequentDeepDiveValue(records, selector, fallback = 'Not shared') {
+    const counts = new Map();
+    records.forEach(record => {
+        const value = String(selector(record) || '').trim();
+        if (value && !['na', 'unknown', '-'].includes(value.toLowerCase())) counts.set(value, (counts.get(value) || 0) + 1);
+    });
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+    return top ? top[0] : fallback;
+}
+
+function renderMetricDeepDiveRMData() {
+    const { entries } = metricDeepDiveState;
+    const summary = document.getElementById('metrics-deepdive-summary');
     const tableHead = document.getElementById('metrics-modal-table-head');
     const tableBody = document.getElementById('metrics-modal-table-body');
-    const countEl = document.getElementById('metrics-modal-count');
-    
-    if (!tableHead || !tableBody || !countEl) return;
+    document.getElementById('metrics-modal-table-title').textContent = 'RM Frequency';
+    document.getElementById('metrics-modal-table-hint').textContent = 'Who contacted how many times';
+    summary.hidden = false;
 
-    tableHead.innerHTML = '';
-    tableBody.innerHTML = '';
+    const validUnique = selector => new Set(entries.map(selector).map(value => String(value || '').trim()).filter(value => value && !['na', 'unknown', '-', 'not shared'].includes(value.toLowerCase()))).size;
+    const issueCount = new Set(entries.map(item => String(item.issue || '').trim()).filter(Boolean)).size;
+    const cards = [
+        ['Total records', entries.length, 'RM-linked slice'],
+        ['Active RMs', validUnique(item => item.rm_name), 'Unique RM names'],
+        ['Active branches', validUnique(item => item.branch), 'Unique branches'],
+        ['Active POCs', validUnique(item => item.poc), 'Responsible branch owners'],
+        ['Brokers', validUnique(item => item.broker_family), 'Unique broker names'],
+        ['Issues', issueCount, 'Issue and sub-issue mix']
+    ];
+    summary.innerHTML = cards.map(([label, value, detail]) => `<div class="metrics-summary-item"><span>${escapeHtml(label)}</span><strong>${Number(value).toLocaleString()}</strong><small>${escapeHtml(detail)}</small></div>`).join('');
 
-    // Filter helpers
-    const interactions = window.viewModel ? window.viewModel.interactions : [];
-    const calls = window.viewModel ? window.viewModel.calls : [];
+    const groups = new Map();
+    entries.forEach(item => {
+        const rm = String(item.rm_name || '').trim() || 'NA';
+        if (!groups.has(rm)) groups.set(rm, []);
+        groups.get(rm).push(item);
+    });
+    const rows = [...groups.entries()].map(([rm, records]) => {
+        const activeDays = new Set(records.map(item => String(item.date || '').slice(0, 10)).filter(Boolean)).size;
+        return {
+            rm,
+            contacts: records.length,
+            activeDays,
+            contactsPerDay: activeDays ? records.length / activeDays : 0,
+            poc: getMostFrequentDeepDiveValue(records, item => item.poc),
+            branch: getMostFrequentDeepDiveValue(records, item => item.branch),
+            broker: getMostFrequentDeepDiveValue(records, item => item.broker_family),
+            issue: getMostFrequentDeepDiveValue(records, item => item.issue, 'General'),
+            subIssue: getMostFrequentDeepDiveValue(records, item => item.sub_issue, 'General'),
+            channel: getMostFrequentDeepDiveValue(records, item => item.channel || item.type || item.call_type, 'Voice Call')
+        };
+    }).sort((a, b) => b.contacts - a.contacts || a.rm.localeCompare(b.rm));
 
-    const formatSeconds = (sec) => {
-        if (sec === null || sec === undefined || isNaN(sec)) return '-';
-        const mins = Math.floor(sec / 60);
-        const secs = Math.round(sec % 60);
-        return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    };
+    tableHead.innerHTML = '<tr><th>RM Name</th><th>Contacts</th><th>Active days</th><th>Contacts/day</th><th>Top POC</th><th>Top branch</th><th>Top broker</th><th>Top issue</th><th>Top sub-issue</th><th>Top channel</th></tr>';
+    tableBody.innerHTML = rows.length ? rows.map(row => `<tr><td><strong>${escapeHtml(row.rm)}</strong></td><td>${row.contacts.toLocaleString()}</td><td>${row.activeDays}</td><td>${row.contactsPerDay.toFixed(1)}</td><td>${escapeHtml(row.poc)}</td><td>${escapeHtml(row.branch)}</td><td>${escapeHtml(row.broker)}</td><td>${escapeHtml(row.issue)}</td><td>${escapeHtml(row.subIssue)}</td><td>${escapeHtml(row.channel)}</td></tr>`).join('') : '<tr><td colspan="10" class="metric-deepdive-empty">No RM records found for this metric.</td></tr>';
+}
 
-    let entries = [];
+function renderMetricDeepDiveAgentPerformance() {
+    const { entries, isCallBased, filteredCalls } = metricDeepDiveState;
+    const summary = document.getElementById('metrics-deepdive-summary');
+    const tableHead = document.getElementById('metrics-modal-table-head');
+    const tableBody = document.getElementById('metrics-modal-table-body');
+    summary.hidden = true;
+    document.getElementById('metrics-modal-table-title').textContent = 'Agent Performance';
+    document.getElementById('metrics-modal-table-hint').textContent = 'Current owner-based metrics';
+
+    const groups = new Map();
+    entries.forEach(item => {
+        const agent = String(item.agent || '').trim() || 'Unassigned';
+        if (!groups.has(agent)) groups.set(agent, []);
+        groups.get(agent).push(item);
+    });
+    const rows = [...groups.entries()].map(([agent, records]) => {
+        const callTickets = isCallBased ? records.length : records.filter(item => item.type === 'Call Ticket').length;
+        const waRecords = isCallBased ? [] : records.filter(item => item.type === 'WhatsApp Chat');
+        const answered = records.filter(item => ['answered', 'connected'].includes(getDeepDiveCallStatus(item))).length;
+        const missedAoh = records.filter(item => ['missed', 'unanswered', 'abandoned', 'aoh'].includes(getDeepDiveCallStatus(item))).length;
+        const rateBase = answered + missedAoh;
+        const agentCalls = isCallBased
+            ? records.filter(call => ['answered', 'connected'].includes(String(call.stage || '').toLowerCase()))
+            : filteredCalls.filter(call => call.agent === agent && ['answered', 'connected'].includes(String(call.stage || '').toLowerCase()));
+        const average = (items, selector) => items.length ? items.reduce((sum, item) => sum + (Number(selector(item)) || 0), 0) / items.length : null;
+        return {
+            agent,
+            poc: getMostFrequentDeepDiveValue(records, item => item.poc),
+            total: records.length,
+            callTickets,
+            answered,
+            missedAoh,
+            answerRate: rateBase ? answered / rateBase * 100 : 0,
+            avgAht: average(agentCalls, getCallAhtSeconds),
+            wa: waRecords.length,
+            waResponse: average(waRecords.filter(item => Number(item.sla_frt) > 0), item => item.sla_frt),
+            waResolution: average(waRecords.filter(item => Number(item.sla_rt) > 0), item => item.sla_rt)
+        };
+    }).sort((a, b) => b.total - a.total || a.agent.localeCompare(b.agent));
+
+    tableHead.innerHTML = '<tr><th>Agent</th><th>Top POC</th><th>Total interactions</th><th>Call tickets</th><th>Ans</th><th>Miss/AOH</th><th>Ans rate</th><th>Avg AHT</th><th>WA chats</th><th>WA avg response</th><th>WA avg resolution</th></tr>';
+    tableBody.innerHTML = rows.length ? rows.map(row => {
+        const rateClass = row.answerRate >= 90 ? 'good' : row.answerRate >= 70 ? 'watch' : 'risk';
+        return `<tr><td><strong class="metric-agent-name">${escapeHtml(row.agent)}</strong></td><td>${escapeHtml(row.poc)}</td><td><strong>${row.total.toLocaleString()}</strong></td><td>${row.callTickets.toLocaleString()}</td><td><span class="metric-count metric-count--good">${row.answered}</span></td><td><span class="metric-count metric-count--risk">${row.missedAoh}</span></td><td><div class="metric-rate"><span><i class="${rateClass}" style="width:${Math.min(100, row.answerRate)}%"></i></span><strong>${row.answerRate.toFixed(1)}%</strong></div></td><td>${row.avgAht === null ? '—' : formatSeconds(row.avgAht)}</td><td>${row.wa.toLocaleString()}</td><td>${row.waResponse === null ? '—' : formatSeconds(row.waResponse)}</td><td>${row.waResolution === null ? '—' : formatSeconds(row.waResolution)}</td></tr>`;
+    }).join('') : '<tr><td colspan="11" class="metric-deepdive-empty">No agent-owned records found for this metric.</td></tr>';
+}
+
+function renderMetricDeepDiveView() {
+    if (!metricDeepDiveState) return;
+    const isRM = metricDeepDiveView === 'rm';
+    document.querySelectorAll('[data-metric-view]').forEach(button => {
+        const active = button.dataset.metricView === metricDeepDiveView;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+    });
+    document.getElementById('metrics-modal-title').textContent = `${metricDeepDiveState.title} — ${isRM ? 'RM Data' : 'Agent Performance'}`;
+    document.getElementById('metrics-modal-view-description').textContent = isRM
+        ? 'RM Data shows the contacted RMs, POCs, branches, issues and channels in this metric.'
+        : 'Agent Performance shows the current owner-based metrics with each agent’s dominant POC.';
+    if (isRM) renderMetricDeepDiveRMData();
+    else renderMetricDeepDiveAgentPerformance();
+}
+
+function openMetricDeepDiveModal(type, title) {
+    const modal = document.getElementById('metrics-modal');
+    if (!modal || !window.viewModel) return;
+    const interactions = window.viewModel.interactions || [];
+    const calls = window.viewModel.calls || [];
+    const dateFilter = title && title.includes('Interactions on') ? title.replace('Interactions on', '').trim() : null;
+    const filteredInteractions = dateFilter ? interactions.filter(item => item.date && item.date.substring(0, 10) === dateFilter) : interactions;
+    const filteredCalls = dateFilter ? calls.filter(call => call.date && call.date.substring(0, 10) === dateFilter) : calls;
+    const byStatus = status => filteredInteractions.filter(item => item.type === 'Call Ticket' && getDeepDiveCallStatus(item) === status);
+    let entries = filteredInteractions;
     let isCallBased = false;
-
-    // Support filtering by date from title if title contains "Interactions on YYYY-MM-DD"
-    let dateFilter = null;
-    if (title && title.includes('Interactions on')) {
-        dateFilter = title.replace('Interactions on', '').trim();
-    }
-
-    let filteredInteractions = interactions;
-    let filteredCalls = calls;
-    if (dateFilter) {
-        filteredInteractions = interactions.filter(item => item.date && item.date.substring(0, 10) === dateFilter);
-        filteredCalls = calls.filter(call => call.date && call.date.substring(0, 10) === dateFilter);
-    }
-
-    // Determine the data subset based on type
-    if (type === 'all' || type === 'interactions') {
-        entries = filteredInteractions;
-    } else if (type === 'tickets') {
-        entries = filteredInteractions.filter(item => item.type === 'Call Ticket');
-    } else if (type === 'whatsapp') {
-        entries = filteredInteractions.filter(item => item.type === 'WhatsApp Chat');
-    } else if (type === 'answered') {
-        entries = filteredInteractions.filter(item => {
-            if (item.type !== 'Call Ticket') return false;
-            let cs = String(item.call_status || "").toLowerCase();
-            if (cs === 'other' || !cs) {
-                const titleLower = (item.title || "").toLowerCase();
-                if (titleLower.includes('missed call')) cs = 'missed';
-                else if (titleLower.includes('aoh call')) cs = 'aoh';
-                else if (titleLower.includes('answered call')) cs = 'answered';
-            }
-            return cs === 'answered';
-        });
-    } else if (type === 'missed') {
-        entries = filteredInteractions.filter(item => {
-            if (item.type !== 'Call Ticket') return false;
-            let cs = String(item.call_status || "").toLowerCase();
-            if (cs === 'other' || !cs) {
-                const titleLower = (item.title || "").toLowerCase();
-                if (titleLower.includes('missed call')) cs = 'missed';
-                else if (titleLower.includes('aoh call')) cs = 'aoh';
-                else if (titleLower.includes('answered call')) cs = 'answered';
-            }
-            return cs === 'missed';
-        });
-    } else if (type === 'aoh') {
-        entries = filteredInteractions.filter(item => {
-            if (item.type !== 'Call Ticket') return false;
-            let cs = String(item.call_status || "").toLowerCase();
-            if (cs === 'other' || !cs) {
-                const titleLower = (item.title || "").toLowerCase();
-                if (titleLower.includes('missed call')) cs = 'missed';
-                else if (titleLower.includes('aoh call')) cs = 'aoh';
-                else if (titleLower.includes('answered call')) cs = 'answered';
-            }
-            return cs === 'aoh';
-        });
-    } else if (type === 'aht') {
-        // Average Handling Time is calculated from answered Ozonetel calls
-        entries = filteredCalls.filter(call => {
-            const st = String(call.stage || "").toLowerCase();
-            return st === 'answered' || st === 'connected';
-        });
+    if (type === 'tickets') entries = filteredInteractions.filter(item => item.type === 'Call Ticket');
+    else if (type === 'whatsapp') entries = filteredInteractions.filter(item => item.type === 'WhatsApp Chat');
+    else if (type === 'answered') entries = byStatus('answered');
+    else if (type === 'missed') entries = byStatus('missed');
+    else if (type === 'aoh') entries = byStatus('aoh');
+    else if (type === 'aht') {
+        entries = filteredCalls.filter(call => ['answered', 'connected'].includes(String(call.stage || '').toLowerCase()));
         isCallBased = true;
     } else if (type === 'aqt') {
-        // Average Queue Time is calculated over all Ozonetel calls (irrespective of stage)
         entries = filteredCalls;
         isCallBased = true;
     }
 
-    countEl.innerText = `${entries.length} Entries`;
-
-    // Populate headers & rows based on whether it is Ozonetel Call or support interaction
-    if (!isCallBased) {
-        // Setup Interactions headers
-        tableHead.innerHTML = `
-            <tr>
-                <th>Date</th>
-                <th>ID</th>
-                <th>Channel Type</th>
-                <th>Relationship Manager</th>
-                <th>Broker Family</th>
-                <th>Branch Location</th>
-                <th>Assigned POC</th>
-                <th>Issue / Comments</th>
-            </tr>
-        `;
-
-        if (entries.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="8" class="text-muted text-center" style="text-align: center; padding: 20px;">No support interaction records found.</td></tr>';
-        } else {
-            // Sort by Date descending
-            const sorted = [...entries].sort((a, b) => safeParseDate(b.date).getTime() - safeParseDate(a.date).getTime());
-            let html = '';
-            sorted.forEach(item => {
-                html += `
-                    <tr>
-                        <td>${item.date || '-'}</td>
-                        <td>${getDevRevLinkHTML(item.id, item.type)}</td>
-                        <td><span class="badge" style="background-color: ${item.type === 'WhatsApp Chat' ? '#10b981' : item.type === 'Care Email' ? '#f59e0b' : '#0ea5e9'}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.72rem;">${item.type}</span></td>
-                        <td><strong>${item.rm_name || '-'}</strong></td>
-                        <td>${item.broker_family || '-'}</td>
-                        <td><span class="badge badge-poc">${item.branch || '-'}</span></td>
-                        <td><strong>${item.poc || 'Unassigned'}</strong></td>
-                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.comments || item.title || ''}">${item.comments || item.title || '-'}</td>
-                    </tr>
-                `;
-            });
-            tableBody.innerHTML = html;
-        }
-    } else {
-        // Setup Call log headers
-        tableHead.innerHTML = `
-            <tr>
-                <th>Date</th>
-                <th>Call ID</th>
-                <th>Status</th>
-                <th>Caller No</th>
-                <th>RM Name</th>
-                <th>Broker Family</th>
-                <th>Support Agent</th>
-                <th class="text-right">Duration</th>
-                <th class="text-right">Queue Time</th>
-                <th class="text-right">Time to Answer</th>
-                <th>Recording</th>
-            </tr>
-        `;
-
-        if (entries.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="11" class="text-muted text-center" style="text-align: center; padding: 20px;">No raw voice call records found.</td></tr>';
-        } else {
-            // Sort by Date descending
-            const sorted = [...entries].sort((a, b) => safeParseDate(b.date).getTime() - safeParseDate(a.date).getTime());
-            let html = '';
-            sorted.forEach(call => {
-                const badgeClass = String(call.stage || "").toLowerCase() === 'answered' || String(call.stage || "").toLowerCase() === 'connected' ? 'text-green' : 'text-red';
-                html += `
-                    <tr>
-                        <td>${call.date || '-'}</td>
-                        <td><code>${call.id || '-'}</code></td>
-                        <td><span class="${badgeClass}">● ${call.stage || 'Unanswered'}</span></td>
-                        <td>${call.caller_no || '-'}</td>
-                        <td><strong>${call.rm_name || '-'}</strong></td>
-                        <td>${call.broker_family || '-'}</td>
-                        <td>${call.agent || 'System'}</td>
-                        <td class="text-right"><strong>${formatSeconds(call.duration)}</strong></td>
-                        <td class="text-right">${formatSeconds(call.queue_time)}</td>
-                        <td class="text-right">${formatSeconds(call.time_to_answer)}</td>
-                        <td>${call.recording_url ? `<a href="${call.recording_url}" target="_blank" class="text-blue" style="text-decoration: none;">🔗 Listen</a>` : '-'}</td>
-                    </tr>
-                `;
-            });
-            tableBody.innerHTML = html;
-        }
+    metricDeepDiveState = { type, title, entries, isCallBased, filteredCalls };
+    metricDeepDiveView = 'rm';
+    document.getElementById('metrics-modal-count').textContent = `${entries.length.toLocaleString()} Entries`;
+    if (modal.dataset.viewTabsBound !== 'true') {
+        modal.dataset.viewTabsBound = 'true';
+        modal.querySelector('.metrics-deepdive-switch').addEventListener('click', event => {
+            const button = event.target.closest('[data-metric-view]');
+            if (!button) return;
+            metricDeepDiveView = button.dataset.metricView;
+            renderMetricDeepDiveView();
+        });
     }
-
-    // Open Modal
+    renderMetricDeepDiveView();
     modal.classList.add('open');
 }
 
