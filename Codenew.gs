@@ -882,6 +882,8 @@ return filtered.map(function(r) { return mapCareEmailExportRow(r); });
 // DEVREV — WRITE TO SHEET (upsert / append-new-only)
 // ================================================================
 var DEVREV_WRITE_CHUNK_ROWS = 250;
+var SHEET_CAPACITY_BUFFER_ROWS = 1000;
+var SHEET_CAPACITY_LOW_WATERMARK = 200;
 
 function sanitizeDevRevSheetValue(col, val) {
 if (val === null || val === undefined) return "";
@@ -896,8 +898,24 @@ return val;
 }
 
 function ensureSheetSize(sheet, rows, cols) {
-if (sheet.getMaxRows() < rows) sheet.insertRowsAfter(sheet.getMaxRows(), rows - sheet.getMaxRows());
+var currentMaxRows = sheet.getMaxRows();
+var lastUsedRow = sheet.getLastRow();
+var requiredRows = Math.max(Number(rows) || 0, lastUsedRow);
+var isNearlyFull = currentMaxRows - lastUsedRow <= SHEET_CAPACITY_LOW_WATERMARK;
+if (currentMaxRows < requiredRows || isNearlyFull) {
+var desiredRows = Math.max(requiredRows, lastUsedRow + SHEET_CAPACITY_BUFFER_ROWS);
+var rowsToAdd = Math.ceil(Math.max(0, desiredRows - currentMaxRows) / SHEET_CAPACITY_BUFFER_ROWS) * SHEET_CAPACITY_BUFFER_ROWS;
+if (rowsToAdd > 0) sheet.insertRowsAfter(currentMaxRows, rowsToAdd);
+}
 if (sheet.getMaxColumns() < cols) sheet.insertColumnsAfter(sheet.getMaxColumns(), cols - sheet.getMaxColumns());
+}
+
+function ensureDashboardSheetCapacity(ss) {
+ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+[SHEET_NAMES.calls, SHEET_NAMES.callTkts, SHEET_NAMES.whatsapp, SHEET_NAMES.careEmails, SHEET_NAMES.breaks].forEach(function(sheetName) {
+var sheet = ss.getSheetByName(sheetName);
+if (sheet) ensureSheetSize(sheet, sheet.getLastRow(), sheet.getMaxColumns());
+});
 }
 
 function setValuesInChunks(sheet, startRow, startCol, values) {
@@ -925,6 +943,7 @@ function writeDevRevToSheet(ss, sheetName, newRows, colNames) {
 
   // Write header row if sheet is empty (also when API returns 0 rows — new sheet stays usable)
   if (data.length === 0 || (data.length === 1 && data[0][0] === "")) {
+    ensureSheetSize(sheet, 1, colNames.length);
     sheet.appendRow(colNames);
     data = [colNames];
   }
@@ -1017,6 +1036,7 @@ function writeDevRevToSheet(ss, sheetName, newRows, colNames) {
   // Batch append all new rows to the bottom of the sheet at once
   if (rowsToAppend.length > 0) {
     var startRow = sheet.getLastRow() + 1;
+    ensureSheetSize(sheet, startRow + rowsToAppend.length - 1, headers.length);
     sheet.getRange(startRow, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend);
   }
 
@@ -1857,6 +1877,7 @@ function getCacheFile() {
 function buildDashboardCache() {
 Logger.log("Building dashboard cache...");
 var start = Date.now();
+ensureDashboardSheetCapacity(SpreadsheetApp.getActiveSpreadsheet());
 
 var payload = {
 calls: compactRowsForCache(readSlimSheet(SHEET_NAMES.calls, CACHE_COLS.calls), "calls"),
@@ -2159,6 +2180,10 @@ var ss = SpreadsheetApp.getActiveSpreadsheet();
 var sheetName = ss.getActiveSheet().getName();
 var watched = [SHEET_NAMES.calls, SHEET_NAMES.callTkts, SHEET_NAMES.whatsapp, SHEET_NAMES.careEmails, SHEET_NAMES.breaks, SHEET_NAMES.redash, IMPORTANT_LINKS_SHEET_NAME];
 if (watched.indexOf(sheetName) === -1) return;
+var activeSheet = ss.getActiveSheet();
+if ([SHEET_NAMES.calls, SHEET_NAMES.callTkts, SHEET_NAMES.whatsapp, SHEET_NAMES.careEmails, SHEET_NAMES.breaks].indexOf(sheetName) !== -1) {
+ensureSheetSize(activeSheet, activeSheet.getLastRow(), activeSheet.getMaxColumns());
+}
 var cache = CacheService.getScriptCache();
 if (cache.get(REBUILD_LOCK_KEY)) { Logger.log("Rebuild already queued — skipping"); return; }
 cache.put(REBUILD_LOCK_KEY, "1", 60);
