@@ -7647,6 +7647,44 @@ function aggregateChartViz(data, dimensionKey, metricKey, limit = 18) {
     return { labels: points.map(point => point.label), values: points.map(point => point.value), points, totalGroups, dimension, metric };
 }
 
+function aggregateChartVizSeries(data, xDimensionKey, yDimensionKey, xLimit = 18, seriesLimit = 8) {
+    const xDimension = CHART_VIZ_DIMENSIONS[xDimensionKey] || CHART_VIZ_DIMENSIONS.date;
+    const yDimension = CHART_VIZ_DIMENSIONS[yDimensionKey] || CHART_VIZ_DIMENSIONS.issue;
+    const xTotals = new Map();
+    const yTotals = new Map();
+    const matrix = new Map();
+    data.forEach(item => {
+        const x = xDimension.get(item);
+        const y = yDimension.get(item);
+        xTotals.set(x, (xTotals.get(x) || 0) + 1);
+        yTotals.set(y, (yTotals.get(y) || 0) + 1);
+        const key = `${x}\u0000${y}`;
+        matrix.set(key, (matrix.get(key) || 0) + 1);
+    });
+    let labels = [...xTotals.keys()];
+    if (xDimensionKey === 'date') labels.sort((a, b) => a.localeCompare(b));
+    else labels.sort((a, b) => xTotals.get(b) - xTotals.get(a) || a.localeCompare(b));
+    if (xDimensionKey !== 'date' && xLimit) labels = labels.slice(0, xLimit);
+    const series = [...yTotals.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, seriesLimit)
+        .map(([label]) => ({ label, values: labels.map(x => matrix.get(`${x}\u0000${label}`) || 0) }));
+    let peak = null;
+    series.forEach(item => item.values.forEach((value, index) => {
+        if (!peak || value > peak.value) peak = { label: `${item.label} at ${labels[index]}`, value };
+    }));
+    return {
+        labels,
+        series,
+        points: peak ? [peak] : [],
+        dimension: xDimension,
+        seriesDimension: yDimension,
+        metric: CHART_VIZ_METRICS.count,
+        isSeries: true,
+        narrativePeak: peak
+    };
+}
+
 function setChartVizSelectOptions(select, options, selected) {
     if (!select) return selected;
     const current = selected;
@@ -7669,7 +7707,10 @@ function chartVizDistinctOptions(data, selector, allLabel, fallback) {
 
 function populateChartVizControls(baseData) {
     const dimensionOptions = Object.entries(CHART_VIZ_DIMENSIONS).map(([value, config]) => ({ value, label: config.label }));
-    const metricOptions = Object.entries(CHART_VIZ_METRICS).map(([value, config]) => ({ value, label: config.label }));
+    const metricOptions = [
+        ...Object.entries(CHART_VIZ_METRICS).map(([value, config]) => ({ value, label: config.label })),
+        ...Object.entries(CHART_VIZ_DIMENSIONS).map(([value, config]) => ({ value: `dimension:${value}`, label: `${config.label} (series)` }))
+    ];
     chartVizFilters.broker = setChartVizSelectOptions(document.getElementById('chart-viz-broker'), chartVizDistinctOptions(baseData, item => item.broker_family, 'All brokers', 'Not shared'), chartVizFilters.broker);
     chartVizFilters.poc = setChartVizSelectOptions(document.getElementById('chart-viz-poc'), chartVizDistinctOptions(baseData, item => item.poc, 'All POCs', 'Not shared'), chartVizFilters.poc);
     chartVizFilters.issue = setChartVizSelectOptions(document.getElementById('chart-viz-issue'), chartVizDistinctOptions(baseData, item => item.issue, 'All issue types', 'General'), chartVizFilters.issue);
@@ -7715,12 +7756,12 @@ function bindChartVizControls() {
     });
 }
 
-function chartVizBaseOptions(metric, isCategory = false) {
+function chartVizBaseOptions(metric, isCategory = false, showLegend = false) {
     return {
         responsive: true,
         maintainAspectRatio: false,
         interaction: { intersect: false, mode: 'index' },
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: showLegend, position: 'bottom', labels: { usePointStyle: true, boxWidth: 7, padding: 13 } } },
         scales: {
             x: { grid: { display: false }, ticks: { maxRotation: isCategory ? 36 : 0, minRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
             y: { beginAtZero: true, ticks: metric.duration ? { callback: value => formatSeconds(value) } : { precision: 0 } }
@@ -7730,30 +7771,50 @@ function chartVizBaseOptions(metric, isCategory = false) {
 
 function renderChartVizLine(index, data) {
     const config = chartVizLineConfigs[index];
-    const aggregation = aggregateChartViz(data, config.x, config.y);
+    const isSeries = String(config.y).startsWith('dimension:');
+    const yDimensionKey = isSeries ? config.y.replace('dimension:', '') : null;
+    const aggregation = isSeries
+        ? aggregateChartVizSeries(data, config.x, yDimensionKey)
+        : aggregateChartViz(data, config.x, config.y);
     const canvas = document.getElementById(`chart-viz-line-${index + 1}`);
     const title = document.getElementById(`chart-viz-line-title-${index + 1}`);
-    if (title) title.textContent = `${aggregation.metric.label} by ${aggregation.dimension.label.toLowerCase()}`;
+    if (title) title.textContent = isSeries
+        ? `${aggregation.seriesDimension.label} mix by ${aggregation.dimension.label.toLowerCase()}`
+        : `${aggregation.metric.label} by ${aggregation.dimension.label.toLowerCase()}`;
     if (!canvas) return aggregation;
+    const palette = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#64748b'];
+    const datasets = isSeries
+        ? aggregation.series.map((series, seriesIndex) => ({
+            label: series.label,
+            data: series.values,
+            borderColor: palette[seriesIndex % palette.length],
+            backgroundColor: palette[seriesIndex % palette.length],
+            pointRadius: aggregation.labels.length > 24 ? 1.5 : 2.5,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+            fill: false,
+            tension: config.x === 'date' ? .28 : .18
+        }))
+        : [{
+            label: aggregation.metric.label,
+            data: aggregation.values,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, .12)',
+            pointBackgroundColor: '#2563eb',
+            pointBorderWidth: 0,
+            pointRadius: aggregation.labels.length > 24 ? 1.5 : 3,
+            pointHoverRadius: 5,
+            borderWidth: 2.25,
+            fill: true,
+            tension: config.x === 'date' ? .28 : .18
+        }];
     chartVizCharts[`line${index + 1}`] = new Chart(canvas.getContext('2d'), {
         type: 'line',
         data: {
             labels: aggregation.labels,
-            datasets: [{
-                label: aggregation.metric.label,
-                data: aggregation.values,
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37, 99, 235, .12)',
-                pointBackgroundColor: '#2563eb',
-                pointBorderWidth: 0,
-                pointRadius: aggregation.labels.length > 24 ? 1.5 : 3,
-                pointHoverRadius: 5,
-                borderWidth: 2.25,
-                fill: true,
-                tension: config.x === 'date' ? .28 : .18
-            }]
+            datasets
         },
-        options: chartVizBaseOptions(aggregation.metric, config.x !== 'date')
+        options: chartVizBaseOptions(aggregation.metric, config.x !== 'date', isSeries)
     });
     return aggregation;
 }
@@ -7799,9 +7860,9 @@ function renderChartVizNarrative(data, aggregations) {
         chartVizFilters.subIssue === 'all' ? null : chartVizFilters.subIssue
     ].filter(Boolean);
     const peakCards = aggregations.map((aggregation, index) => {
-        const peak = aggregation.points.reduce((best, point) => !best || point.value > best.value ? point : best, null);
+        const peak = aggregation.narrativePeak || aggregation.points.reduce((best, point) => !best || point.value > best.value ? point : best, null);
         const statement = peak
-            ? `${aggregation.metric.label} peaks at <strong>${escapeHtml(peak.label)}</strong> with <strong>${chartVizFormatMetric(aggregation.metric, peak.value)}</strong>.`
+            ? `${aggregation.isSeries ? `${aggregation.seriesDimension.label} activity` : aggregation.metric.label} peaks at <strong>${escapeHtml(peak.label)}</strong> with <strong>${chartVizFormatMetric(aggregation.metric, peak.value)}</strong>.`
             : 'No plotted values are available for this axis combination.';
         return `<div class="chart-viz-narrative-point"><span>0${index + 1}</span><p>${statement}</p></div>`;
     }).join('');
