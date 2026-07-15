@@ -2896,6 +2896,7 @@ function switchTab(tabId) {
         'tab-monthly-view': 'Monthly View',
         'tab-agent-performance': 'Agent Performance',
         'tab-branch-broker-activity': 'Branch & Broker Activity',
+        'tab-chart-visualization': 'Chart Visualization',
         'tab-tickets-chats': 'Tickets & Chats',
         'tab-ai-summary': 'AI Summary',
         'tab-guide': 'Guide'
@@ -2909,6 +2910,7 @@ function switchTab(tabId) {
         'tab-monthly-view': 'Date-wise monthly metric aggregation',
         'tab-agent-performance': 'Agent workload, quality & productivity metrics',
         'tab-branch-broker-activity': 'POC-mapped branch and broker engagement',
+        'tab-chart-visualization': 'Build configurable visual stories from support activity',
         'tab-tickets-chats': 'Browsable registry of all support interactions',
         'tab-ai-summary': 'AI-powered narrative summaries & focus areas',
         'tab-guide': 'How to use this dashboard'
@@ -3556,6 +3558,8 @@ function buildViewModel() {
         renderAgentPerformance();
     } else if (currentTab === 'tab-branch-broker-activity') {
         renderBranchBrokerActivity();
+    } else if (currentTab === 'tab-chart-visualization') {
+        renderChartVisualization();
     } else if (currentTab === 'tab-tickets-chats') {
         renderTicketsChatsView();
     } else if (currentTab === 'tab-ai-summary') {
@@ -7517,11 +7521,310 @@ function formatSeconds(sec) {
 let mdCharts = {};
 let intelCharts = {};
 let agentPerfCharts = {};
+let chartVizCharts = {};
+
+const CHART_VIZ_DIMENSIONS = {
+    date: { label: 'Date', get: item => chartVizDateKey(item.date) },
+    broker_family: { label: 'Broker', get: item => chartVizValue(item.broker_family, 'Not shared') },
+    channel: { label: 'Channel', get: item => chartVizChannelLabel(item.type) },
+    issue: { label: 'Issue type', get: item => chartVizValue(item.issue, 'General') },
+    sub_issue: { label: 'Sub-issue type', get: item => chartVizValue(item.sub_issue, 'General') },
+    poc: { label: 'POC', get: item => chartVizValue(item.poc, 'Not shared') },
+    branch: { label: 'Branch', get: item => chartVizValue(item.branch, 'Not shared') },
+    agent: { label: 'Agent', get: item => chartVizValue(item.agent, 'Unassigned') }
+};
+
+const CHART_VIZ_METRICS = {
+    count: { label: 'Interactions', calculate: rows => rows.length },
+    unique_rms: { label: 'Unique RMs', calculate: rows => chartVizUniqueCount(rows, item => item.rm_name || item.RM_Name || item.rm) },
+    unique_branches: { label: 'Active branches', calculate: rows => chartVizUniqueCount(rows, item => item.branch) },
+    unique_pocs: { label: 'Active POCs', calculate: rows => chartVizUniqueCount(rows, item => item.poc) },
+    call_tickets: { label: 'Call tickets', calculate: rows => rows.filter(item => item.type === 'Call Ticket').length },
+    whatsapp: { label: 'WhatsApp conversations', calculate: rows => rows.filter(item => item.type === 'WhatsApp Chat').length },
+    care_emails: { label: 'Care emails', calculate: rows => rows.filter(item => item.type === 'Care Email').length },
+    answered: { label: 'Answered calls', calculate: rows => rows.filter(item => ['answered', 'connected'].includes(getDeepDiveCallStatus(item))).length },
+    missed: { label: 'Missed / abandoned calls', calculate: rows => rows.filter(item => ['missed', 'abandoned', 'aoh'].includes(getDeepDiveCallStatus(item))).length },
+    avg_frt: { label: 'Average first response', duration: true, calculate: rows => chartVizAverage(rows, item => item.sla_frt) },
+    avg_resolution: { label: 'Average resolution time', duration: true, calculate: rows => chartVizAverage(rows, item => item.sla_rt != null ? item.sla_rt : item.resolution_time) }
+};
+
+let chartVizFilters = { channel: 'all', broker: 'all', poc: 'all', issue: 'all', subIssue: 'all' };
+let chartVizLineConfigs = [
+    { x: 'date', y: 'count' },
+    { x: 'broker_family', y: 'count' },
+    { x: 'issue', y: 'unique_rms' },
+    { x: 'poc', y: 'unique_branches' }
+];
+let chartVizBarDimension = 'broker_family';
 
 function destroyChartGroup(group) {
     Object.keys(group).forEach(key => {
         if (group[key]) { group[key].destroy(); group[key] = null; }
     });
+}
+
+function chartVizValue(value, fallback) {
+    const normalized = String(value == null ? '' : value).trim();
+    return normalized && !['na', 'n/a', '-', 'unknown'].includes(normalized.toLowerCase()) ? normalized : fallback;
+}
+
+function chartVizDateKey(value) {
+    const parsed = safeParseDate(value);
+    if (!parsed || isNaN(parsed.getTime())) return 'Unknown date';
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function chartVizChannelLabel(type) {
+    if (type === 'WhatsApp Chat') return 'WhatsApp';
+    if (type === 'Care Email') return 'Care';
+    if (type === 'Call Ticket') return 'Call Tickets';
+    return chartVizValue(type, 'Other');
+}
+
+function chartVizUniqueCount(rows, selector) {
+    const values = new Set();
+    rows.forEach(item => {
+        const value = chartVizValue(selector(item), '');
+        if (value) values.add(value.toLowerCase());
+    });
+    return values.size;
+}
+
+function chartVizAverage(rows, selector) {
+    const values = rows.map(selector).map(Number).filter(value => Number.isFinite(value) && value > 0);
+    return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
+}
+
+function getChartVizUniversalData() {
+    if (!rawData || !Array.isArray(rawData.support_interactions)) return [];
+    const fromTs = window.viewModel ? window.viewModel.fromTs : 0;
+    const toTs = window.viewModel ? window.viewModel.toTs : Number.MAX_SAFE_INTEGER;
+    return rawData.support_interactions.filter(item => {
+        const parsed = safeParseDate(item.date);
+        if (!parsed || isNaN(parsed.getTime())) return false;
+        const timestamp = parsed.getTime();
+        if (timestamp < fromTs || timestamp > toTs) return false;
+        if (activeFilters.broker && !activeFilters.broker.includes('all') && !activeFilters.broker.includes(item.broker_family)) return false;
+        if (activeFilters.poc && !activeFilters.poc.includes('all') && !activeFilters.poc.includes(item.poc)) return false;
+        if (activeFilters.agent && !activeFilters.agent.includes('all') && !activeFilters.agent.includes(item.agent)) return false;
+        if (activeFilters.branch && activeFilters.branch !== 'all' && item.branch !== activeFilters.branch) return false;
+        if (activeFilters.hideSmallcaseRm && !activeFilters.hideSmallcaseRm.includes('none')) {
+            const rm = String(item.rm_name || item.RM_Name || item.rm || '').trim().toLowerCase();
+            if (String(item.branch || '').toLowerCase() === 'smallcase' && activeFilters.hideSmallcaseRm.some(value => String(value).trim().toLowerCase() === rm)) return false;
+        }
+        return true;
+    });
+}
+
+function getChartVizFilteredData(baseData) {
+    return baseData.filter(item => {
+        if (chartVizFilters.channel !== 'all' && item.type !== chartVizFilters.channel) return false;
+        if (chartVizFilters.broker !== 'all' && chartVizValue(item.broker_family, 'Not shared') !== chartVizFilters.broker) return false;
+        if (chartVizFilters.poc !== 'all' && chartVizValue(item.poc, 'Not shared') !== chartVizFilters.poc) return false;
+        if (chartVizFilters.issue !== 'all' && chartVizValue(item.issue, 'General') !== chartVizFilters.issue) return false;
+        if (chartVizFilters.subIssue !== 'all' && chartVizValue(item.sub_issue, 'General') !== chartVizFilters.subIssue) return false;
+        return true;
+    });
+}
+
+function aggregateChartViz(data, dimensionKey, metricKey, limit = 18) {
+    const dimension = CHART_VIZ_DIMENSIONS[dimensionKey] || CHART_VIZ_DIMENSIONS.date;
+    const metric = CHART_VIZ_METRICS[metricKey] || CHART_VIZ_METRICS.count;
+    const groups = new Map();
+    data.forEach(item => {
+        const key = dimension.get(item);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(item);
+    });
+    let points = [...groups.entries()].map(([label, rows]) => ({ label, value: metric.calculate(rows), rows: rows.length }));
+    if (dimensionKey === 'date') points.sort((a, b) => a.label.localeCompare(b.label));
+    else points.sort((a, b) => b.value - a.value || b.rows - a.rows || a.label.localeCompare(b.label));
+    const totalGroups = points.length;
+    if (dimensionKey !== 'date' && limit) points = points.slice(0, limit);
+    return { labels: points.map(point => point.label), values: points.map(point => point.value), points, totalGroups, dimension, metric };
+}
+
+function setChartVizSelectOptions(select, options, selected) {
+    if (!select) return selected;
+    const current = selected;
+    select.replaceChildren();
+    options.forEach(option => {
+        const element = document.createElement('option');
+        element.value = option.value;
+        element.textContent = option.label;
+        select.appendChild(element);
+    });
+    const available = options.some(option => option.value === current);
+    select.value = available ? current : options[0].value;
+    return select.value;
+}
+
+function chartVizDistinctOptions(data, selector, allLabel, fallback) {
+    const values = [...new Set(data.map(item => chartVizValue(selector(item), fallback)))].sort((a, b) => a.localeCompare(b));
+    return [{ value: 'all', label: allLabel }, ...values.map(value => ({ value, label: value }))];
+}
+
+function populateChartVizControls(baseData) {
+    const dimensionOptions = Object.entries(CHART_VIZ_DIMENSIONS).map(([value, config]) => ({ value, label: config.label }));
+    const metricOptions = Object.entries(CHART_VIZ_METRICS).map(([value, config]) => ({ value, label: config.label }));
+    chartVizFilters.broker = setChartVizSelectOptions(document.getElementById('chart-viz-broker'), chartVizDistinctOptions(baseData, item => item.broker_family, 'All brokers', 'Not shared'), chartVizFilters.broker);
+    chartVizFilters.poc = setChartVizSelectOptions(document.getElementById('chart-viz-poc'), chartVizDistinctOptions(baseData, item => item.poc, 'All POCs', 'Not shared'), chartVizFilters.poc);
+    chartVizFilters.issue = setChartVizSelectOptions(document.getElementById('chart-viz-issue'), chartVizDistinctOptions(baseData, item => item.issue, 'All issue types', 'General'), chartVizFilters.issue);
+    const issueSlice = chartVizFilters.issue === 'all' ? baseData : baseData.filter(item => chartVizValue(item.issue, 'General') === chartVizFilters.issue);
+    chartVizFilters.subIssue = setChartVizSelectOptions(document.getElementById('chart-viz-subissue'), chartVizDistinctOptions(issueSlice, item => item.sub_issue, 'All sub-issue types', 'General'), chartVizFilters.subIssue);
+    const channel = document.getElementById('chart-viz-channel');
+    if (channel) channel.value = chartVizFilters.channel;
+    chartVizLineConfigs.forEach((config, index) => {
+        config.x = setChartVizSelectOptions(document.getElementById(`chart-viz-x-${index + 1}`), dimensionOptions, config.x);
+        config.y = setChartVizSelectOptions(document.getElementById(`chart-viz-y-${index + 1}`), metricOptions, config.y);
+    });
+    chartVizBarDimension = setChartVizSelectOptions(document.getElementById('chart-viz-bar-dimension'), dimensionOptions.filter(option => option.value !== 'date'), chartVizBarDimension);
+}
+
+function bindChartVizControls() {
+    const section = document.getElementById('tab-chart-visualization');
+    if (!section || section.dataset.controlsBound === 'true') return;
+    section.dataset.controlsBound = 'true';
+    const filterBindings = [
+        ['chart-viz-channel', 'channel'], ['chart-viz-broker', 'broker'], ['chart-viz-poc', 'poc'],
+        ['chart-viz-issue', 'issue'], ['chart-viz-subissue', 'subIssue']
+    ];
+    filterBindings.forEach(([id, key]) => {
+        const control = document.getElementById(id);
+        if (control) control.addEventListener('change', () => {
+            chartVizFilters[key] = control.value;
+            if (key === 'issue') chartVizFilters.subIssue = 'all';
+            renderChartVisualization();
+        });
+    });
+    chartVizLineConfigs.forEach((config, index) => {
+        const x = document.getElementById(`chart-viz-x-${index + 1}`);
+        const y = document.getElementById(`chart-viz-y-${index + 1}`);
+        if (x) x.addEventListener('change', () => { config.x = x.value; renderChartVisualization(); });
+        if (y) y.addEventListener('change', () => { config.y = y.value; renderChartVisualization(); });
+    });
+    const bar = document.getElementById('chart-viz-bar-dimension');
+    if (bar) bar.addEventListener('change', () => { chartVizBarDimension = bar.value; renderChartVisualization(); });
+    const reset = document.getElementById('chart-viz-reset');
+    if (reset) reset.addEventListener('click', () => {
+        chartVizFilters = { channel: 'all', broker: 'all', poc: 'all', issue: 'all', subIssue: 'all' };
+        renderChartVisualization();
+    });
+}
+
+function chartVizBaseOptions(metric, isCategory = false) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false }, ticks: { maxRotation: isCategory ? 36 : 0, minRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+            y: { beginAtZero: true, ticks: metric.duration ? { callback: value => formatSeconds(value) } : { precision: 0 } }
+        }
+    };
+}
+
+function renderChartVizLine(index, data) {
+    const config = chartVizLineConfigs[index];
+    const aggregation = aggregateChartViz(data, config.x, config.y);
+    const canvas = document.getElementById(`chart-viz-line-${index + 1}`);
+    const title = document.getElementById(`chart-viz-line-title-${index + 1}`);
+    if (title) title.textContent = `${aggregation.metric.label} by ${aggregation.dimension.label.toLowerCase()}`;
+    if (!canvas) return aggregation;
+    chartVizCharts[`line${index + 1}`] = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: aggregation.labels,
+            datasets: [{
+                label: aggregation.metric.label,
+                data: aggregation.values,
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, .12)',
+                pointBackgroundColor: '#2563eb',
+                pointBorderWidth: 0,
+                pointRadius: aggregation.labels.length > 24 ? 1.5 : 3,
+                pointHoverRadius: 5,
+                borderWidth: 2.25,
+                fill: true,
+                tension: config.x === 'date' ? .28 : .18
+            }]
+        },
+        options: chartVizBaseOptions(aggregation.metric, config.x !== 'date')
+    });
+    return aggregation;
+}
+
+function renderChartVizSupportCharts(data) {
+    const barAggregation = aggregateChartViz(data, chartVizBarDimension, 'count', 12);
+    const barTitle = document.getElementById('chart-viz-bar-title');
+    if (barTitle) barTitle.textContent = `Top ${barAggregation.dimension.label.toLowerCase()} by interactions`;
+    const barCanvas = document.getElementById('chart-viz-bar');
+    if (barCanvas) chartVizCharts.bar = new Chart(barCanvas.getContext('2d'), {
+        type: 'bar',
+        data: { labels: barAggregation.labels, datasets: [{ label: 'Interactions', data: barAggregation.values, backgroundColor: '#0f9f8f', borderRadius: 5, maxBarThickness: 34 }] },
+        options: chartVizBaseOptions(CHART_VIZ_METRICS.count, true)
+    });
+    const channelAggregation = aggregateChartViz(data, 'channel', 'count', 0);
+    const pieCanvas = document.getElementById('chart-viz-pie');
+    if (pieCanvas) chartVizCharts.pie = new Chart(pieCanvas.getContext('2d'), {
+        type: 'doughnut',
+        data: { labels: channelAggregation.labels, datasets: [{ data: channelAggregation.values, backgroundColor: ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6'], borderWidth: 0, hoverOffset: 5 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } } } }
+    });
+}
+
+function chartVizFormatMetric(metric, value) {
+    return metric.duration ? formatSeconds(value) : Number(value || 0).toLocaleString('en-IN');
+}
+
+function renderChartVizNarrative(data, aggregations) {
+    const target = document.getElementById('chart-viz-narrative-body');
+    if (!target) return;
+    if (!data.length) {
+        target.innerHTML = '<div class="chart-viz-empty"><strong>No matching activity</strong><span>Broaden one or more visualization filters while keeping the universal date range.</span></div>';
+        return;
+    }
+    const activeDays = chartVizUniqueCount(data, item => chartVizDateKey(item.date));
+    const channel = aggregateChartViz(data, 'channel', 'count', 0).points[0];
+    const broker = aggregateChartViz(data, 'broker_family', 'count', 1).points[0];
+    const selectedFilters = [
+        chartVizFilters.channel === 'all' ? 'Combined channels' : chartVizChannelLabel(chartVizFilters.channel),
+        chartVizFilters.broker === 'all' ? null : chartVizFilters.broker,
+        chartVizFilters.poc === 'all' ? null : chartVizFilters.poc,
+        chartVizFilters.issue === 'all' ? null : chartVizFilters.issue,
+        chartVizFilters.subIssue === 'all' ? null : chartVizFilters.subIssue
+    ].filter(Boolean);
+    const peakCards = aggregations.map((aggregation, index) => {
+        const peak = aggregation.points.reduce((best, point) => !best || point.value > best.value ? point : best, null);
+        const statement = peak
+            ? `${aggregation.metric.label} peaks at <strong>${escapeHtml(peak.label)}</strong> with <strong>${chartVizFormatMetric(aggregation.metric, peak.value)}</strong>.`
+            : 'No plotted values are available for this axis combination.';
+        return `<div class="chart-viz-narrative-point"><span>0${index + 1}</span><p>${statement}</p></div>`;
+    }).join('');
+    target.innerHTML = `
+        <div class="chart-viz-narrative-overview">
+            <p><strong>${data.length.toLocaleString('en-IN')} interactions</strong> across ${activeDays.toLocaleString('en-IN')} active day${activeDays === 1 ? '' : 's'} match <span>${escapeHtml(selectedFilters.join(' · '))}</span>.</p>
+            <p>${broker ? `<strong>${escapeHtml(broker.label)}</strong> is the leading broker with ${broker.value.toLocaleString('en-IN')} interactions.` : ''} ${channel ? `${escapeHtml(channel.label)} is the largest channel in this view.` : ''}</p>
+        </div>
+        <div class="chart-viz-narrative-points">${peakCards}</div>`;
+}
+
+function renderChartVisualization() {
+    if (!document.getElementById('tab-chart-visualization')) return;
+    bindChartVizControls();
+    const baseData = getChartVizUniversalData();
+    populateChartVizControls(baseData);
+    const data = getChartVizFilteredData(baseData);
+    const dateRange = document.getElementById('chart-viz-date-range');
+    if (dateRange) dateRange.textContent = `${activeFilters.dateFrom || 'Start'} → ${activeFilters.dateTo || 'Today'}`;
+    destroyChartGroup(chartVizCharts);
+    const aggregations = chartVizLineConfigs.map((config, index) => renderChartVizLine(index, data));
+    renderChartVizSupportCharts(data);
+    renderChartVizNarrative(data, aggregations);
 }
 
 function formatSecondsCompact(s) {

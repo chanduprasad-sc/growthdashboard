@@ -119,6 +119,10 @@
                     <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 21h18v-2H3v2zm2-4h4V7H5v10zm6 0h4V3h-4v14zm6 0h4v-7h-4v7z"/></svg>
                     Branch &amp; Broker Activity
                 </button>
+                <button class="nav-btn" data-tab="tab-chart-visualization">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19h16v2H2V3h2v16zm3-3.5 3.5-4 3 2.25L18.5 7 20 8.1l-6.2 8.35-3.05-2.3-2.25 2.55L7 15.5z"/></svg>
+                    Chart Visualization
+                </button>
                 <button class="nav-btn" data-tab="tab-tickets-chats">
                     <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
                     Tickets & Chats
@@ -2141,6 +2145,74 @@
                         </table>
                     </div>
                 </div>
+            </section>
+
+            <!-- CHART VISUALIZATION -->
+            <section id="tab-chart-visualization" class="tab-content">
+                <div class="dashboard-section-wrapper chart-viz-header">
+                    <div class="chart-viz-title-lockup">
+                        <span class="chart-viz-title-mark" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4 19h16M5 16l4-5 4 3 6-8M16 6h3v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        <div>
+                            <h2 class="section-heading">Chart Visualization</h2>
+                            <p>Explore support activity with four independently configurable charts. The dashboard’s universal date range is applied automatically.</p>
+                        </div>
+                    </div>
+                    <div class="chart-viz-date-chip" id="chart-viz-date-range" aria-label="Active universal date range">Universal dates</div>
+                </div>
+
+                <div class="chart-viz-filter-bar" aria-label="Chart visualization filters">
+                    <div class="chart-viz-filter-heading">
+                        <div>
+                            <span>Visualization filters</span>
+                            <small>These refine this tab without changing the universal dashboard filters.</small>
+                        </div>
+                        <button type="button" id="chart-viz-reset" class="chart-viz-reset-btn">Reset chart filters</button>
+                    </div>
+                    <div class="chart-viz-filter-grid">
+                        <label><span>Channel</span><select id="chart-viz-channel"><option value="all">Combined</option><option value="Call Ticket">Call Tickets</option><option value="WhatsApp Chat">WhatsApp</option><option value="Care Email">Care</option></select></label>
+                        <label><span>Broker</span><select id="chart-viz-broker"><option value="all">All brokers</option></select></label>
+                        <label><span>POC</span><select id="chart-viz-poc"><option value="all">All POCs</option></select></label>
+                        <label><span>Issue type</span><select id="chart-viz-issue"><option value="all">All issue types</option></select></label>
+                        <label><span>Sub-issue type</span><select id="chart-viz-subissue"><option value="all">All sub-issue types</option></select></label>
+                    </div>
+                </div>
+
+                <div class="chart-viz-grid">
+                    <article class="chart-viz-card" data-chart-number="1">
+                        <div class="chart-viz-card-head"><div><span>Chart 01</span><h3 id="chart-viz-line-title-1">Interactions by date</h3></div><div class="chart-viz-axis-controls"><label>X axis<select id="chart-viz-x-1"></select></label><label>Y axis<select id="chart-viz-y-1"></select></label></div></div>
+                        <div class="chart-viz-canvas-wrap"><canvas id="chart-viz-line-1"></canvas></div>
+                    </article>
+                    <article class="chart-viz-card" data-chart-number="2">
+                        <div class="chart-viz-card-head"><div><span>Chart 02</span><h3 id="chart-viz-line-title-2">Interactions by broker</h3></div><div class="chart-viz-axis-controls"><label>X axis<select id="chart-viz-x-2"></select></label><label>Y axis<select id="chart-viz-y-2"></select></label></div></div>
+                        <div class="chart-viz-canvas-wrap"><canvas id="chart-viz-line-2"></canvas></div>
+                    </article>
+                    <article class="chart-viz-card" data-chart-number="3">
+                        <div class="chart-viz-card-head"><div><span>Chart 03</span><h3 id="chart-viz-line-title-3">Unique RMs by issue</h3></div><div class="chart-viz-axis-controls"><label>X axis<select id="chart-viz-x-3"></select></label><label>Y axis<select id="chart-viz-y-3"></select></label></div></div>
+                        <div class="chart-viz-canvas-wrap"><canvas id="chart-viz-line-3"></canvas></div>
+                    </article>
+                    <article class="chart-viz-card" data-chart-number="4">
+                        <div class="chart-viz-card-head"><div><span>Chart 04</span><h3 id="chart-viz-line-title-4">Active branches by POC</h3></div><div class="chart-viz-axis-controls"><label>X axis<select id="chart-viz-x-4"></select></label><label>Y axis<select id="chart-viz-y-4"></select></label></div></div>
+                        <div class="chart-viz-canvas-wrap"><canvas id="chart-viz-line-4"></canvas></div>
+                    </article>
+                </div>
+
+                <div class="chart-viz-support-grid">
+                    <article class="chart-viz-card chart-viz-support-card">
+                        <div class="chart-viz-card-head"><div><span>Ranked view</span><h3 id="chart-viz-bar-title">Top brokers by interactions</h3></div><label class="chart-viz-single-control">Group by<select id="chart-viz-bar-dimension"></select></label></div>
+                        <div class="chart-viz-canvas-wrap chart-viz-canvas-wrap--support"><canvas id="chart-viz-bar"></canvas></div>
+                    </article>
+                    <article class="chart-viz-card chart-viz-support-card">
+                        <div class="chart-viz-card-head"><div><span>Mix view</span><h3>Channel distribution</h3></div></div>
+                        <div class="chart-viz-canvas-wrap chart-viz-canvas-wrap--support"><canvas id="chart-viz-pie"></canvas></div>
+                    </article>
+                </div>
+
+                <section class="chart-viz-narrative" aria-labelledby="chart-viz-narrative-title">
+                    <div class="chart-viz-narrative-heading"><span class="chart-viz-narrative-icon" aria-hidden="true">✦</span><div><p>Dynamic interpretation</p><h3 id="chart-viz-narrative-title">What the selected view shows</h3></div></div>
+                    <div id="chart-viz-narrative-body" class="chart-viz-narrative-body"></div>
+                </section>
             </section>
 
             <!-- SUB-DASHBOARD 7: TICKETS & CHATS VIEW -->
