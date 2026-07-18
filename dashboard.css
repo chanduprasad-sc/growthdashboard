@@ -5984,6 +5984,67 @@ body.light-mode .modal-badge-info {
 .kpi-source-bridge--stacked > span { width: 100%; }
 .kpi-source-bridge--stacked strong { flex: 1 1 150px; text-align: left; }
 
+/* Equal-weight DevRev and Ozonetel KPI presentation */
+.kpi-dual-source-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    margin-top: 13px;
+    flex: 1;
+}
+.kpi-source-column {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    padding-right: 16px;
+}
+.kpi-source-column--ozonetel {
+    padding-right: 0;
+    padding-left: 16px;
+    border-left: 1px solid var(--border-color);
+}
+.kpi-source-label {
+    color: var(--accent-primary);
+    font-size: .61rem;
+    font-weight: 850;
+    letter-spacing: .075em;
+    text-transform: uppercase;
+}
+.kpi-source-column--ozonetel .kpi-source-label { color: var(--accent-blue); }
+.kpi-source-column .kpi-value {
+    margin: 7px 0 6px;
+    font-size: clamp(1.9rem, 2.2vw, 2.45rem);
+}
+.kpi-source-column .kpi-desc {
+    min-height: 30px;
+    line-height: 1.35;
+}
+.kpi-source-column .kpi-sub-info { margin-top: auto; padding-top: 9px; }
+.kpi-source-detail {
+    margin-top: auto;
+    padding-top: 9px;
+    color: var(--text-muted);
+    font-size: .65rem;
+    line-height: 1.45;
+}
+.kpi-source-detail strong { color: var(--text-primary); font-weight: 800; }
+.kpi-source-detail span { padding: 0 2px; color: var(--text-muted); }
+.kpi-source-detail--risk strong { color: var(--accent-red); }
+
+@media (max-width: 1500px) and (min-width: 1201px) {
+    .kpi-source-column { padding-right: 10px; }
+    .kpi-source-column--ozonetel { padding-right: 0; padding-left: 10px; }
+    .kpi-source-column .kpi-value { font-size: 1.85rem; }
+    .kpi-source-column .kpi-desc,
+    .kpi-source-detail { font-size: .6rem; }
+    .kpi-source-column .kpi-delta { font-size: .66rem; }
+}
+@media (max-width: 520px) {
+    .kpi-dual-source-grid { grid-template-columns: 1fr; gap: 14px; }
+    .kpi-source-column { padding-right: 0; }
+    .kpi-source-column--ozonetel { padding-top: 14px; padding-left: 0; border-top: 1px solid var(--border-color); border-left: 0; }
+}
+
 @media (max-width: 1450px) {
     .interaction-hero-layout { grid-template-columns: minmax(190px, .6fr) minmax(360px, 1.4fr); gap: 18px; }
     .interaction-hero-ozonetel { padding-left: 17px; }

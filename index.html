@@ -391,10 +391,20 @@
                             </div>
                             <div class="kpi-card" id="card-tickets">
                                 <span class="kpi-title">Call Tickets <small>DevRev record + Ozonetel call volume</small></span>
-                                <div class="kpi-value" id="pulse-call-tickets">0</div>
-                                <div class="kpi-desc">DevRev Tickets created</div>
-                                <div class="kpi-sub-info" id="pulse-tickets-sub"></div>
-                                <div class="kpi-source-bridge"><span>Ozonetel</span><strong><b id="pulse-oz-inbound">0</b> inbound · <b id="pulse-oz-progressive">0</b> progressive</strong></div>
+                                <div class="kpi-dual-source-grid">
+                                    <div class="kpi-source-column">
+                                        <span class="kpi-source-label">DevRev</span>
+                                        <div class="kpi-value" id="pulse-call-tickets">0</div>
+                                        <div class="kpi-desc">Tickets created</div>
+                                        <div class="kpi-sub-info" id="pulse-tickets-sub"></div>
+                                    </div>
+                                    <div class="kpi-source-column kpi-source-column--ozonetel">
+                                        <span class="kpi-source-label">Ozonetel</span>
+                                        <div class="kpi-value text-blue" id="pulse-oz-total">0</div>
+                                        <div class="kpi-desc">Inbound + progressive calls</div>
+                                        <div class="kpi-source-detail"><strong id="pulse-oz-inbound">0</strong> inbound <span>·</span> <strong id="pulse-oz-progressive">0</strong> progressive</div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="kpi-card" id="card-whatsapp">
                                 <span class="kpi-title">WhatsApp Chats <small>DevRev conversations</small></span>
@@ -404,24 +414,54 @@
                             </div>
                             <div class="kpi-card" id="card-answered">
                                 <span class="kpi-title">Answered Calls <small>DevRev outcome + Ozonetel connected</small></span>
-                                <div class="kpi-value text-green" id="pulse-answered-calls">0</div>
-                                <div class="kpi-desc">DevRev answered call tickets</div>
-                                <div class="kpi-sub-info" id="pulse-answered-sub"></div>
-                                <div class="kpi-source-bridge"><span>Ozonetel connected</span><strong id="pulse-oz-connected">0</strong></div>
+                                <div class="kpi-dual-source-grid">
+                                    <div class="kpi-source-column">
+                                        <span class="kpi-source-label">DevRev</span>
+                                        <div class="kpi-value text-green" id="pulse-answered-calls">0</div>
+                                        <div class="kpi-desc">Answered call tickets</div>
+                                        <div class="kpi-sub-info" id="pulse-answered-sub"></div>
+                                    </div>
+                                    <div class="kpi-source-column kpi-source-column--ozonetel">
+                                        <span class="kpi-source-label">Ozonetel</span>
+                                        <div class="kpi-value text-green" id="pulse-oz-connected">0</div>
+                                        <div class="kpi-desc">Connected calls</div>
+                                        <div class="kpi-source-detail">Operational connected volume</div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="kpi-card" id="card-missed">
                                 <span class="kpi-title">Missed / Abandoned Calls <small>DevRev missed + Ozonetel abandoned</small></span>
-                                <div class="kpi-value text-red" id="pulse-missed-calls">0</div>
-                                <div class="kpi-desc">Voice calls missed/abandoned</div>
-                                <div class="kpi-sub-info" id="pulse-missed-sub"></div>
-                                <div class="kpi-source-bridge kpi-source-bridge--risk"><span>Ozonetel abandoned</span><strong><b id="pulse-oz-abandoned">0</b> · <b id="pulse-oz-abandoned-rate">0%</b></strong></div>
+                                <div class="kpi-dual-source-grid">
+                                    <div class="kpi-source-column">
+                                        <span class="kpi-source-label">DevRev</span>
+                                        <div class="kpi-value text-red" id="pulse-missed-calls">0</div>
+                                        <div class="kpi-desc">Missed call tickets</div>
+                                        <div class="kpi-sub-info" id="pulse-missed-sub"></div>
+                                    </div>
+                                    <div class="kpi-source-column kpi-source-column--ozonetel">
+                                        <span class="kpi-source-label">Ozonetel</span>
+                                        <div class="kpi-value text-red" id="pulse-oz-abandoned">0</div>
+                                        <div class="kpi-desc">Abandoned calls</div>
+                                        <div class="kpi-source-detail kpi-source-detail--risk"><strong id="pulse-oz-abandoned-rate">0%</strong> of inbound calls</div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="kpi-card" id="card-aoh">
                                 <span class="kpi-title">AOH / Progressive Calls <small>DevRev AOH + Ozonetel progressive outcome</small></span>
-                                <div class="kpi-value text-blue" id="pulse-aoh-calls">0</div>
-                                <div class="kpi-desc">After-office-hours ticket outcomes</div>
-                                <div class="kpi-sub-info" id="pulse-aoh-sub"></div>
-                                <div class="kpi-source-bridge"><span>Progressive result</span><strong><b id="pulse-oz-prog-answered">0</b> answered · <b id="pulse-oz-prog-unanswered">0</b> unanswered</strong></div>
+                                <div class="kpi-dual-source-grid">
+                                    <div class="kpi-source-column">
+                                        <span class="kpi-source-label">DevRev</span>
+                                        <div class="kpi-value text-blue" id="pulse-aoh-calls">0</div>
+                                        <div class="kpi-desc">After-office-hours outcomes</div>
+                                        <div class="kpi-sub-info" id="pulse-aoh-sub"></div>
+                                    </div>
+                                    <div class="kpi-source-column kpi-source-column--ozonetel">
+                                        <span class="kpi-source-label">Ozonetel</span>
+                                        <div class="kpi-value text-blue" id="pulse-oz-prog-attempted">0</div>
+                                        <div class="kpi-desc">Progressive calls attempted</div>
+                                        <div class="kpi-source-detail"><strong id="pulse-oz-prog-answered">0</strong> answered <span>·</span> <strong id="pulse-oz-prog-unanswered">0</strong> unanswered</div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="kpi-card" id="card-aht">
                                 <span class="kpi-title">Avg Handling Time <small>Ozonetel inbound call timing</small></span>
