@@ -57,6 +57,41 @@
     </div>
     <div class="noise-overlay"></div>
 
+    <!-- Vengeance UI-inspired utility notch -->
+    <header class="vui-notch-shell" aria-label="Dashboard utilities">
+        <div class="vui-notch-rail" aria-hidden="true"></div>
+        <svg class="vui-notch-curve vui-notch-curve-left" viewBox="0 0 50 66" preserveAspectRatio="none" aria-hidden="true">
+            <path class="vui-notch-fill" d="M0 0H50V66C27 66 25 40 0 40Z"/>
+            <path class="vui-notch-edge" d="M0 40C25 40 27 66 50 66"/>
+        </svg>
+        <nav class="vui-notch-core">
+            <button id="sidebar-sync-btn" class="vui-notch-action" type="button" title="Sync dashboard data">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></svg>
+                <span>Sync</span>
+            </button>
+            <button id="theme-toggle-btn" class="vui-notch-action" type="button" title="Switch color mode">
+                <span class="theme-toggle-icon-container" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" class="toggle-icon sun-icon"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                    <svg viewBox="0 0 24 24" class="toggle-icon moon-icon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                </span>
+                <span class="theme-text">Dark Mode</span>
+            </button>
+            <button id="screenshot-btn" class="vui-notch-action" type="button" title="Download a screenshot of the active dashboard tab">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5 13 3h-2L9.5 5H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4.5Z"/><circle cx="12" cy="12.5" r="3.5"/></svg>
+                <span>Screenshot</span>
+            </button>
+            <button id="notch-guide-btn" class="vui-notch-action" data-notch-tab="tab-guide" type="button" title="Open dashboard guide">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11a1 1 0 0 1 1 1v17a3 3 0 0 0-3-3H4V5.5ZM20 5.5A2.5 2.5 0 0 0 17.5 3H13a1 1 0 0 0-1 1v17a3 3 0 0 1 3-3h5V5.5Z"/></svg>
+                <span>Guide</span>
+            </button>
+        </nav>
+        <svg class="vui-notch-curve vui-notch-curve-right" viewBox="0 0 50 66" preserveAspectRatio="none" aria-hidden="true">
+            <path class="vui-notch-fill" d="M50 0H0V66C23 66 25 40 50 40Z"/>
+            <path class="vui-notch-edge" d="M50 40C25 40 23 66 0 66"/>
+        </svg>
+        <div class="vui-notch-rail" aria-hidden="true"></div>
+    </header>
+
     <!-- Floating button to restore sidebar -->
     <button id="sidebar-expand-btn" class="sidebar-expand-btn hidden" title="Show Sidebar">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
@@ -131,34 +166,9 @@
                     <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" fill="none" stroke="currentColor" stroke-width="0"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
                     AI Summary
                 </button>
-                <button class="nav-btn" data-tab="tab-guide">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/></svg>
-                    Guide
-                </button>
             </nav>
 
             <div class="sidebar-footer">
-                <button id="theme-toggle-btn" class="theme-toggle">
-                    <div class="theme-toggle-icon-container">
-                        <!-- Sun Icon (shown in dark mode) -->
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon sun-icon">
-                            <circle cx="12" cy="12" r="4"/>
-                            <path d="M12 2v2"/>
-                            <path d="M12 20v2"/>
-                            <path d="m4.93 4.93 1.41 1.41"/>
-                            <path d="m17.66 17.66 1.41 1.41"/>
-                            <path d="M2 12h2"/>
-                            <path d="M20 12h2"/>
-                            <path d="m6.34 17.66-1.41 1.41"/>
-                            <path d="m19.07 4.93-1.41 1.41"/>
-                        </svg>
-                        <!-- Moon Icon (shown in light mode) -->
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon moon-icon">
-                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
-                        </svg>
-                    </div>
-                    <span class="toggle-text theme-text">Dark Mode</span>
-                </button>
                 <div class="connection-status-panel">
                     <div class="status-indicator-row">
                         <span id="connection-status-dot" class="status-dot offline"></span>
@@ -166,9 +176,6 @@
                     </div>
                     <strong id="data-gen-time" class="data-time-badge">Loading...</strong>
                     <div class="status-action-row">
-                        <button id="sidebar-sync-btn" class="sidebar-action-btn" title="Refresh Live Data">
-                            🔄 Sync
-                        </button>
                         <button id="sidebar-config-btn" class="sidebar-action-btn" title="Configure Live Google Sheet">
                             ⚙️ Setup
                         </button>
@@ -232,12 +239,6 @@
                         </div>
                     </div>             </div>
                 
-                <!-- Screenshot Trigger & Filters -->
-                <div class="top-utility-bar">
-                    <button id="screenshot-btn" class="screenshot-btn" title="Download Weekly Pulse Dashboard Summary">
-                        <span class="btn-icon">📸</span> Take Dashboard Screenshot
-                    </button>
-                </div>
             </header>
 
             <!-- Filters Panel (Global) -->

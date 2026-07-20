@@ -520,6 +520,9 @@ body.sidebar-collapsed .sidebar {
 body.sidebar-collapsed .workspace {
     margin-left: 80px; /* Shift workspace left to fill width */
 }
+body.sidebar-collapsed .vui-notch-shell {
+    left: 80px;
+}
 
 .brand {
     display: flex;
@@ -681,8 +684,109 @@ body.dark-mode .moon-icon {
 .workspace {
     flex-grow: 1;
     margin-left: 310px; /* spacing matching floating sidebar layout */
-    padding: 30px 40px 30px 10px;
+    padding: 88px 40px 30px 10px;
     min-width: 0;
+}
+
+/* Vengeance UI Notch Navbar — adapted for the dashboard's vanilla stack */
+.vui-notch-shell {
+    --notch-surface: color-mix(in srgb, var(--bg-main) 94%, transparent);
+    position: fixed;
+    top: 0;
+    left: 310px;
+    right: 40px;
+    z-index: 120;
+    display: flex;
+    align-items: flex-start;
+    height: 66px;
+    pointer-events: none;
+    transition: left 280ms cubic-bezier(.22, 1, .36, 1);
+}
+.vui-notch-rail {
+    flex: 1 1 60px;
+    height: 40px;
+    background: var(--notch-surface);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--text-primary) 5%, transparent);
+    backdrop-filter: blur(18px) saturate(135%);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+.vui-notch-curve {
+    width: 50px;
+    height: 66px;
+    flex: 0 0 50px;
+    overflow: visible;
+}
+.vui-notch-fill { fill: var(--notch-surface); }
+.vui-notch-edge {
+    fill: none;
+    stroke: var(--border-color);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+.vui-notch-core {
+    pointer-events: auto;
+    height: 66px;
+    min-width: 520px;
+    padding: 0 10px 9px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 5px;
+    background: var(--notch-surface);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 12px 30px -22px rgba(8, 15, 30, .55);
+    backdrop-filter: blur(18px) saturate(135%);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+.vui-notch-action {
+    height: 40px;
+    padding: 0 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-secondary);
+    font: 650 .74rem/1 var(--font-heading);
+    cursor: pointer;
+    transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+.vui-notch-action > svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.vui-notch-action:hover,
+.vui-notch-action.active {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+    border-color: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+.vui-notch-action:active { transform: translateY(1px); }
+.vui-notch-action:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+.vui-notch-action:disabled { cursor: wait; opacity: .58; }
+.vui-notch-action .theme-toggle-icon-container { width: 17px; height: 17px; }
+.vui-notch-action .toggle-icon {
+    position: absolute;
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform .35s cubic-bezier(.22, 1, .36, 1), opacity .25s ease;
 }
 
 /* ==========================================================================
@@ -3408,6 +3512,15 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     background-color: #ef4444 !important;
     color: #ef4444 !important;
 }
+.status-dot.syncing {
+    background-color: var(--accent-primary) !important;
+    color: var(--accent-primary) !important;
+    animation: status-sync-pulse 1.4s ease-in-out infinite;
+}
+@keyframes status-sync-pulse {
+    0%, 100% { opacity: .48; transform: scale(.82); }
+    50% { opacity: 1; transform: scale(1); }
+}
 .status-text {
     font-size: 0.78rem;
     font-weight: 700;
@@ -3445,6 +3558,13 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     background: rgba(255, 255, 255, 0.06);
     color: var(--text-primary);
     border-color: var(--text-muted);
+}
+.sidebar-action-btn:disabled {
+    cursor: wait;
+    opacity: .62;
+}
+@media (prefers-reduced-motion: reduce) {
+    .status-dot.syncing { animation: none; opacity: 1; }
 }
 
 /* ========================================================================
@@ -5774,21 +5894,75 @@ body.light-mode .modal-badge-info {
     border: 1px solid rgba(31, 122, 224, 0.15) !important;
 }
 
-/* Daily Tools attention marker */
-.nav-btn[data-tab="tab-daily-tools"] {
-    border: 2px solid var(--accent-red) !important;
-    box-shadow: inset 0 0 10px rgba(var(--accent-red-rgb), .2), 0 0 16px rgba(var(--accent-red-rgb), .52) !important;
-    filter: drop-shadow(0 0 5px rgba(var(--accent-red-rgb), .6));
-    animation: daily-tools-glow 1.8s ease-in-out infinite;
+/* Vengeance UI Liquid Metal — shader-inspired, dependency-free navigation treatment */
+@property --liquid-metal-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
 }
+.nav-btn[data-tab="tab-daily-tools"] {
+    --liquid-metal-fill: color-mix(in srgb, var(--bg-sidebar) 94%, #111827);
+    border: 2px solid transparent !important;
+    background:
+        linear-gradient(var(--liquid-metal-fill), var(--liquid-metal-fill)) padding-box,
+        conic-gradient(from var(--liquid-metal-angle), #111318 0deg, #d7dde6 36deg, #4c525b 72deg, #fff 112deg, #777e88 151deg, #171a20 205deg, #f7f9fc 253deg, #565d68 302deg, #111318 360deg) border-box !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 10%, transparent), 0 7px 20px -13px rgba(210, 219, 232, .9) !important;
+    animation: vui-liquid-metal-flow 4.8s linear infinite;
+}
+body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: color-mix(in srgb, var(--bg-sidebar) 96%, #fff); }
 .nav-btn[data-tab="tab-daily-tools"]:hover,
 .nav-btn[data-tab="tab-daily-tools"].active {
-    border-color: var(--accent-red) !important;
-    box-shadow: inset 0 0 13px rgba(var(--accent-red-rgb), .3), 0 0 24px rgba(var(--accent-red-rgb), .68) !important;
+    color: var(--text-primary) !important;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.2), 0 9px 26px -11px rgba(214, 224, 238, .95) !important;
 }
-@keyframes daily-tools-glow {
-    0%, 100% { filter: drop-shadow(0 0 3px rgba(var(--accent-red-rgb), .42)); }
-    50% { filter: drop-shadow(0 0 9px rgba(var(--accent-red-rgb), .95)); }
+@keyframes vui-liquid-metal-flow {
+    to { --liquid-metal-angle: 360deg; }
+}
+
+/* Vengeance UI Agent Bento Grid — shared visual language for every chart surface */
+.vui-agent-bento-grid.vui-agent-bento-grid {
+    gap: 8px !important;
+    align-items: stretch;
+}
+.vui-agent-bento-card.vui-agent-bento-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent) !important;
+    border-radius: 20px !important;
+    background: color-mix(in srgb, var(--bg-card) 96%, transparent) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, #fff 4%, transparent), 0 2px 5px rgba(8, 15, 30, .05), 0 16px 34px -30px rgba(8, 15, 30, .48) !important;
+    transition: transform 220ms cubic-bezier(.22, 1, .36, 1), border-color 220ms ease, box-shadow 220ms ease !important;
+}
+.vui-agent-bento-card.vui-agent-bento-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(145deg, color-mix(in srgb, #fff 7%, transparent), transparent 34%);
+}
+.vui-agent-bento-card.vui-agent-bento-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent-primary) 24%, var(--border-color)) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, #fff 5%, transparent), 0 5px 12px rgba(8, 15, 30, .07), 0 22px 42px -30px rgba(var(--accent-primary-rgb), .3) !important;
+}
+.vui-agent-bento-card.vui-agent-bento-card canvas {
+    border-radius: 14px;
+}
+
+@media (max-width: 900px) {
+    .vui-notch-shell { left: 20px; right: 20px; }
+    .vui-notch-core { min-width: 450px; }
+    .workspace,
+    body.sidebar-collapsed .workspace { padding-top: 88px; }
+}
+@media (max-width: 650px) {
+    .vui-notch-shell { left: 8px; right: 8px; }
+    .vui-notch-core { min-width: 0; flex: 1 1 auto; padding-inline: 5px; gap: 2px; }
+    .vui-notch-curve { width: 28px; flex-basis: 28px; }
+    .vui-notch-rail { flex-basis: 8px; }
+    .vui-notch-action { width: 42px; padding: 0; }
+    .vui-notch-action > span:not(.theme-toggle-icon-container) { display: none; }
 }
 
 /* Dual RM / Agent metric deep-dive */
@@ -5889,6 +6063,8 @@ body.light-mode .modal-badge-info {
 }
 @media (prefers-reduced-motion: reduce) {
     .nav-btn[data-tab="tab-daily-tools"] { animation: none; }
+    .vui-agent-bento-card,
+    .vui-notch-action { transition: none !important; }
 }
 
 /* Integrated DevRev + Ozonetel Weekly Pulse cards */

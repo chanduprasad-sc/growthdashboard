@@ -255,6 +255,50 @@ function addChartExportButtons() {
     });
 }
 
+// Apply the Vengeance Agent Bento visual system to static and dynamically-rendered charts.
+function initializeVengeanceChartSurfaces() {
+    const surfaceSelector = [
+        '.visual-card',
+        '.deepdive-chart-card',
+        '.intelligence-panel',
+        '.chart-viz-card',
+        '.ai-report-chart-card',
+        '.chart-wrapper',
+        '.dashboard-card',
+        '.weekly-pulse-card',
+        '.chart-card',
+        '.theme-card'
+    ].join(', ');
+    const gridSelector = [
+        '.chart-row-2',
+        '.chart-row-3',
+        '.vc-charts-row-2',
+        '.vc-charts-row-3',
+        '.vc-charts-row-4',
+        '.deepdive-chart-grid',
+        '.chart-viz-grid',
+        '.chart-viz-support-grid',
+        '.ai-report-charts-grid'
+    ].join(', ');
+
+    const decorate = (root = document) => {
+        const scope = root.querySelectorAll ? root : document;
+        scope.querySelectorAll('canvas').forEach(canvas => {
+            const surface = canvas.closest(surfaceSelector);
+            if (surface) surface.classList.add('vui-agent-bento-card');
+        });
+        scope.querySelectorAll(gridSelector).forEach(grid => {
+            if (grid.querySelector('canvas')) grid.classList.add('vui-agent-bento-grid');
+        });
+    };
+
+    decorate(document);
+    const observer = new MutationObserver(mutations => {
+        if (mutations.some(mutation => mutation.addedNodes.length)) decorate(document);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
 
 // Global State
 let rawData = null;
@@ -2107,189 +2151,257 @@ Answer:
 // -------------------------------------------------------------
 // 1. DATA INITIALIZATION & ENTRY
 // -------------------------------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Instantly load from localStorage if available to speed up load time
-    const cachedDataStr = localStorage.getItem('b2b_dashboard_raw_payload');
-    if (cachedDataStr) {
-        try {
-            console.log("Found cached dashboard data in localStorage. Instantly loading...");
-            const cachedData = JSON.parse(cachedDataStr);
-            if (cachedData && cachedData.calls && cachedData.callTkts && cachedData.whatsapp) {
-                rawData = compileRawCache(cachedData);
-            } else {
-                rawData = cachedData;
-            }
-            if (rawData) {
-                populateFilterDropdowns();
-                setDefaultDateRange();
-                buildViewModel();
-                const statusDot = document.getElementById('connection-status-dot');
-                const statusText = document.getElementById('connection-status-text');
-                const timeBadge = document.getElementById('data-gen-time');
-                if (statusDot) statusDot.className = 'status-dot online';
-                if (statusText) statusText.innerText = 'Cached Loaded';
-                if (timeBadge) timeBadge.innerText = rawData.generated_at || 'Local';
-            }
-        } catch (e) {
-            console.error("Error loading cached dashboard data", e);
-        }
+const DASHBOARD_CACHE_DB = 'b2b-support-dashboard';
+const DASHBOARD_CACHE_STORE = 'snapshots';
+const DASHBOARD_CACHE_KEY = 'latest-good-payload';
+const DASHBOARD_LEGACY_CACHE_KEY = 'b2b_dashboard_raw_payload';
+const DASHBOARD_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+const DASHBOARD_RETRY_DELAYS_MS = [15000, 45000, 120000, 300000];
+let dashboardSyncPromise = null;
+let dashboardRetryTimer = null;
+let dashboardRetryAttempt = 0;
+let dashboardLastCacheRecord = null;
+let dashboardLastSyncAt = 0;
+
+function openDashboardCacheDb() {
+    return new Promise((resolve, reject) => {
+        if (!window.indexedDB) return reject(new Error('IndexedDB is unavailable'));
+        const request = indexedDB.open(DASHBOARD_CACHE_DB, 1);
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(DASHBOARD_CACHE_STORE)) db.createObjectStore(DASHBOARD_CACHE_STORE, { keyPath: 'id' });
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('Unable to open IndexedDB'));
+        request.onblocked = () => reject(new Error('IndexedDB upgrade is blocked'));
+    });
+}
+
+async function readDashboardCache() {
+    const db = await openDashboardCacheDb();
+    try {
+        return await new Promise((resolve, reject) => {
+            const request = db.transaction(DASHBOARD_CACHE_STORE, 'readonly').objectStore(DASHBOARD_CACHE_STORE).get(DASHBOARD_CACHE_KEY);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error || new Error('Unable to read dashboard cache'));
+        });
+    } finally {
+        db.close();
     }
+}
 
-    // 2. Perform background sync/fetch and setup event listeners
-    loadDashboardData();
-    setupEventListeners();
-    initCustomDropdowns();
-    // BorderGlow.init();
-});
+async function writeDashboardCache(payload) {
+    const record = {
+        id: DASHBOARD_CACHE_KEY,
+        payload,
+        savedAt: Date.now(),
+        generatedAt: payload.builtAt || payload.generated_at || ''
+    };
+    const db = await openDashboardCacheDb();
+    try {
+        await new Promise((resolve, reject) => {
+            const transaction = db.transaction(DASHBOARD_CACHE_STORE, 'readwrite');
+            transaction.objectStore(DASHBOARD_CACHE_STORE).put(record);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error || new Error('Unable to save dashboard cache'));
+            transaction.onabort = () => reject(transaction.error || new Error('Dashboard cache write was aborted'));
+        });
+        dashboardLastCacheRecord = record;
+        return record;
+    } finally {
+        db.close();
+    }
+}
 
-async function loadDashboardData() {
+function dashboardPayloadRecordCount(data) {
+    if (!data || typeof data !== 'object') return 0;
+    if (Array.isArray(data.callTkts) && Array.isArray(data.whatsapp)) {
+        return (Array.isArray(data.calls) ? data.calls.length : 0) + data.callTkts.length + data.whatsapp.length + (Array.isArray(data.careEmails) ? data.careEmails.length : 0);
+    }
+    return (Array.isArray(data.calls) ? data.calls.length : 0) + (Array.isArray(data.support_interactions) ? data.support_interactions.length : 0);
+}
+
+function validateDashboardPayload(data, referencePayload = null) {
+    if (!data || typeof data !== 'object') return { valid: false, reason: 'Response is not a data object' };
+    if (data.error) return { valid: false, reason: `Apps Script error: ${data.error}` };
+    const rawShape = Array.isArray(data.calls) && Array.isArray(data.callTkts) && Array.isArray(data.whatsapp);
+    const compiledShape = Array.isArray(data.calls) && Array.isArray(data.support_interactions);
+    if (!rawShape && !compiledShape) return { valid: false, reason: 'Required dashboard collections are missing' };
+    const recordCount = dashboardPayloadRecordCount(data);
+    if (recordCount === 0) return { valid: false, reason: 'The response contains no dashboard records' };
+    const referenceCount = dashboardPayloadRecordCount(referencePayload);
+    if (referenceCount >= 100 && recordCount < referenceCount * 0.35) {
+        return { valid: false, reason: `Response appears incomplete (${recordCount} records versus ${referenceCount} in the last good snapshot)` };
+    }
+    return { valid: true, rawShape, recordCount };
+}
+
+function updateDashboardConnectionStatus(status, label, detail) {
     const statusDot = document.getElementById('connection-status-dot');
     const statusText = document.getElementById('connection-status-text');
     const timeBadge = document.getElementById('data-gen-time');
     const syncBtn = document.getElementById('sidebar-sync-btn');
+    if (statusDot) statusDot.className = `status-dot ${status}`;
+    if (statusText) statusText.innerText = label;
+    if (timeBadge) timeBadge.innerText = detail || 'No saved data';
+    if (syncBtn) syncBtn.style.display = 'inline-flex';
+}
 
-    function updateStatusUI(status, label, timeStr) {
-        if (statusDot) {
-            statusDot.className = 'status-dot ' + status;
+function dashboardCacheAge(savedAt) {
+    if (!savedAt) return 'Saved snapshot';
+    const minutes = Math.max(0, Math.floor((Date.now() - savedAt) / 60000));
+    if (minutes < 1) return 'Saved just now';
+    if (minutes < 60) return `Saved ${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Saved ${hours}h ago`;
+    return `Saved ${Math.floor(hours / 24)}d ago`;
+}
+
+function applyDashboardPayload(data) {
+    const validation = validateDashboardPayload(data);
+    if (!validation.valid) throw new Error(validation.reason);
+    rawData = validation.rawShape ? compileRawCache(data) : data;
+    populateFilterDropdowns();
+    if (!activeFilters.dateFrom || !activeFilters.dateTo) {
+        setDefaultDateRange();
+    } else {
+        const elFrom = document.getElementById('filter-date-from');
+        const elTo = document.getElementById('filter-date-to');
+        if (elFrom) elFrom.value = activeFilters.dateFrom;
+        if (elTo) elTo.value = activeFilters.dateTo;
+    }
+    buildViewModel();
+    return validation;
+}
+
+async function readLegacyDashboardCache() {
+    const cachedDataStr = localStorage.getItem(DASHBOARD_LEGACY_CACHE_KEY);
+    if (!cachedDataStr) return null;
+    try {
+        const payload = JSON.parse(cachedDataStr);
+        const validation = validateDashboardPayload(payload);
+        if (!validation.valid) throw new Error(validation.reason);
+        try {
+            const record = await writeDashboardCache(payload);
+            localStorage.removeItem(DASHBOARD_LEGACY_CACHE_KEY);
+            console.log('Migrated dashboard cache from localStorage to IndexedDB.');
+            return record;
+        } catch (idbError) {
+            console.warn('IndexedDB migration failed; using legacy cache for this session.', idbError);
+            return { id: DASHBOARD_CACHE_KEY, payload, savedAt: 0, generatedAt: payload.builtAt || payload.generated_at || '' };
         }
-        if (statusText) {
-            statusText.innerText = label;
-        }
-        if (timeBadge) {
-            timeBadge.innerText = timeStr || 'No data';
-        }
-        if (syncBtn) {
-            syncBtn.style.display = (status === 'online') ? 'inline-flex' : 'none';
+    } catch (error) {
+        console.warn('Discarding invalid legacy dashboard cache.', error);
+        return null;
+    }
+}
+
+function clearDashboardRetry() {
+    if (dashboardRetryTimer) clearTimeout(dashboardRetryTimer);
+    dashboardRetryTimer = null;
+    dashboardRetryAttempt = 0;
+}
+
+function scheduleDashboardRetry() {
+    if (dashboardRetryTimer || document.hidden || navigator.onLine === false) return;
+    const delay = DASHBOARD_RETRY_DELAYS_MS[Math.min(dashboardRetryAttempt, DASHBOARD_RETRY_DELAYS_MS.length - 1)];
+    dashboardRetryAttempt++;
+    dashboardRetryTimer = setTimeout(() => {
+        dashboardRetryTimer = null;
+        loadDashboardData({ reason: 'automatic retry' });
+    }, delay);
+}
+
+async function initializeDashboardData() {
+    updateDashboardConnectionStatus('syncing', 'Loading saved data', 'Opening local snapshot…');
+    let cachedRecord = null;
+    try {
+        cachedRecord = await readDashboardCache();
+    } catch (error) {
+        console.warn('IndexedDB cache could not be read.', error);
+    }
+    if (!cachedRecord) cachedRecord = await readLegacyDashboardCache();
+    if (cachedRecord && cachedRecord.payload) {
+        try {
+            applyDashboardPayload(cachedRecord.payload);
+            dashboardLastCacheRecord = cachedRecord;
+            updateDashboardConnectionStatus('offline', 'Saved data ready', `${cachedRecord.generatedAt || 'Last good snapshot'} · ${dashboardCacheAge(cachedRecord.savedAt)}`);
+        } catch (error) {
+            console.warn('Saved dashboard snapshot failed validation.', error);
+            cachedRecord = null;
         }
     }
+    if (!cachedRecord) updateDashboardConnectionStatus('syncing', 'Connecting', 'Fetching the first snapshot…');
+    await loadDashboardData({ reason: 'startup' });
+    setTimeout(() => fetchClickupTasksLive(), 300);
+}
 
+document.addEventListener('DOMContentLoaded', () => {
+    setupEventListeners();
+    initCustomDropdowns();
+    initializeVengeanceChartSurfaces();
+    initializeDashboardData();
+    window.addEventListener('online', () => loadDashboardData({ reason: 'connection restored' }));
+    window.addEventListener('offline', () => {
+        updateDashboardConnectionStatus('offline', rawData ? 'Working from saved data' : 'Offline', dashboardLastCacheRecord ? dashboardCacheAge(dashboardLastCacheRecord.savedAt) : 'No saved snapshot');
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && navigator.onLine !== false && Date.now() - dashboardLastSyncAt > 5 * 60 * 1000) loadDashboardData({ reason: 'tab resumed' });
+    });
+    setInterval(() => {
+        if (!document.hidden && navigator.onLine !== false) loadDashboardData({ reason: 'scheduled refresh' });
+    }, DASHBOARD_REFRESH_INTERVAL_MS);
+});
+
+function loadDashboardData(options = {}) {
+    if (dashboardSyncPromise) return dashboardSyncPromise;
+    dashboardSyncPromise = performDashboardSync(options).finally(() => { dashboardSyncPromise = null; });
+    return dashboardSyncPromise;
+}
+
+async function performDashboardSync(options = {}) {
+    const hasSavedData = Boolean(rawData);
+    updateDashboardConnectionStatus('syncing', hasSavedData ? 'Refreshing quietly' : 'Connecting', hasSavedData && dashboardLastCacheRecord ? dashboardCacheAge(dashboardLastCacheRecord.savedAt) : 'Contacting Google Sheets…');
     try {
-        let data = null;
-        let isLive = false;
-        let connectionError = false;
-
-        // Ensure default URL is saved in localStorage if empty to prevent manual pasting
+        if (navigator.onLine === false) throw new Error('Browser is offline');
         let liveUrl = localStorage.getItem('live_google_sheet_url');
-        if (!liveUrl || liveUrl.trim() === "") {
+        if (!liveUrl || !liveUrl.trim()) {
             liveUrl = GOOGLE_SCRIPT_API_URL;
             localStorage.setItem('live_google_sheet_url', GOOGLE_SCRIPT_API_URL);
         }
         const liveEnabled = localStorage.getItem('live_sync_enabled') !== 'false';
-        
-        let targetUrl = "";
-
-        if (liveEnabled && liveUrl && liveUrl.trim() !== "") {
-            targetUrl = getCleanApiUrl(liveUrl);
-        } else if (typeof GOOGLE_SCRIPT_API_URL === "string" &&
-                   GOOGLE_SCRIPT_API_URL.trim() !== "" &&
-                   !GOOGLE_SCRIPT_API_URL.includes("YOUR_DEPLOYED_SCRIPT_WEB_APP_URL")) {
-            targetUrl = getCleanApiUrl(GOOGLE_SCRIPT_API_URL);
+        const configuredUrl = liveEnabled ? liveUrl : GOOGLE_SCRIPT_API_URL;
+        const targetUrl = getCleanApiUrl(configuredUrl);
+        if (!targetUrl) throw new Error('No valid Google Sheets web-app URL is configured');
+        console.log(`Refreshing dashboard data (${options.reason || 'requested refresh'}): ${targetUrl}`);
+        const response = await fetchWithRetry(targetUrl, { cache: 'no-store' }, 2, 30000);
+        const data = await response.json();
+        const validation = validateDashboardPayload(data, dashboardLastCacheRecord && dashboardLastCacheRecord.payload);
+        if (!validation.valid) throw new Error(validation.reason);
+        applyDashboardPayload(data);
+        clearDashboardRetry();
+        dashboardLastSyncAt = Date.now();
+        try {
+            await writeDashboardCache(data);
+            localStorage.removeItem(DASHBOARD_LEGACY_CACHE_KEY);
+        } catch (cacheError) {
+            console.warn('Live data loaded, but IndexedDB persistence failed.', cacheError);
         }
-
-        if (targetUrl) {
-            console.log("Attempting to fetch live data from Google Sheets API (with timeout & retry): " + targetUrl);
-            try {
-                // Increased timeout to 40000ms to tolerate cold starts and reduce failures
-                const response = await fetchWithRetry(targetUrl, {}, 2, 40000);
-                data = await response.json();
-                isLive = true;
-                console.log("Successfully fetched live dashboard data from Google Sheets API.");
-                // Save to localStorage cache
-                localStorage.setItem('b2b_dashboard_raw_payload', JSON.stringify(data));
-            } catch (err) {
-                console.warn("Network, timeout, or CORS issue fetching from Google Sheets API, falling back to local cache file. Details:", err);
-                connectionError = true;
-            }
-        }
-
-        // If live fetch failed, try loading from localStorage cache
-        if (!data) {
-            const cachedDataStr = localStorage.getItem('b2b_dashboard_raw_payload');
-            if (cachedDataStr) {
-                try {
-                    data = JSON.parse(cachedDataStr);
-                    console.log("Loaded fallback from localStorage cache.");
-                } catch (e) {
-                    console.error("Error parsing cached data", e);
-                }
-            }
-        }
-
-
-
-        // Fallback to empty skeleton data structure directly in code to avoid static files
-        if (!data) {
-            console.log("No live data loaded. Initializing empty skeleton data structure.");
-            data = {
-                generated_at: "No live data loaded",
-                support_interactions: [],
-                calls: [],
-                agent_breaks: [],
-                outliers: [],
-                repeat_loops: [],
-                top_themes: [],
-                recent_comments: [],
-                poc_mappings: [],
-                agent_scorecards: [],
-                redashQueries: [],
-                importantLinks: [],
-                importantSheets: []
-            };
-        }
-
-        if (!data) {
-            updateStatusUI('error', 'No Data Found', 'Setup required');
-            alert("No data available. Please click 'Setup' in the footer to connect your live Google Sheet.");
-            return;
-        }
-
-        // Run compiler client-side if raw Google Sheet cache shape is detected
-        if (data && data.calls && data.callTkts && data.whatsapp) {
-            console.log("Raw Google Sheet cache payload detected. Commencing client-side compilation...");
-            rawData = compileRawCache(data);
-        } else {
-            console.log("Precompiled dashboard data structure detected.");
-            rawData = data;
-        }
-
-        // Update Connection Status UI
-        if (isLive) {
-            updateStatusUI('online', 'Live Connected', rawData.generated_at || 'Just Now');
-        } else if (connectionError) {
-            updateStatusUI('error', 'Sync Failed', 'Local Cache');
-        } else {
-            updateStatusUI('offline', 'Local Cache', rawData.generated_at || 'Local');
-        }
-
-        // Detect empty/skeleton data (prompt user to connect)
-        const totalInteractions = (rawData.support_interactions || []).length;
-        const totalCalls = (rawData.calls || []).length;
-
-        // Populate filter dropdown choices
-        populateFilterDropdowns();
-
-        // Establish default date range (Last 30 days) if not already set
-        if (!activeFilters.dateFrom || !activeFilters.dateTo) {
-            setDefaultDateRange();
-        } else {
-            // Keep UI in sync with active filter variables
-            const elFrom = document.getElementById('filter-date-from');
-            const elTo = document.getElementById('filter-date-to');
-            if (elFrom) elFrom.value = activeFilters.dateFrom;
-            if (elTo) elTo.value = activeFilters.dateTo;
-        }
-
-        // Run reactive view model compiler
-        buildViewModel();
-
-        // Load ClickUp tasks automatically in the background on startup
-        setTimeout(() => {
-            fetchClickupTasksLive();
-        }, 300);
+        const generatedAt = data.builtAt || rawData.generated_at || data.generated_at || 'Updated just now';
+        updateDashboardConnectionStatus('online', 'Up to date', generatedAt);
+        return { success: true, validation };
     } catch (error) {
-        console.error("Dashboard Load Error:", error);
-        updateStatusUI('error', 'Load Error', 'Check console');
-        alert("Error loading B2B data file. Please ensure your Google Sheet API is correctly configured.");
+        console.warn('Background dashboard refresh failed; preserving the last good snapshot.', error);
+        if (!rawData && dashboardLastCacheRecord && dashboardLastCacheRecord.payload) {
+            try { applyDashboardPayload(dashboardLastCacheRecord.payload); } catch (cacheError) { console.error('Last-good snapshot could not be applied.', cacheError); }
+        }
+        if (rawData) {
+            updateDashboardConnectionStatus('offline', 'Saved data · retrying', dashboardLastCacheRecord ? dashboardCacheAge(dashboardLastCacheRecord.savedAt) : 'Refresh will retry automatically');
+        } else {
+            updateDashboardConnectionStatus('error', 'Unable to load data', 'Retrying automatically…');
+        }
+        scheduleDashboardRetry();
+        return { success: false, error };
     }
 }
 
@@ -2477,6 +2589,10 @@ function setupEventListeners() {
             switchTab(tabId);
         });
     });
+    const notchGuideBtn = document.getElementById('notch-guide-btn');
+    if (notchGuideBtn) {
+        notchGuideBtn.addEventListener('click', () => switchTab(notchGuideBtn.dataset.notchTab));
+    }
 
     // Preset Date buttons
     document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -2730,10 +2846,15 @@ function setupEventListeners() {
                     pseudoElement: '::view-transition-new(root)'
                 }
             );
+        }).catch(() => {
+            // Browsers can abort the visual snapshot while the page is still painting.
+            // The theme class has already changed, so no user-facing recovery is needed.
         });
 
         // Re-render charts AFTER the wipe is fully done — no flicker.
         transition.finished.then(() => {
+            buildViewModel();
+        }).catch(() => {
             buildViewModel();
         });
     });
@@ -2878,6 +2999,10 @@ function switchTab(tabId) {
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.getAttribute('data-tab') === tabId) btn.classList.add('active');
+    });
+    document.querySelectorAll('.vui-notch-action[data-notch-tab]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.notchTab === tabId);
+        btn.setAttribute('aria-current', btn.dataset.notchTab === tabId ? 'page' : 'false');
     });
 
     // Toggle active content container
@@ -5780,12 +5905,15 @@ async function generateAITabNarrative() {
 
 
 function captureDashboardScreenshot() {
-    const captureArea = document.getElementById('weekly-pulse-dashboard-capture-area');
+    const activeTab = document.querySelector('.tab-content.active');
+    const weeklyCapture = document.getElementById('weekly-pulse-dashboard-capture-area');
+    const captureArea = currentTab === 'tab-weekly-pulse' && weeklyCapture ? weeklyCapture : activeTab;
     if (!captureArea) return;
 
     // Add visual indicator class during rendering
     const btn = document.getElementById('screenshot-btn');
-    btn.innerHTML = `<span class="spinner" style="width: 14px; height: 14px; display: inline-block; margin: 0 6px 0 0; vertical-align: middle;"></span> Capturing...`;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = `<span class="spinner" style="width:14px;height:14px;display:inline-block"></span><span>Capturing</span>`;
     btn.disabled = true;
 
     // Add screenshot class to disable gradient text clip
@@ -5803,18 +5931,19 @@ function captureDashboardScreenshot() {
 
         // Trigger download
         const link = document.createElement('a');
-        link.download = `Weekly_Pulse_Dashboard_Report_${activeFilters.dateFrom}_to_${activeFilters.dateTo}.png`;
+        const pageName = (document.getElementById('page-title')?.innerText || 'Dashboard').trim().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '');
+        link.download = `${pageName}_Dashboard_${activeFilters.dateFrom}_to_${activeFilters.dateTo}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
 
         // Restore button state
-        btn.innerHTML = `<span class="btn-icon">📸</span> Take Dashboard Screenshot`;
+        btn.innerHTML = originalHtml;
         btn.disabled = false;
     }).catch(err => {
         console.error("Screenshot capture failed:", err);
         // Remove screenshot class
         captureArea.classList.remove('is-capturing-screenshot');
-        btn.innerHTML = `<span class="btn-icon">📸</span> Take Dashboard Screenshot`;
+        btn.innerHTML = originalHtml;
         btn.disabled = false;
         alert("Unable to generate screenshot. Ensure all chart objects are fully loaded.");
     });
