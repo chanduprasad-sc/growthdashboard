@@ -14,6 +14,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="dashboard.css">
+    <script>
+        (() => {
+            const browserScale = window.outerWidth > 0 && window.innerWidth > 0 ? window.outerWidth / window.innerWidth : 1;
+            const appScale = Math.min(1.5, Math.max(0.5, 0.75 / browserScale));
+            document.documentElement.style.setProperty('--app-zoom', appScale.toFixed(4));
+            document.documentElement.dataset.appZoom = String(appScale);
+        })();
+    </script>
     <!-- Favicon / Thumbnail -->
     <link rel="icon" type="image/png" href="https://dl.svgcdn.com/png/arcticons/smallcase-200.png">
     <link rel="apple-touch-icon" href="https://dl.svgcdn.com/png/arcticons/smallcase-200.png">
@@ -180,6 +188,11 @@
                         <span id="connection-status-text" class="status-text">Local Fallback</span>
                     </div>
                     <strong id="data-gen-time" class="data-time-badge">Loading...</strong>
+                    <div class="source-freshness-list" aria-label="Data source freshness">
+                        <span class="source-freshness" data-freshness-source="devrev"><i></i><b>DevRev</b><small>Checking…</small></span>
+                        <span class="source-freshness" data-freshness-source="ozonetel"><i></i><b>Ozonetel</b><small>Checking…</small></span>
+                        <span class="source-freshness" data-freshness-source="whatsapp"><i></i><b>WhatsApp</b><small>Checking…</small></span>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -372,9 +385,9 @@
                                             </div>
                                             <div class="ozonetel-inline-group">
                                                 <h4>Timing</h4>
-                                                <div><span>Average AHT</span><strong id="hero-oz-aht">00:00:00</strong></div>
-                                                <div><span>Median AHT</span><strong id="hero-oz-median">00:00:00</strong></div>
-                                                <div><span>90th % AHT</span><strong id="hero-oz-p90">00:00:00</strong></div>
+                                                <div><span>Average AHT</span><strong><b id="hero-oz-aht">00:00:00</b><small class="metric-sample" id="hero-oz-aht-n">n=0</small></strong></div>
+                                                <div><span>Median AHT</span><strong><b id="hero-oz-median">00:00:00</b><small class="metric-sample" id="hero-oz-median-n">n=0</small></strong></div>
+                                                <div><span>90th % AHT</span><strong><b id="hero-oz-p90">00:00:00</b><small class="metric-sample" id="hero-oz-p90-n">n=0</small></strong></div>
                                                 <div><span>Talk / Hold</span><strong><b id="hero-oz-talk">00:00:00</b> · <b id="hero-oz-hold">00:00:00</b></strong></div>
                                                 <div><span>Queue Ans / Unans</span><strong><b id="hero-oz-queue-ans">00:00:00</b> · <b id="hero-oz-queue-unans">00:00:00</b></strong></div>
                                             </div>
@@ -467,9 +480,9 @@
                             <div class="kpi-card" id="card-aht">
                                 <span class="kpi-title">Avg Handling Time <small>Ozonetel inbound call timing</small></span>
                                 <div class="kpi-value" id="pulse-aht">00:00</div>
-                                <div class="kpi-desc">Avg duration per answered inbound call</div>
+                                <div class="kpi-desc">Avg duration per answered inbound call <small class="metric-sample" id="pulse-aht-primary-sample">n=0</small></div>
                                 <div class="kpi-sub-info" id="pulse-aht-sub"></div>
-                                <div class="kpi-source-bridge"><span>Median / 90th %</span><strong><b id="pulse-oz-median-aht">00:00:00</b> · <b id="pulse-oz-p90-aht">00:00:00</b></strong></div>
+                                <div class="kpi-source-bridge"><span>Median / 90th % <small class="metric-sample" id="pulse-aht-sample">n=0</small></span><strong><b id="pulse-oz-median-aht">00:00:00</b> · <b id="pulse-oz-p90-aht">00:00:00</b></strong></div>
                             </div>
                             <div class="kpi-card" id="card-aqt">
                                 <span class="kpi-title">Avg Queue Time <small>Ozonetel queue and conversation timing</small></span>
@@ -863,18 +876,18 @@
                                     <div class="card-header">AHT / TIMING</div>
                                     <div class="card-body">
                                         <div class="metric-row">
-                                            <span class="metric-label">Average AHT</span>
+                                            <span class="metric-label">Average AHT <small class="metric-sample" id="md-snap-avg-aht-n">n=0</small></span>
                                             <span class="metric-value-container">
                                                 <span class="metric-value" id="md-snap-avg-aht">0:00</span>
                                                 <span class="change-badge" id="md-snap-aht-change"></span>
                                             </span>
                                         </div>
                                         <div class="metric-row">
-                                            <span class="metric-label">Median AHT</span>
+                                            <span class="metric-label">Median AHT <small class="metric-sample" id="md-snap-median-aht-n">n=0</small></span>
                                             <span class="metric-value" id="md-snap-median-aht">0:00</span>
                                         </div>
                                         <div class="metric-row">
-                                            <span class="metric-label">90th Percentile AHT</span>
+                                            <span class="metric-label">90th Percentile AHT <small class="metric-sample" id="md-snap-90p-aht-n">n=0</small></span>
                                             <span class="metric-value" id="md-snap-90p-aht">0:00</span>
                                         </div>
                                         <div class="metric-row">

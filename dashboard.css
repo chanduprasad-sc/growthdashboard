@@ -4,6 +4,7 @@
    DESIGN SYSTEM - CSS VARIABLES & ROOT
    ========================================================================== */
 :root {
+    --app-zoom: .75;
     /* Typography */
     --font-heading: 'SF Pro Display', -apple-system, 'BlinkMacSystemFont', 'Helvetica Neue', sans-serif;
     --font-body: 'SF Pro Text', -apple-system, 'BlinkMacSystemFont', sans-serif;
@@ -113,6 +114,7 @@ body {
     overflow-x: hidden;
     transition: var(--transition-smooth);
     line-height: 1.5;
+    zoom: var(--app-zoom);
 
     /* Unified Theme Colors mappings */
     --purple: var(--accent-primary);
@@ -3558,6 +3560,48 @@ body.light-mode .agent-breaks-breakdown-wrapper {
     color: var(--text-primary);
     font-family: var(--font-mono);
     word-break: break-all;
+}
+.source-freshness-list {
+    display: grid;
+    gap: 5px;
+    padding-top: 7px;
+    border-top: 1px solid var(--border-color);
+}
+.source-freshness {
+    display: grid;
+    grid-template-columns: 7px minmax(58px, auto) 1fr;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: .65rem;
+    line-height: 1.2;
+}
+.source-freshness i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+.source-freshness b { color: var(--text-primary); font-weight: 700; }
+.source-freshness small { overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.source-freshness.fresh i { background: var(--accent-green); box-shadow: 0 0 7px rgba(var(--accent-green-rgb), .4); }
+.source-freshness.watch i { background: var(--accent-yellow); }
+.source-freshness.stale i,
+.source-freshness.empty i { background: var(--accent-red); }
+
+.metric-sample {
+    display: inline-flex;
+    margin-left: 5px;
+    padding: 1px 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--text-muted);
+    background: rgba(148, 163, 184, .08);
+    font-size: .55rem;
+    font-weight: 750;
+    line-height: 1.35;
+    vertical-align: .08em;
+    white-space: nowrap;
 }
 .status-action-row {
     display: flex;

@@ -308,11 +308,15 @@ function setupZoomIndicator() {
             ? window.outerWidth / window.innerWidth
             : 1;
         const viewportScale = window.visualViewport?.scale || 1;
-        const rawPercent = layoutRatio * viewportScale * 100;
+        const appScale = Number(document.documentElement.dataset.appZoom)
+            || parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-zoom'))
+            || .75;
+        const rawPercent = layoutRatio * viewportScale * appScale * 100;
         const roundedPercent = Math.min(500, Math.max(25, Math.round(rawPercent / 5) * 5));
         indicator.value = `Zoom ${roundedPercent}%`;
         indicator.textContent = `Zoom ${roundedPercent}%`;
         indicator.dataset.zoom = String(roundedPercent);
+        indicator.title = `Effective dashboard scale: ${roundedPercent}%`;
     };
 
     update();
@@ -323,6 +327,7 @@ function setupZoomIndicator() {
 
 // Global State
 let rawData = null;
+let dashboardDataIndexes = null;
 let currentTab = 'tab-weekly-pulse';
 let activityViewMode = 'branch';
 let activitySortKey = 'score';
@@ -727,6 +732,122 @@ function getAnsweredQueueSeconds(call) {
     return Number(call && call.queue_time) || Number(call && call.time_to_answer) || 0;
 }
 
+function getDashboardDateKey(value) {
+    if (!value) return '';
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+    const parsed = safeParseDate(value);
+    if (!parsed || isNaN(parsed.getTime())) return '';
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${parsed.getFullYear()}-${month}-${day}`;
+}
+
+function buildDashboardDataIndexes(data) {
+    const interactionsByDate = new Map();
+    const callsByDate = new Map();
+    const add = (map, row) => {
+        const key = getDashboardDateKey(row && row.date);
+        if (!key) return;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(row);
+    };
+    (data.support_interactions || []).forEach(row => add(interactionsByDate, row));
+    (data.calls || []).forEach(row => add(callsByDate, row));
+    return { interactionsByDate, callsByDate };
+}
+
+function collectIndexedDateRange(index, fromDate, toDate) {
+    if (!index || !fromDate || !toDate) return [];
+    const rows = [];
+    const cursor = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+    const end = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+    while (cursor <= end) {
+        const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+        const bucket = index.get(key);
+        if (bucket) rows.push(...bucket);
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return rows;
+}
+
+function buildViewAggregates(interactions, calls, mappings) {
+    const daily = Object.create(null);
+    const ensureDay = date => {
+        const key = getDashboardDateKey(date);
+        if (!key) return null;
+        if (!daily[key]) daily[key] = {
+            callTickets: 0, answered: 0, missed: 0, aoh: 0, whatsapp: 0, careEmails: 0,
+            ozonetelCalls: 0, ozonetelAnswered: 0, ahtTotal: 0, ahtSamples: 0
+        };
+        return daily[key];
+    };
+
+    const pocStats = Object.create(null);
+    const ensurePoc = value => {
+        const poc = String(value || 'No POC').trim() || 'No POC';
+        if (!pocStats[poc]) pocStats[poc] = {
+            pocName: poc, tkt: 0, wa: 0, total: 0,
+            branches: Object.create(null), rms: Object.create(null), issues: Object.create(null), combinations: Object.create(null), repeatClusters: 0
+        };
+        return pocStats[poc];
+    };
+    (mappings || []).forEach(mapping => { if (mapping.POC) ensurePoc(mapping.POC); });
+
+    (interactions || []).forEach(item => {
+        const day = ensureDay(item.date);
+        let callStatus = String(item.call_status || '').toLowerCase();
+        if (item.type === 'Call Ticket') {
+            if (day) day.callTickets++;
+            if (callStatus === 'other' || !callStatus) {
+                const title = String(item.title || '').toLowerCase();
+                if (title.includes('answered call')) callStatus = 'answered';
+                else if (title.includes('missed call')) callStatus = 'missed';
+                else if (title.includes('aoh call')) callStatus = 'aoh';
+            }
+            if (day && callStatus === 'answered') day.answered++;
+            else if (day && callStatus === 'missed') day.missed++;
+            else if (day && callStatus === 'aoh') day.aoh++;
+        } else if (item.type === 'WhatsApp Chat' && day) day.whatsapp++;
+        else if (item.type === 'Care Email' && day) day.careEmails++;
+
+        const poc = ensurePoc(item.poc);
+        poc.total++;
+        if (item.type === 'Call Ticket') poc.tkt++;
+        else if (item.type === 'WhatsApp Chat') poc.wa++;
+        if (item.branch && item.branch !== 'Not shared') poc.branches[item.branch] = (poc.branches[item.branch] || 0) + 1;
+        if (item.rm_name && item.rm_name !== 'NA') poc.rms[item.rm_name] = (poc.rms[item.rm_name] || 0) + 1;
+        const issue = item.issue || 'General';
+        poc.issues[issue] = (poc.issues[issue] || 0) + 1;
+        const combination = `${item.rm_name}|${item.branch}|${item.issue}|${item.sub_issue}`;
+        poc.combinations[combination] = (poc.combinations[combination] || 0) + 1;
+    });
+
+    (calls || []).forEach(call => {
+        const day = ensureDay(call.date);
+        if (!day) return;
+        day.ozonetelCalls++;
+        const answered = ['answered', 'connected'].includes(String(call.stage || '').toLowerCase());
+        if (answered) {
+            day.ozonetelAnswered++;
+            const duration = getCallAhtSeconds(call);
+            if (duration > 0) {
+                day.ahtTotal += duration;
+                day.ahtSamples++;
+            }
+        }
+    });
+
+    Object.values(pocStats).forEach(poc => {
+        poc.repeatClusters = Object.values(poc.combinations).filter(count => count >= 2).length;
+    });
+
+    return {
+        daily,
+        pocs: pocStats,
+        branchBroker: buildBranchBrokerActivity(interactions, calls, mappings)
+    };
+}
+
 function calculateOzonetelMetrics(calls) {
     const source = Array.isArray(calls) ? calls : [];
     const isAnswered = call => ['answered', 'connected'].includes(String(call.stage || '').toLowerCase());
@@ -760,7 +881,7 @@ function calculateOzonetelMetrics(calls) {
         const upper = Math.ceil(position);
         return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
     };
-    const inboundAht = inboundAnswered.map(getCallAhtSeconds);
+    const inboundAht = inboundAnswered.map(getCallAhtSeconds).filter(value => Number.isFinite(value) && value > 0);
     const unansweredProgressive = progressive.filter(call => !isAnswered(call));
     let progressiveAgent = 0, progressiveUser = 0, progressiveOther = 0;
     unansweredProgressive.forEach(call => {
@@ -785,7 +906,8 @@ function calculateOzonetelMetrics(calls) {
         abandonedRate: inbound.length ? abandoned.length / inbound.length * 100 : 0,
         averageAht: average(inboundAht),
         medianAht: percentile(inboundAht, 0.5),
-        p90Aht: percentile(inbound.map(getCallAhtSeconds), 0.9),
+        p90Aht: percentile(inboundAht, 0.9),
+        ahtSampleSize: inboundAht.length,
         averageTalk: average(inboundAnswered.map(call => Number(call.talk_time) || 0)),
         averageHold: average(inboundAnswered.map(call => Number(call.hold_time) || 0)),
         averageQueueAnswered: average(inboundAnswered.map(getAnsweredQueueSeconds)),
@@ -867,7 +989,7 @@ function buildBranchBrokerActivity(interactions, calls, mappings) {
 function renderBranchBrokerActivity() {
     const body = document.getElementById('activity-table-body');
     if (!body || !window.viewModel) return;
-    const dataset = buildBranchBrokerActivity(
+    const dataset = window.viewModel.aggregates?.branchBroker || buildBranchBrokerActivity(
         window.viewModel.interactions || [],
         window.viewModel.calls || [],
         rawData && rawData.poc_mappings ? rawData.poc_mappings : []
@@ -2268,6 +2390,34 @@ function updateDashboardConnectionStatus(status, label, detail) {
     if (syncBtn) syncBtn.style.display = 'inline-flex';
 }
 
+function updateSourceFreshnessIndicators(data) {
+    const interactions = Array.isArray(data?.support_interactions) ? data.support_interactions : [];
+    const sourceRows = {
+        devrev: interactions.filter(row => row.type === 'Call Ticket' || row.type === 'Care Email'),
+        ozonetel: Array.isArray(data?.calls) ? data.calls : [],
+        whatsapp: interactions.filter(row => row.type === 'WhatsApp Chat')
+    };
+    const parsedGenerated = safeParseDate(data?.generated_at || data?.builtAt);
+    const referenceTime = parsedGenerated && !isNaN(parsedGenerated.getTime()) ? parsedGenerated.getTime() : Date.now();
+    const formatter = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' });
+
+    Object.entries(sourceRows).forEach(([source, rows]) => {
+        const element = document.querySelector(`[data-freshness-source="${source}"]`);
+        if (!element) return;
+        const timestamps = rows.map(row => safeParseDate(row.date)?.getTime()).filter(Number.isFinite);
+        const latest = timestamps.reduce((max, value) => Math.max(max, value), 0);
+        const ageDays = latest ? Math.max(0, Math.floor((referenceTime - latest) / 86400000)) : Infinity;
+        const state = !latest ? 'empty' : ageDays <= 2 ? 'fresh' : ageDays <= 7 ? 'watch' : 'stale';
+        const statusLabel = !latest ? 'No rows' : `${formatter.format(new Date(latest))} · ${rows.length.toLocaleString()}`;
+        element.className = `source-freshness ${state}`;
+        const detail = element.querySelector('small');
+        if (detail) detail.textContent = statusLabel;
+        element.title = !latest
+            ? 'No usable dated rows received for this source.'
+            : `${rows.length.toLocaleString()} rows · latest record ${new Date(latest).toLocaleString('en-IN')} · ${ageDays === 0 ? 'current' : `${ageDays} day${ageDays === 1 ? '' : 's'} behind the dataset build`}`;
+    });
+}
+
 function dashboardCacheAge(savedAt) {
     if (!savedAt) return 'Saved snapshot';
     const minutes = Math.max(0, Math.floor((Date.now() - savedAt) / 60000));
@@ -2282,6 +2432,8 @@ function applyDashboardPayload(data) {
     const validation = validateDashboardPayload(data);
     if (!validation.valid) throw new Error(validation.reason);
     rawData = validation.rawShape ? compileRawCache(data) : data;
+    dashboardDataIndexes = buildDashboardDataIndexes(rawData);
+    updateSourceFreshnessIndicators(rawData);
     populateFilterDropdowns();
     if (!activeFilters.dateFrom || !activeFilters.dateTo) {
         setDefaultDateRange();
@@ -3522,9 +3674,12 @@ function buildViewModel() {
     const toD = safeParseDate(activeFilters.dateTo);
     if (toD) toD.setHours(23, 59, 59, 999);
     const toTs = toD ? toD.getTime() : 0;
+    if (!dashboardDataIndexes) dashboardDataIndexes = buildDashboardDataIndexes(rawData);
+    const interactionCandidates = collectIndexedDateRange(dashboardDataIndexes.interactionsByDate, fromD, toD);
+    const callCandidates = collectIndexedDateRange(dashboardDataIndexes.callsByDate, fromD, toD);
 
     // Filter active interactions
-    const filteredInteractions = rawData.support_interactions.filter(item => {
+    const filteredInteractions = interactionCandidates.filter(item => {
         if (!item.date) return false;
         const itemTs = safeParseDate(item.date).getTime();
         if (isNaN(itemTs)) return false;
@@ -3558,7 +3713,7 @@ function buildViewModel() {
 
     // Filter active raw call logs
     const ignoredCalls = [];
-    const filteredCalls = rawData.calls.filter(call => {
+    const filteredCalls = callCandidates.filter(call => {
         if (!call.date) return false;
         const callTs = safeParseDate(call.date).getTime();
         if (isNaN(callTs)) return false;
@@ -3604,8 +3759,9 @@ function buildViewModel() {
     const prevToD = safeParseDate(prevPeriod.to);
     if (prevToD) prevToD.setHours(23, 59, 59, 999);
     const prevToTs = prevToD ? prevToD.getTime() : 0;
+    const previousInteractionCandidates = collectIndexedDateRange(dashboardDataIndexes.interactionsByDate, prevFromD, prevToD);
 
-    const prevInteractions = rawData.support_interactions.filter(item => {
+    const prevInteractions = previousInteractionCandidates.filter(item => {
         if (!item.date) return false;
         const itemTs = safeParseDate(item.date).getTime();
         if (isNaN(itemTs)) return false;
@@ -3649,6 +3805,8 @@ function buildViewModel() {
         return true;
     });
 
+    const aggregates = buildViewAggregates(filteredInteractions, filteredCalls, rawData.poc_mappings || []);
+
     window.viewModel = {
         interactions: filteredInteractions,
         calls: filteredCalls,
@@ -3658,7 +3816,8 @@ function buildViewModel() {
         fromTs,
         toTs,
         prevFromTs,
-        prevToTs
+        prevToTs,
+        aggregates
     };
 
     // Render components based on active tab
@@ -3845,8 +4004,11 @@ function renderWeeklyOzonetelMetrics(calls) {
         'hero-oz-abandoned': metrics.abandoned.toLocaleString(),
         'hero-oz-abandoned-rate': `${metrics.abandonedRate.toFixed(1)}%`,
         'hero-oz-aht': formatSeconds(metrics.averageAht),
+        'hero-oz-aht-n': `n=${metrics.ahtSampleSize.toLocaleString()}`,
         'hero-oz-median': formatSeconds(metrics.medianAht),
+        'hero-oz-median-n': `n=${metrics.ahtSampleSize.toLocaleString()}`,
         'hero-oz-p90': formatSeconds(metrics.p90Aht),
+        'hero-oz-p90-n': `n=${metrics.ahtSampleSize.toLocaleString()}`,
         'hero-oz-talk': formatSeconds(metrics.averageTalk),
         'hero-oz-hold': formatSeconds(metrics.averageHold),
         'hero-oz-queue-ans': formatSeconds(metrics.averageQueueAnswered),
@@ -3868,6 +4030,7 @@ function renderWeeklyOzonetelMetrics(calls) {
         'pulse-oz-prog-unanswered': progressiveUnanswered.toLocaleString(),
         'pulse-oz-median-aht': formatSeconds(metrics.medianAht),
         'pulse-oz-p90-aht': formatSeconds(metrics.p90Aht),
+        'pulse-aht-sample': `n=${metrics.ahtSampleSize.toLocaleString()}`,
         'pulse-oz-queue-unanswered': formatSeconds(metrics.averageQueueUnanswered),
         'pulse-oz-talk': formatSeconds(metrics.averageTalk),
         'pulse-oz-hold': formatSeconds(metrics.averageHold)
@@ -3974,6 +4137,7 @@ function renderKeyMetricsGrid(interactions, calls) {
     // Average Handling Time (AHT) and Average Queue Time (AQT) from Ozonetel Calls sheet (calls)
     // Only count inbound answered calls for AHT/AQT (progressive/outbound excluded)
     let callAns = 0;
+    let callAhtSamples = 0;
     let totalCallDuration = 0;
     let totalCallQueue = 0;
     
@@ -3984,7 +4148,11 @@ function renderKeyMetricsGrid(interactions, calls) {
         if (!ct || ct === 'inbound') { // inbound or unclassified
             if (st === 'answered' || st === 'connected') {
                 callAns++;
-                totalCallDuration += getCallAhtSeconds(call);
+                const duration = getCallAhtSeconds(call);
+                if (duration > 0) {
+                    totalCallDuration += duration;
+                    callAhtSamples++;
+                }
                 totalCallQueue += getAnsweredQueueSeconds(call);
             }
         }
@@ -4001,20 +4169,25 @@ function renderKeyMetricsGrid(interactions, calls) {
 
     let finalAHT = 0;
     let finalAQT = 0;
+    let finalAhtSampleSize = 0;
 
     if (activeFilters.channel === 'WhatsApp Chat') {
         finalAHT = chatCount > 0 ? totalChatResolution / chatCount : 0;
+        finalAhtSampleSize = chatCount;
         finalAQT = 0;
     } else if (activeFilters.channel === 'Call Ticket' || activeFilters.channel === 'Voice Call') {
-        finalAHT = callAns > 0 ? totalCallDuration / callAns : 0;
+        finalAHT = callAhtSamples > 0 ? totalCallDuration / callAhtSamples : 0;
+        finalAhtSampleSize = callAhtSamples;
         finalAQT = callAns > 0 ? totalCallQueue / callAns : 0;
     } else {
         // Combined
-        if (callAns > 0) {
-            finalAHT = totalCallDuration / callAns;
+        if (callAhtSamples > 0) {
+            finalAHT = totalCallDuration / callAhtSamples;
+            finalAhtSampleSize = callAhtSamples;
             finalAQT = totalCallQueue / callAns;
         } else {
             finalAHT = chatCount > 0 ? totalChatResolution / chatCount : 0;
+            finalAhtSampleSize = chatCount;
             finalAQT = 0;
         }
     }
@@ -4032,6 +4205,8 @@ function renderKeyMetricsGrid(interactions, calls) {
     document.getElementById('pulse-aoh-calls').innerText = aoh.toLocaleString();
     
     document.getElementById('pulse-aht').innerText = formatDuration(finalAHT);
+    const pulseAhtSample = document.getElementById('pulse-aht-primary-sample');
+    if (pulseAhtSample) pulseAhtSample.innerText = `n=${finalAhtSampleSize.toLocaleString()}`;
     document.getElementById('pulse-aqt').innerText = formatDuration(finalAQT);
 
     // --- KPI Sub-Info Population ---
@@ -4137,8 +4312,11 @@ function renderKeyMetricsGrid(interactions, calls) {
             const st = String(c.stage || '').toLowerCase();
             if (!ct || ct === 'inbound') {
                 if (st === 'answered' || st === 'connected') {
-                    prevCallAns++;
-                    prevTotalDur += getCallAhtSeconds(c);
+                    const duration = getCallAhtSeconds(c);
+                    if (duration > 0) {
+                        prevCallAns++;
+                        prevTotalDur += duration;
+                    }
                 }
             }
         });
@@ -4228,64 +4406,12 @@ function renderPOCQueryHeatmap(data) {
     const container = document.getElementById('pulse-poc-blocks-container');
     container.innerHTML = '';
 
-    // Group metrics per POC
-    const pocStats = {};
-    const allPocs = new Set();
-
-    // Collect all POCs seen in data
-    data.forEach(item => {
-        if (item.poc) allPocs.add(item.poc);
-    });
-
-    // Also parse from poc mappings to ensure they exist
-    rawData.poc_mappings.forEach(m => {
-        if (m.POC) allPocs.add(m.POC);
-    });
-
-    allPocs.forEach(poc => {
-        pocStats[poc] = {
-            pocName: poc,
-            tkt: 0,
-            wa: 0,
-            total: 0,
-            branches: {},
-            rms: {},
-            issues: {}
-        };
-    });
-
-    data.forEach(item => {
-        const poc = item.poc || 'No POC';
-        if (!pocStats[poc]) return;
-
-        const s = pocStats[poc];
-        s.total++;
-        if (item.type === 'Call Ticket') s.tkt++;
-        else if (item.type === 'WhatsApp Chat') s.wa++;
-
-        if (item.branch && item.branch !== 'Not shared') s.branches[item.branch] = (s.branches[item.branch] || 0) + 1;
-        if (item.rm_name && item.rm_name !== 'NA') s.rms[item.rm_name] = (s.rms[item.rm_name] || 0) + 1;
-
-        const cat = item.issue || "General";
-        s.issues[cat] = (s.issues[cat] || 0) + 1;
-    });
-
-    // Compute repeat clusters per POC
-    const pocCombinations = {};
-    data.forEach(item => {
-        const poc = item.poc || 'No POC';
-        if (!pocCombinations[poc]) pocCombinations[poc] = {};
-        const combKey = `${item.rm_name}|${item.branch}|${item.issue}|${item.sub_issue}`;
-        pocCombinations[poc][combKey] = (pocCombinations[poc][combKey] || 0) + 1;
-    });
-    const pocRepeatClusters = {};
-    Object.keys(pocCombinations).forEach(poc => {
-        let repeats = 0;
-        Object.values(pocCombinations[poc]).forEach(cnt => {
-            if (cnt >= 2) repeats++;
-        });
-        pocRepeatClusters[poc] = repeats;
-    });
+    // POC grouping is compiled once with the view model and reused by cards/charts.
+    const pocStats = window.viewModel?.aggregates?.pocs || buildViewAggregates(
+        data,
+        window.viewModel?.calls || [],
+        rawData?.poc_mappings || []
+    ).pocs;
 
     // Render cards sorted by total count desc
     Object.values(pocStats).sort((a, b) => b.total - a.total).forEach(poc => {
@@ -4297,7 +4423,7 @@ function renderPOCQueryHeatmap(data) {
         const topBr = Object.keys(poc.branches).sort((a, b) => poc.branches[b] - poc.branches[a])[0] || 'NA';
         const topRM = Object.keys(poc.rms).sort((a, b) => poc.rms[b] - poc.rms[a])[0] || 'NA';
         const topIssue = Object.keys(poc.issues).sort((a, b) => poc.issues[b] - poc.issues[a])[0] || 'NA';
-        const repeats = pocRepeatClusters[name] || 0;
+        const repeats = poc.repeatClusters || 0;
 
         const color = getPocColor(name);
 
@@ -6480,25 +6606,15 @@ function renderVisualControlDashboard() {
 
     // Call Tickets Over Time (answered vs missed vs AOH vs total)
     const callStatusCounts = {};
+    const dailyAggregates = window.viewModel?.aggregates?.daily || {};
     datesArray.forEach(d => {
-        callStatusCounts[d] = { total: 0, answered: 0, missed: 0, aoh: 0 };
-    });
-    data.forEach(item => {
-        if (item.type !== 'Call Ticket' || !item.date) return;
-        const d = item.date.substring(0, 10);
-        if (callStatusCounts[d]) {
-            callStatusCounts[d].total++;
-            let cs = String(item.call_status || "").toLowerCase();
-            if (cs === 'other' || !cs) {
-                const titleLower = (item.title || "").toLowerCase();
-                if (titleLower.includes('missed call')) cs = 'missed';
-                else if (titleLower.includes('aoh call')) cs = 'aoh';
-                else if (titleLower.includes('answered call')) cs = 'answered';
-            }
-            if (cs === 'answered') callStatusCounts[d].answered++;
-            else if (cs === 'missed') callStatusCounts[d].missed++;
-            else if (cs === 'aoh') callStatusCounts[d].aoh++;
-        }
+        const aggregate = dailyAggregates[d] || {};
+        callStatusCounts[d] = {
+            total: aggregate.callTickets || 0,
+            answered: aggregate.answered || 0,
+            missed: aggregate.missed || 0,
+            aoh: aggregate.aoh || 0
+        };
     });
 
     const callTotalPoints = datesArray.map(d => callStatusCounts[d].total);
@@ -6508,24 +6624,12 @@ function renderVisualControlDashboard() {
 
     // WhatsApp Over Time
     const waCounts = {};
-    datesArray.forEach(d => { waCounts[d] = 0; });
-    data.forEach(item => {
-        if (item.type === 'WhatsApp Chat' && item.date) {
-            const d = item.date.substring(0, 10);
-            if (waCounts[d] !== undefined) waCounts[d]++;
-        }
-    });
+    datesArray.forEach(d => { waCounts[d] = dailyAggregates[d]?.whatsapp || 0; });
     const waPoints = datesArray.map(d => waCounts[d]);
 
     // Care Emails Over Time
     const emailCounts = {};
-    datesArray.forEach(d => { emailCounts[d] = 0; });
-    data.forEach(item => {
-        if (item.type === 'Care Email' && item.date) {
-            const d = item.date.substring(0, 10);
-            if (emailCounts[d] !== undefined) emailCounts[d]++;
-        }
-    });
+    datesArray.forEach(d => { emailCounts[d] = dailyAggregates[d]?.careEmails || 0; });
     const emailPoints = datesArray.map(d => emailCounts[d]);
 
     const formatDateLabel = (dStr) => {
@@ -8260,7 +8364,7 @@ function renderMainOverview(data, calls) {
     if (elSnapInboundPct) elSnapInboundPct.innerText = `${inboundAbandonedPct}%`;
 
     // 3. AHT / TIMING (Inbound Answered Calls)
-    const inboundAnsDurations = inboundConnected.map(getCallAhtSeconds);
+    const inboundAnsDurations = inboundConnected.map(getCallAhtSeconds).filter(value => Number.isFinite(value) && value > 0);
     const inboundTalkTimes = inboundConnected.map(c => Number(c.talk_time) || 0);
     const inboundHoldTimes = inboundConnected.map(c => Number(c.hold_time) || 0);
     const inboundQueueAns = inboundConnected.map(getAnsweredQueueSeconds);
@@ -8294,6 +8398,10 @@ function renderMainOverview(data, calls) {
     if (elSnapMedianAht) elSnapMedianAht.innerText = formatDuration(medianAht);
     const elSnap90pAht = document.getElementById('md-snap-90p-aht');
     if (elSnap90pAht) elSnap90pAht.innerText = formatDuration(p90Aht);
+    ['md-snap-avg-aht-n', 'md-snap-median-aht-n', 'md-snap-90p-aht-n'].forEach(id => {
+        const sample = document.getElementById(id);
+        if (sample) sample.innerText = `n=${inboundAnsDurations.length.toLocaleString()}`;
+    });
     const elSnapAvgTalk = document.getElementById('md-snap-avg-talk');
     if (elSnapAvgTalk) elSnapAvgTalk.innerText = formatDuration(avgTalk);
     const elSnapAvgHold = document.getElementById('md-snap-avg-hold');
@@ -9811,17 +9919,9 @@ function renderMonthlyView() {
     const rows = [];
     for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${selectedYear}-${String(selectedMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-        const dayInteractions = allInteractions.filter(d => {
-            if (!d.date) return false;
-            // Use string comparison to avoid timezone shifts
-            const dStr = typeof d.date === 'string' ? d.date.substring(0, 10) : (safeParseDate(d.date) || {}).toISOString?.().substring(0, 10) || '';
-            return dStr === dateStr;
-        });
-        const dayCalls = allCalls.filter(c => {
-            if (!c.date) return false;
-            const dStr = typeof c.date === 'string' ? c.date.substring(0, 10) : (safeParseDate(c.date) || {}).toISOString?.().substring(0, 10) || '';
-            return dStr === dateStr;
-        });
+        if (!dashboardDataIndexes) dashboardDataIndexes = buildDashboardDataIndexes(rawData);
+        const dayInteractions = dashboardDataIndexes.interactionsByDate.get(dateStr) || [];
+        const dayCalls = dashboardDataIndexes.callsByDate.get(dateStr) || [];
 
         // Case-insensitive call_type matching
         const inboundCalls = dayCalls.filter(c => (c.call_type || '').toLowerCase() === 'inbound' || (!c.call_type));
@@ -9867,7 +9967,7 @@ function renderMonthlyView() {
 
         // AHT / Timing
         // Match the source report: AHT is the answered call Duration field.
-        const inboundAnsDurations = inboundConnected.map(getCallAhtSeconds);
+        const inboundAnsDurations = inboundConnected.map(getCallAhtSeconds).filter(value => Number.isFinite(value) && value > 0);
         const inboundTalkTimes = inboundConnected.map(c => Number(c.talk_time) || 0);
         const inboundHoldTimes = inboundConnected.map(c => Number(c.hold_time) || 0);
         const inboundQueueAns = inboundConnected.map(getAnsweredQueueSeconds);
@@ -9951,6 +10051,7 @@ function renderMonthlyView() {
             avg_aht: avgAht,
             median_aht: medianAht,
             p90_aht: p90Aht,
+            aht_n: inboundAnsDurations.length,
             avg_talk: avgTalk,
             avg_hold: avgHold,
             avg_queue_ans: avgQueueAns,
@@ -9971,16 +10072,10 @@ function renderMonthlyView() {
 
     // Build monthly aggregates
     const monthKey = `${selectedYear}-${String(selectedMonth+1).padStart(2,'0')}`;
-    const monthCalls = allCalls.filter(c => {
-        if (!c.date) return false;
-        const parsed = safeParseDate(c.date);
-        return parsed && parsed.getFullYear() === selectedYear && parsed.getMonth() === selectedMonth;
-    });
-    const monthInteractions = allInteractions.filter(i => {
-        if (!i.date) return false;
-        const parsed = safeParseDate(i.date);
-        return parsed && parsed.getFullYear() === selectedYear && parsed.getMonth() === selectedMonth;
-    });
+    const monthStart = new Date(selectedYear, selectedMonth, 1);
+    const monthEnd = new Date(selectedYear, selectedMonth + 1, 0);
+    const monthCalls = collectIndexedDateRange(dashboardDataIndexes.callsByDate, monthStart, monthEnd);
+    const monthInteractions = collectIndexedDateRange(dashboardDataIndexes.interactionsByDate, monthStart, monthEnd);
     
     // Inbound month aggregates
     // Case-insensitive call_type matching for monthly aggregates
@@ -9989,6 +10084,7 @@ function renderMonthlyView() {
     const mInboundUnanswered = mInbound.filter(c => (c.stage || '').toLowerCase() === 'unanswered' || (c.stage || '').toLowerCase() === 'missed' || (c.stage || '').toLowerCase() === 'abandoned');
     const mInboundAoh = mInbound.filter(c => (c.sub_issue || '').toLowerCase() === 'aoh');
     const mInboundAbandonedReal = mInboundUnanswered.filter(c => (c.sub_issue || '').toLowerCase() !== 'aoh');
+    const mInboundAhtDurations = mInboundConnected.map(getCallAhtSeconds).filter(value => Number.isFinite(value) && value > 0);
 
     // Progressive month aggregates
     const mProg = monthCalls.filter(c => (c.call_type || '').toLowerCase().includes('progressive') || (c.call_type || '').toLowerCase().includes('callback'));
@@ -10026,21 +10122,22 @@ function renderMonthlyView() {
         }).length,
         inbound_abandoned_pct: mInbound.length ? (mInboundAbandonedReal.length / mInbound.length * 100).toFixed(1) + '%' : '0.0%',
         // Match the source report: AHT is the answered call Duration field.
-        avg_aht: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+getCallAhtSeconds(c),0)/mInboundConnected.length) : 0,
+        avg_aht: mInboundAhtDurations.length ? Math.round(mInboundAhtDurations.reduce((sum, value) => sum + value, 0) / mInboundAhtDurations.length) : 0,
         median_aht: (() => {
-            const durs = mInboundConnected.map(getCallAhtSeconds);
+            const durs = [...mInboundAhtDurations];
             if(!durs.length) return 0;
             durs.sort((a,b)=>a-b);
             const mid = Math.floor(durs.length/2);
             return durs.length % 2 !== 0 ? durs[mid] : (durs[mid-1] + durs[mid]) / 2;
         })(),
         p90_aht: (() => {
-            const durs = mInboundConnected.map(getCallAhtSeconds);
+            const durs = [...mInboundAhtDurations];
             if(!durs.length) return 0;
             durs.sort((a,b)=>a-b);
             const idx = Math.floor(durs.length * 0.9);
             return durs[Math.min(idx, durs.length-1)];
         })(),
+        aht_n: mInboundAhtDurations.length,
         avg_talk: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.talk_time)||0),0)/mInboundConnected.length) : 0,
         avg_hold: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+(Number(c.hold_time)||0),0)/mInboundConnected.length) : 0,
         avg_queue_ans: mInboundConnected.length ? Math.round(mInboundConnected.reduce((s,c)=>s+getAnsweredQueueSeconds(c),0)/mInboundConnected.length) : 0,
@@ -10110,9 +10207,9 @@ function renderMonthlyView() {
         { label: 'Abandoned %', key: 'inbound_abandoned_pct', isPercent: true, aggregateType: 'pct' },
         
         { label: 'AHT / TIMING', isHeader: true },
-        { label: 'Avg Handling Time (AHT)', key: 'avg_aht', isTime: true, aggregateType: 'time' },
-        { label: 'Median AHT', key: 'median_aht', isTime: true, aggregateType: 'time' },
-        { label: '90th Percentile AHT', key: 'p90_aht', isTime: true, aggregateType: 'time' },
+        { label: 'Avg Handling Time (AHT)', key: 'avg_aht', sampleKey: 'aht_n', isTime: true, aggregateType: 'time' },
+        { label: 'Median AHT', key: 'median_aht', sampleKey: 'aht_n', isTime: true, aggregateType: 'time' },
+        { label: '90th Percentile AHT', key: 'p90_aht', sampleKey: 'aht_n', isTime: true, aggregateType: 'time' },
         { label: 'Avg Talk Time', key: 'avg_talk', isTime: true, aggregateType: 'time' },
         { label: 'Avg Hold Time', key: 'avg_hold', isTime: true, aggregateType: 'time' },
         { label: 'Avg Queue Time (Answered)', key: 'avg_queue_ans', isTime: true, aggregateType: 'time' },
@@ -10157,7 +10254,8 @@ function renderMonthlyView() {
             let val = r[metric.key];
             if (metric.isTime) {
                 // All time metrics rendered as hh:mm:ss for consistency
-                bodyHtml += `<td>${formatDuration(val)}</td>`;
+                const sample = metric.sampleKey ? `<small class="metric-sample">n=${(r[metric.sampleKey] || 0).toLocaleString()}</small>` : '';
+                bodyHtml += `<td>${formatDuration(val)}${sample}</td>`;
             } else if (metric.isMinute) {
                 bodyHtml += `<td>${formatMinutesVal(val)}</td>`;
             } else if (metric.isPercent) {
@@ -10178,7 +10276,8 @@ function renderMonthlyView() {
             aggValHtml = `${aggVal}`;
         } else if (metric.aggregateType === 'time') {
             // All time aggregates as hh:mm:ss
-            aggValHtml = `${formatDuration(aggVal)}`;
+            const sample = metric.sampleKey ? `<small class="metric-sample">n=${(monthAggregates[metric.sampleKey] || 0).toLocaleString()}</small>` : '';
+            aggValHtml = `${formatDuration(aggVal)}${sample}`;
         } else if (metric.aggregateType === 'min') {
             aggValHtml = `${formatMinutesVal(aggVal)}`;
         }
