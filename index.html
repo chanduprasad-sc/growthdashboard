@@ -80,6 +80,10 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5 13 3h-2L9.5 5H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4.5Z"/><circle cx="12" cy="12.5" r="3.5"/></svg>
                 <span>Screenshot</span>
             </button>
+            <button id="sidebar-config-btn" class="vui-notch-action" type="button" title="Configure live Google Sheet">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.03V3h4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.97 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+                <span>Setup</span>
+            </button>
             <button id="notch-guide-btn" class="vui-notch-action" data-notch-tab="tab-guide" type="button" title="Open dashboard guide">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11a1 1 0 0 1 1 1v17a3 3 0 0 0-3-3H4V5.5ZM20 5.5A2.5 2.5 0 0 0 17.5 3H13a1 1 0 0 0-1 1v17a3 3 0 0 1 3-3h5V5.5Z"/></svg>
                 <span>Guide</span>
@@ -90,6 +94,7 @@
             <path class="vui-notch-edge" d="M50 40C25 40 23 66 0 66"/>
         </svg>
         <div class="vui-notch-rail" aria-hidden="true"></div>
+        <output id="zoom-indicator" class="zoom-indicator" aria-live="polite" title="Estimated browser page zoom">Zoom 100%</output>
     </header>
 
     <!-- Floating button to restore sidebar -->
@@ -175,11 +180,6 @@
                         <span id="connection-status-text" class="status-text">Local Fallback</span>
                     </div>
                     <strong id="data-gen-time" class="data-time-badge">Loading...</strong>
-                    <div class="status-action-row">
-                        <button id="sidebar-config-btn" class="sidebar-action-btn" title="Configure Live Google Sheet">
-                            ⚙️ Setup
-                        </button>
-                    </div>
                 </div>
             </div>
         </aside>

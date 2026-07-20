@@ -299,6 +299,27 @@ function initializeVengeanceChartSurfaces() {
     observer.observe(document.body, { childList: true, subtree: true });
 }
 
+function setupZoomIndicator() {
+    const indicator = document.getElementById('zoom-indicator');
+    if (!indicator) return;
+
+    const update = () => {
+        const layoutRatio = window.outerWidth > 0 && window.innerWidth > 0
+            ? window.outerWidth / window.innerWidth
+            : 1;
+        const viewportScale = window.visualViewport?.scale || 1;
+        const rawPercent = layoutRatio * viewportScale * 100;
+        const roundedPercent = Math.min(500, Math.max(25, Math.round(rawPercent / 5) * 5));
+        indicator.value = `Zoom ${roundedPercent}%`;
+        indicator.textContent = `Zoom ${roundedPercent}%`;
+        indicator.dataset.zoom = String(roundedPercent);
+    };
+
+    update();
+    window.addEventListener('resize', update, { passive: true });
+    window.visualViewport?.addEventListener('resize', update, { passive: true });
+}
+
 
 // Global State
 let rawData = null;
@@ -2340,6 +2361,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     initCustomDropdowns();
     initializeVengeanceChartSurfaces();
+    setupZoomIndicator();
     initializeDashboardData();
     window.addEventListener('online', () => loadDashboardData({ reason: 'connection restored' }));
     window.addEventListener('offline', () => {
@@ -2818,40 +2840,13 @@ function setupEventListeners() {
             return;
         }
 
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = rect.left + rect.width / 2;
-        const y = rect.top  + rect.height / 2;
-        const endRadius = Math.hypot(
-            Math.max(x, window.innerWidth  - x),
-            Math.max(y, window.innerHeight - y)
-        );
-
-        // Only swap CSS classes inside the transition callback (very fast).
+        // Keep the transition short and calm: the browser cross-dissolves the
+        // two theme snapshots while chart reconstruction waits until the end.
         const transition = document.startViewTransition(() => {
             applyThemeColors();
         });
 
-        // Start the clip-path wipe once both snapshots are ready.
-        transition.ready.then(() => {
-            document.documentElement.animate(
-                {
-                    clipPath: [
-                        `circle(0px at ${x}px ${y}px)`,
-                        `circle(${endRadius}px at ${x}px ${y}px)`
-                    ]
-                },
-                {
-                    duration: 600,
-                    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-                    pseudoElement: '::view-transition-new(root)'
-                }
-            );
-        }).catch(() => {
-            // Browsers can abort the visual snapshot while the page is still painting.
-            // The theme class has already changed, so no user-facing recovery is needed.
-        });
-
-        // Re-render charts AFTER the wipe is fully done — no flicker.
+        // Re-render charts after the cross-dissolve so canvases do not flash.
         transition.finished.then(() => {
             buildViewModel();
         }).catch(() => {
@@ -5904,7 +5899,23 @@ async function generateAITabNarrative() {
 // -------------------------------------------------------------
 
 
-function captureDashboardScreenshot() {
+function showDashboardNotice(message, type = 'success') {
+    let notice = document.getElementById('dashboard-notice');
+    if (!notice) {
+        notice = document.createElement('div');
+        notice.id = 'dashboard-notice';
+        notice.className = 'dashboard-notice';
+        notice.setAttribute('role', 'status');
+        notice.setAttribute('aria-live', 'polite');
+        document.body.appendChild(notice);
+    }
+    notice.textContent = message;
+    notice.className = `dashboard-notice ${type} visible`;
+    clearTimeout(notice._hideTimer);
+    notice._hideTimer = setTimeout(() => notice.classList.remove('visible'), 4200);
+}
+
+async function captureDashboardScreenshot() {
     const activeTab = document.querySelector('.tab-content.active');
     const weeklyCapture = document.getElementById('weekly-pulse-dashboard-capture-area');
     const captureArea = currentTab === 'tab-weekly-pulse' && weeklyCapture ? weeklyCapture : activeTab;
@@ -5919,34 +5930,65 @@ function captureDashboardScreenshot() {
     // Add screenshot class to disable gradient text clip
     captureArea.classList.add('is-capturing-screenshot');
 
-    // Use html2canvas to capture the DOM segment
-    html2canvas(captureArea, {
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: document.body.classList.contains('light-mode') ? '#f8fafc' : '#060a13',
-        scale: 2 // High-quality 2x scaling
-    }).then(canvas => {
-        // Remove screenshot class
-        captureArea.classList.remove('is-capturing-screenshot');
+    try {
+        if (typeof html2canvas !== 'function') throw new Error('Screenshot library is unavailable');
+        if (document.fonts?.ready) await document.fonts.ready;
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-        // Trigger download
-        const link = document.createElement('a');
+        const bounds = captureArea.getBoundingClientRect();
+        const width = Math.max(1, captureArea.scrollWidth || bounds.width);
+        const height = Math.max(1, captureArea.scrollHeight || bounds.height);
+        const dimensionScale = Math.min(2, 14000 / width, 14000 / height);
+        const areaScale = Math.sqrt(80000000 / (width * height));
+        const preferredScale = Math.max(.75, Math.min(dimensionScale, areaScale));
+        const backgroundColor = document.body.classList.contains('light-mode') ? '#f3f5fa' : '#0b090e';
+        const baseOptions = {
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor,
+            logging: false,
+            imageTimeout: 12000,
+            removeContainer: true,
+            scrollX: 0,
+            scrollY: -window.scrollY,
+            onclone: clonedDocument => clonedDocument.documentElement.classList.add('screenshot-rendering'),
+            ignoreElements: element => {
+                if (element.tagName !== 'IMG') return false;
+                const source = element.currentSrc || element.src || '';
+                try { return source && new URL(source, location.href).origin !== location.origin; }
+                catch (_) { return false; }
+            }
+        };
+
+        let canvas;
+        try {
+            canvas = await html2canvas(captureArea, { ...baseOptions, scale: preferredScale });
+        } catch (firstError) {
+            console.warn('High-resolution screenshot attempt failed; retrying in compatibility mode.', firstError);
+            canvas = await html2canvas(captureArea, { ...baseOptions, scale: 1, foreignObjectRendering: false });
+        }
+
+        const blob = await new Promise((resolve, reject) => {
+            canvas.toBlob(result => result ? resolve(result) : reject(new Error('PNG encoding failed')), 'image/png');
+        });
         const pageName = (document.getElementById('page-title')?.innerText || 'Dashboard').trim().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '');
+        const link = document.createElement('a');
+        const objectUrl = URL.createObjectURL(blob);
         link.download = `${pageName}_Dashboard_${activeFilters.dateFrom}_to_${activeFilters.dateTo}.png`;
-        link.href = canvas.toDataURL('image/png');
+        link.href = objectUrl;
+        document.body.appendChild(link);
         link.click();
-
-        // Restore button state
-        btn.innerHTML = originalHtml;
-        btn.disabled = false;
-    }).catch(err => {
-        console.error("Screenshot capture failed:", err);
-        // Remove screenshot class
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+        showDashboardNotice('Screenshot downloaded successfully.', 'success');
+    } catch (error) {
+        console.error('Screenshot capture failed:', error);
+        showDashboardNotice('Screenshot could not be created. Try once more after the charts finish loading.', 'error');
+    } finally {
         captureArea.classList.remove('is-capturing-screenshot');
         btn.innerHTML = originalHtml;
         btn.disabled = false;
-        alert("Unable to generate screenshot. Ensure all chart objects are fully loaded.");
-    });
+    }
 }
 
 function openPocDeepDiveModal(pocName) {

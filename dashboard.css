@@ -143,7 +143,7 @@ body {
     padding: 3px;
     border: 1px solid var(--border-color);
     border-radius: 10px;
-    background: color-mix(in srgb, var(--bg-main) 72%, transparent);
+    background: rgba(148, 163, 184, .08);
 }
 
 .activity-view-btn {
@@ -327,7 +327,7 @@ body {
 .activity-status--high { color: var(--accent-green); background: rgba(var(--accent-green-rgb), .12); }
 .activity-status--active { color: var(--accent-blue); background: rgba(var(--accent-blue-rgb), .12); }
 .activity-status--low { color: var(--accent-yellow); background: rgba(var(--accent-yellow-rgb), .13); }
-.activity-status--inactive { color: var(--text-muted); background: color-mix(in srgb, var(--text-muted) 12%, transparent); }
+.activity-status--inactive { color: var(--text-muted); background: rgba(148, 163, 184, .12); }
 .activity-empty { padding: 36px !important; color: var(--text-muted) !important; text-align: center !important; }
 
 @media (max-width: 980px) {
@@ -456,6 +456,7 @@ body.light-mode .blob {
     z-index: 100;
     box-shadow: 0 12px 40px var(--card-shadow);
     transition: var(--transition-smooth);
+    overflow: hidden;
 }
 
 /* Sidebar collapse/expand styles */
@@ -556,6 +557,11 @@ body.sidebar-collapsed .vui-notch-shell {
     flex-direction: column;
     gap: 10px;
     flex-grow: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, .28) transparent;
 }
 .nav-btn {
     display: flex;
@@ -607,6 +613,7 @@ body.light-mode .nav-btn.active {
     gap: 18px;
     border-top: 1px solid var(--border-color);
     padding-top: 24px;
+    flex: 0 0 auto;
 }
 .theme-toggle {
     display: flex;
@@ -690,7 +697,7 @@ body.dark-mode .moon-icon {
 
 /* Vengeance UI Notch Navbar — adapted for the dashboard's vanilla stack */
 .vui-notch-shell {
-    --notch-surface: color-mix(in srgb, var(--bg-main) 94%, transparent);
+    --notch-surface: rgba(11, 9, 14, .94);
     position: fixed;
     top: 0;
     left: 310px;
@@ -702,12 +709,13 @@ body.dark-mode .moon-icon {
     pointer-events: none;
     transition: left 280ms cubic-bezier(.22, 1, .36, 1);
 }
+body.light-mode .vui-notch-shell { --notch-surface: rgba(243, 245, 250, .96); }
 .vui-notch-rail {
     flex: 1 1 60px;
     height: 40px;
     background: var(--notch-surface);
     border-bottom: 1px solid var(--border-color);
-    box-shadow: 0 1px 0 color-mix(in srgb, var(--text-primary) 5%, transparent);
+    box-shadow: 0 1px 0 rgba(15, 23, 42, .05);
     backdrop-filter: blur(18px) saturate(135%);
     -webkit-backdrop-filter: blur(18px) saturate(135%);
 }
@@ -727,7 +735,7 @@ body.dark-mode .moon-icon {
 .vui-notch-core {
     pointer-events: auto;
     height: 66px;
-    min-width: 520px;
+    min-width: 610px;
     padding: 0 10px 9px;
     display: flex;
     align-items: flex-end;
@@ -767,8 +775,8 @@ body.dark-mode .moon-icon {
 .vui-notch-action:hover,
 .vui-notch-action.active {
     color: var(--text-primary);
-    background: color-mix(in srgb, var(--text-primary) 7%, transparent);
-    border-color: color-mix(in srgb, var(--text-primary) 10%, transparent);
+    background: rgba(148, 163, 184, .12);
+    border-color: rgba(148, 163, 184, .2);
 }
 .vui-notch-action:active { transform: translateY(1px); }
 .vui-notch-action:focus-visible {
@@ -787,6 +795,25 @@ body.dark-mode .moon-icon {
     stroke-linecap: round;
     stroke-linejoin: round;
     transition: transform .35s cubic-bezier(.22, 1, .36, 1), opacity .25s ease;
+}
+.zoom-indicator {
+    position: absolute;
+    top: 9px;
+    right: 10px;
+    min-width: 72px;
+    height: 24px;
+    padding: 0 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font: 700 .65rem/1 var(--font-heading);
+    letter-spacing: .01em;
+    box-shadow: 0 4px 14px rgba(8, 15, 30, .06);
+    pointer-events: none;
 }
 
 /* ==========================================================================
@@ -4644,31 +4671,23 @@ body.light-mode .scrollbar-themed::-webkit-scrollbar-thumb {
    VIEW TRANSITION & THEME TOGGLER ANIMATIONS
    ========================================================================== */
 
-/* Suppress default cross-fade so our clip-path animation is the only thing */
+/* Smooth, short cross-dissolve between color modes */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-    animation: none !important;
     mix-blend-mode: normal !important;
+    animation-duration: 340ms !important;
+    animation-timing-function: cubic-bezier(.22, 1, .36, 1) !important;
 }
-/* Old snapshot stays underneath */
 ::view-transition-old(root) {
     z-index: 1 !important;
-    /* Keep old frame fully opaque — no fading */
-    opacity: 1 !important;
+    animation-name: theme-fade-out !important;
 }
-/* New snapshot clips in from the top */
 ::view-transition-new(root) {
-    z-index: 9999 !important;
-    opacity: 1 !important;
+    z-index: 2 !important;
+    animation-name: theme-fade-in !important;
 }
-.light-mode {
-    view-transition-name: root;
-}
-.dark-mode {
-    view-transition-name: root;
-}
-
-
+@keyframes theme-fade-out { to { opacity: 0; filter: brightness(.96); } }
+@keyframes theme-fade-in { from { opacity: 0; filter: brightness(1.04); } }
 /* --- Custom Popover Select Dropdowns (shadcn/ui inspired) --- */
 .custom-select-wrapper {
     position: relative;
@@ -5901,15 +5920,15 @@ body.light-mode .modal-badge-info {
     inherits: false;
 }
 .nav-btn[data-tab="tab-daily-tools"] {
-    --liquid-metal-fill: color-mix(in srgb, var(--bg-sidebar) 94%, #111827);
+    --liquid-metal-fill: rgba(18, 18, 24, .97);
     border: 2px solid transparent !important;
     background:
         linear-gradient(var(--liquid-metal-fill), var(--liquid-metal-fill)) padding-box,
         conic-gradient(from var(--liquid-metal-angle), #111318 0deg, #d7dde6 36deg, #4c525b 72deg, #fff 112deg, #777e88 151deg, #171a20 205deg, #f7f9fc 253deg, #565d68 302deg, #111318 360deg) border-box !important;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 10%, transparent), 0 7px 20px -13px rgba(210, 219, 232, .9) !important;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), 0 7px 20px -13px rgba(210, 219, 232, .9) !important;
     animation: vui-liquid-metal-flow 4.8s linear infinite;
 }
-body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: color-mix(in srgb, var(--bg-sidebar) 96%, #fff); }
+body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: rgba(250, 251, 253, .98); }
 .nav-btn[data-tab="tab-daily-tools"]:hover,
 .nav-btn[data-tab="tab-daily-tools"].active {
     color: var(--text-primary) !important;
@@ -5927,10 +5946,10 @@ body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: colo
 .vui-agent-bento-card.vui-agent-bento-card {
     position: relative;
     overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent) !important;
+    border: 1px solid var(--border-color) !important;
     border-radius: 20px !important;
-    background: color-mix(in srgb, var(--bg-card) 96%, transparent) !important;
-    box-shadow: 0 0 0 1px color-mix(in srgb, #fff 4%, transparent), 0 2px 5px rgba(8, 15, 30, .05), 0 16px 34px -30px rgba(8, 15, 30, .48) !important;
+    background: var(--bg-card) !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.04), 0 2px 5px rgba(8, 15, 30, .05), 0 16px 34px -30px rgba(8, 15, 30, .48) !important;
     transition: transform 220ms cubic-bezier(.22, 1, .36, 1), border-color 220ms ease, box-shadow 220ms ease !important;
 }
 .vui-agent-bento-card.vui-agent-bento-card::before {
@@ -5939,12 +5958,12 @@ body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: colo
     inset: 0;
     pointer-events: none;
     border-radius: inherit;
-    background: linear-gradient(145deg, color-mix(in srgb, #fff 7%, transparent), transparent 34%);
+    background: linear-gradient(145deg, rgba(255,255,255,.07), transparent 34%);
 }
 .vui-agent-bento-card.vui-agent-bento-card:hover {
     transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--accent-primary) 24%, var(--border-color)) !important;
-    box-shadow: 0 0 0 1px color-mix(in srgb, #fff 5%, transparent), 0 5px 12px rgba(8, 15, 30, .07), 0 22px 42px -30px rgba(var(--accent-primary-rgb), .3) !important;
+    border-color: rgba(var(--accent-primary-rgb), .24) !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.05), 0 5px 12px rgba(8, 15, 30, .07), 0 22px 42px -30px rgba(var(--accent-primary-rgb), .3) !important;
 }
 .vui-agent-bento-card.vui-agent-bento-card canvas {
     border-radius: 14px;
@@ -5952,7 +5971,7 @@ body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: colo
 
 @media (max-width: 900px) {
     .vui-notch-shell { left: 20px; right: 20px; }
-    .vui-notch-core { min-width: 450px; }
+    .vui-notch-core { min-width: 540px; }
     .workspace,
     body.sidebar-collapsed .workspace { padding-top: 88px; }
 }
@@ -5963,7 +5982,49 @@ body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: colo
     .vui-notch-rail { flex-basis: 8px; }
     .vui-notch-action { width: 42px; padding: 0; }
     .vui-notch-action > span:not(.theme-toggle-icon-container) { display: none; }
+    .zoom-indicator { top: 70px; right: 0; }
 }
+
+/* Browser zoom reduces the effective viewport height; keep every nav item reachable. */
+@media (max-height: 950px) and (min-width: 901px) {
+    .sidebar { top: 16px; bottom: 16px; padding: 18px 16px; }
+    .brand { margin-bottom: 16px; }
+    .nav-menu { gap: 3px; padding-right: 3px; }
+    .nav-btn { height: 38px !important; padding-inline: 14px !important; }
+    .sidebar-footer { gap: 10px; padding-top: 12px; }
+    .connection-status-panel { gap: 5px; padding: 10px 12px; margin-top: 0; }
+}
+
+.dashboard-notice {
+    position: fixed;
+    top: 76px;
+    right: 24px;
+    z-index: 140;
+    max-width: min(390px, calc(100vw - 32px));
+    padding: 11px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: 0 14px 36px rgba(8, 15, 30, .16);
+    font: 650 .75rem/1.45 var(--font-heading);
+    opacity: 0;
+    transform: translateY(-8px);
+    pointer-events: none;
+    transition: opacity 180ms ease, transform 220ms cubic-bezier(.22, 1, .36, 1);
+}
+.dashboard-notice.visible { opacity: 1; transform: translateY(0); }
+.dashboard-notice.success { border-color: rgba(var(--accent-green-rgb), .34); }
+.dashboard-notice.error { border-color: rgba(var(--accent-red-rgb), .4); }
+
+/* Stable html2canvas rendering: no animation frames or decorative overlays in the clone. */
+html.screenshot-rendering *,
+html.screenshot-rendering *::before,
+html.screenshot-rendering *::after {
+    animation: none !important;
+    transition: none !important;
+}
+html.screenshot-rendering .vui-agent-bento-card::before { display: none !important; }
 
 /* Dual RM / Agent metric deep-dive */
 .metrics-deepdive-content {
@@ -6041,7 +6102,7 @@ body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: colo
 .metric-count--good { color: var(--accent-green); background: rgba(var(--accent-green-rgb), .1); }
 .metric-count--risk { color: var(--accent-red); background: rgba(var(--accent-red-rgb), .1); }
 .metric-rate { display: flex; align-items: center; gap: 9px; min-width: 150px; }
-.metric-rate > span { width: 90px; height: 6px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--text-muted) 14%, transparent); }
+.metric-rate > span { width: 90px; height: 6px; overflow: hidden; border-radius: 999px; background: rgba(148, 163, 184, .14); }
 .metric-rate i { display: block; height: 100%; border-radius: inherit; }
 .metric-rate i.good { background: var(--accent-green); }
 .metric-rate i.watch { background: var(--accent-yellow); }
@@ -6065,6 +6126,8 @@ body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: colo
     .nav-btn[data-tab="tab-daily-tools"] { animation: none; }
     .vui-agent-bento-card,
     .vui-notch-action { transition: none !important; }
+    ::view-transition-old(root),
+    ::view-transition-new(root) { animation: none !important; }
 }
 
 /* Integrated DevRev + Ozonetel Weekly Pulse cards */
@@ -6124,7 +6187,7 @@ body.light-mode .nav-btn[data-tab="tab-daily-tools"] { --liquid-metal-fill: colo
     gap: 8px;
     min-height: 24px;
     padding: 4px 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
+    border-bottom: 1px solid var(--border-color);
 }
 .ozonetel-inline-group > div:last-child { border-bottom: 0; }
 .ozonetel-inline-group span {
