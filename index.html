@@ -164,7 +164,7 @@
                     Agent Performance
                 </button>
                 <button class="nav-btn" data-tab="tab-branch-broker-activity">
-                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 21h18v-2H3v2zm2-4h4V7H5v10zm6 0h4V3h-4v14zm6 0h4v-7h-4v7z"/></svg>
+                    <span class="nav-icon nav-icon-emoji" aria-hidden="true">🏥</span>
                     Branch &amp; Broker Activity
                 </button>
                 <button class="nav-btn" data-tab="tab-chart-visualization">
@@ -1729,13 +1729,7 @@
                     <h2 class="section-heading">🧠 Cross-Channel Intelligence</h2>
                 </div>
                 
-                <!-- Sub-tab pills for inner navigation -->
-                <div class="sub-tab-pills" id="intel-sub-tabs" style="margin-bottom: 20px;">
-                    <button class="sub-tab-pill active" data-subtab="intel-overview">🔮 Operations Intelligence</button>
-                    <button class="sub-tab-pill" data-subtab="intel-branches">🏥 Branch Activity Monitor</button>
-                </div>
-
-                <!-- Intel Sub-Tab 1: Overview -->
+                <!-- Operations Intelligence -->
                 <div class="sub-tab-content active" id="intel-overview">
                     <div class="intelligence-grid" id="intel-grid">
                     <!-- Smart Executive Insights Panel -->
@@ -1849,74 +1843,7 @@
                         <canvas id="intel-sankey-canvas" height="400" style="width:100%;"></canvas>
                     </div>
                 </div>
-                </div> <!-- End of intel-overview sub-tab-content -->
-
-                <!-- Intel Sub-Tab 2: Branch Activity Monitor -->
-                <div class="sub-tab-content" id="intel-branches">
-                    <div class="intelligence-grid">
-                        <!-- KPI Scorecards -->
-                        <div class="intelligence-panel full-width" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; background: transparent; border: none; padding: 0;">
-                            <div class="agent-score-card">
-                                <div class="score-label">Active Branches</div>
-                                <div class="score-value text-green" id="intel-branch-active-count">0</div>
-                            </div>
-                            <div class="agent-score-card">
-                                <div class="score-label">Inactive/Dormant Branches</div>
-                                <div class="score-value text-red" id="intel-branch-inactive-count">0</div>
-                            </div>
-                            <div class="agent-score-card">
-                                <div class="score-label">Total Registered Branches</div>
-                                <div class="score-value" id="intel-branch-total-count">0</div>
-                            </div>
-                            <div class="agent-score-card">
-                                <div class="score-label">Dormancy Rate</div>
-                                <div class="score-value text-orange" id="intel-branch-dormancy-rate">0%</div>
-                            </div>
-                        </div>
-
-                        <!-- Left Panel: Status Distribution Donut Chart -->
-                        <div class="intelligence-panel" style="grid-column: span 1;">
-                            <div class="panel-title"><span class="panel-icon">📊</span> Branch Health Distribution</div>
-                            <div style="height: 250px; position: relative;">
-                                <canvas id="intel-branch-status-donut"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Right Panel: Top Inactive Branches Alert List -->
-                        <div class="intelligence-panel" style="grid-column: span 1;">
-                            <div class="panel-title"><span class="panel-icon">⚠️</span> High-Risk Inactive Branches</div>
-                            <div class="scrollbar-themed" style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;" id="intel-branch-inactive-list">
-                                <!-- Dynamic risk cards -->
-                            </div>
-                        </div>
-
-                        <!-- Full Width: Detailed Branch Activity Matrix -->
-                        <div class="intelligence-panel full-width">
-                            <div class="panel-title"><span class="panel-icon">📋</span> Branch Engagement Matrix</div>
-                            <div class="agent-comparison-table-wrapper">
-                                <div class="monthly-table-scroll scrollbar-themed" style="max-height: 45vh; overflow-y: auto;">
-                                    <table class="agent-comparison-table" id="intel-branch-matrix-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Branch Name</th>
-                                                <th>Status</th>
-                                                <th>Active Calls</th>
-                                                <th>Active WA</th>
-                                                <th>Active Emails</th>
-                                                <th>Total (Active)</th>
-                                                <th>Last Activity Date</th>
-                                                <th>Days Dormant</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="intel-branch-matrix-body">
-                                            <!-- Dynamic rows -->
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                </div> <!-- End of intelligence content -->
             </section>
 
             <!-- SUB-DASHBOARD 5: MONTHLY VIEW -->
