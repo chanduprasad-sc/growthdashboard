@@ -12551,7 +12551,11 @@ function renderDailyForms() {
     const count = document.getElementById('daily-forms-count');
     if (!list) return;
 
-    const combined = DEFAULT_DAILY_FORMS.concat(Array.isArray(rawData.forms) ? rawData.forms : []);
+    // Column K is authoritative: preserve the sheet's row order exactly. The
+    // legacy ClickUp forms are used only while the sheet-backed payload is not
+    // available (for example before the updated Apps Script is deployed).
+    const sheetForms = Array.isArray(rawData.forms) ? rawData.forms : [];
+    const combined = sheetForms.length ? sheetForms : DEFAULT_DAILY_FORMS;
     const seen = new Set();
     const forms = combined.map((item, index) => ({
         name: String(item && (item.name || item.label || item.title) || `Form ${index + 1}`).trim(),
