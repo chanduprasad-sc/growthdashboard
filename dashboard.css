@@ -1051,6 +1051,7 @@ body.light-mode .visual-card:hover {
     align-items: flex-end;
     gap: 20px;
 }
+.date-filter-row { align-items: flex-start; }
 .filter-row-sub {
     display: flex;
     flex-wrap: wrap;
@@ -1129,7 +1130,7 @@ body.light-mode .preset-btn.active, body.light-mode .pill-btn.active {
     align-items: center;
     gap: 7px;
     min-height: 22px;
-    margin: -7px 0 14px;
+    margin: 2px 0 0;
     color: var(--text-secondary);
     font-size: .72rem;
     line-height: 1.4;
@@ -6453,7 +6454,7 @@ html.screenshot-rendering .vui-agent-bento-card::before { display: none !importa
 }
 .interaction-hero-layout {
     display: grid;
-    grid-template-columns: minmax(220px, .72fr) minmax(390px, 1.45fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 24px;
     height: 100%;
 }
@@ -6492,33 +6493,18 @@ html.screenshot-rendering .vui-agent-bento-card::before { display: none !importa
 .ozonetel-inline-group--timing {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 0;
+    grid-template-columns: minmax(0, 1fr);
     padding: 13px 0 0;
     border-top: 1px solid var(--border-color);
     border-left: 0;
 }
 .ozonetel-inline-group--timing h4 { grid-column: 1 / -1; }
 .ozonetel-inline-group--timing > div {
-    grid-column: span 2;
     min-width: 0;
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 2px 11px;
-    border-bottom: 0;
-    border-left: 1px solid var(--border-color);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-color);
+    border-left: 0;
 }
-.ozonetel-inline-group--timing > div:first-of-type { padding-left: 0; border-left: 0; }
-.ozonetel-inline-group--timing > div:nth-of-type(3) { padding-right: 0; }
-.ozonetel-inline-group--timing > div:nth-of-type(n + 4) {
-    grid-column: span 3;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border-color);
-}
-.ozonetel-inline-group--timing > div:nth-of-type(4) { padding-left: 0; border-left: 0; }
-.ozonetel-inline-group--timing > div:last-child { padding-right: 0; }
-.ozonetel-inline-group--timing > div strong { margin-top: 3px; }
 .ozonetel-inline-group h4 {
     margin-bottom: 7px;
     color: var(--accent-primary);
@@ -6634,7 +6620,7 @@ html.screenshot-rendering .vui-agent-bento-card::before { display: none !importa
 }
 
 @media (max-width: 1450px) {
-    .interaction-hero-layout { grid-template-columns: minmax(190px, .6fr) minmax(360px, 1.4fr); gap: 18px; }
+    .interaction-hero-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
     .interaction-hero-ozonetel { padding-left: 17px; }
     .ozonetel-inline-group { padding: 0 9px; }
     .ozonetel-inline-group span { font-size: .58rem; }
@@ -6642,7 +6628,7 @@ html.screenshot-rendering .vui-agent-bento-card::before { display: none !importa
 }
 @media (max-width: 1200px) {
     #card-interactions { min-height: 300px; }
-    .interaction-hero-layout { grid-template-columns: minmax(230px, .7fr) minmax(450px, 1.3fr); }
+    .interaction-hero-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 850px) {
     #card-interactions { grid-column: span 1; }
@@ -6653,10 +6639,7 @@ html.screenshot-rendering .vui-agent-bento-card::before { display: none !importa
     .ozonetel-inline-groups { grid-template-columns: 1fr; }
     .ozonetel-inline-group { padding: 11px 0; border-top: 1px solid var(--border-color); border-left: 0; }
     .ozonetel-inline-group:first-child { padding-top: 0; border-top: 0; }
-    .ozonetel-inline-group--timing { grid-column: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .ozonetel-inline-group--timing > div,
-    .ozonetel-inline-group--timing > div:nth-of-type(n + 4) { grid-column: span 1; }
-    .ozonetel-inline-group--timing > div:nth-of-type(odd) { padding-left: 0; border-left: 0; }
+    .ozonetel-inline-group--timing { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

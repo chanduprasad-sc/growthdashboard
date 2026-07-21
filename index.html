@@ -270,7 +270,7 @@
             <!-- Filters Panel (Global) -->
             <div class="filter-panel weekly-filters-container">
                 <!-- Row 1: Preset Timeline & Custom Range -->
-                <div class="filter-row" style="margin-bottom: 16px;">
+                <div class="filter-row date-filter-row" style="margin-bottom: 16px;">
                     <!-- Date Presets -->
                     <div class="filter-group">
                         <label class="filter-label">Preset Timeline</label>
@@ -296,12 +296,11 @@
                             <input type="date" id="filter-date-to" class="date-input-field" placeholder="End Date">
                             <button id="apply-date-btn" class="apply-date-btn-direct">Apply Range</button>
                         </div>
+                        <div id="date-comparison-note" class="date-comparison-note" aria-live="polite">
+                            <span aria-hidden="true">⇄</span>
+                            <span>Comparison period will appear after the dates load.</span>
+                        </div>
                     </div>
-                </div>
-
-                <div id="date-comparison-note" class="date-comparison-note" aria-live="polite">
-                    <span aria-hidden="true">⇄</span>
-                    <span>Comparison period will appear after the dates load.</span>
                 </div>
 
                 <!-- Row 2: Channel, Select Dropdowns, Reset -->
