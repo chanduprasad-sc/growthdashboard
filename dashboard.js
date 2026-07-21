@@ -2041,7 +2041,8 @@ function compileRawCache(cache) {
         "agent_scorecards": agent_scorecards,
         "redashQueries": cache.redashQueries || [],
         "importantLinks": cache.importantLinks || [],
-        "importantSheets": cache.importantSheets || []
+        "importantSheets": cache.importantSheets || [],
+        "forms": cache.forms || []
     };
 }
 
@@ -12333,10 +12334,17 @@ function initCustomDropdowns() {
 // ================================================================
 // DAILY TOOLS — REDASH & CLICKUP DASHBOARD INTEGRATION
 // ================================================================
-let dtActiveSubTab = 'dt-redash';
+let dtActiveSubTab = 'dt-forms';
 let clickupTasks = [];
+let clickupFetchAttempted = false;
+let clickupFetchInFlight = false;
 let clickupActiveTab = 'active'; // 'active' or 'closed'
 let clickupModalActiveTab = 'active'; // 'active' or 'closed'
+
+const DEFAULT_DAILY_FORMS = [
+    { name: 'CX ROTA Form', url: 'https://forms.clickup.com/603234/f/jd32-9404/UM47JAM7C8QS7RT2B2' },
+    { name: 'Publisher ROTA request form', url: 'https://forms.clickup.com/603234/f/jd32-25844/2HV47GR6UHDI4L0IX9' }
+];
 
 function renderDailyToolsTab() {
     // Setup sub-tab event listeners (only once)
@@ -12460,6 +12468,7 @@ function renderDailyToolsTab() {
     // hardcoded fallback cards never flash when a sub-tab is opened.
     renderNamedLinks('important-links-grid', rawData.importantLinks || [], 'link');
     renderNamedLinks('important-sheets-grid', rawData.importantSheets || [], 'sheet');
+    renderDailyForms();
 
     if (dtActiveSubTab === 'dt-redash') {
         renderRedashQueries();
@@ -12523,6 +12532,77 @@ function getSafeExternalUrl(value) {
     }
 }
 
+function getEmbeddableFormUrl(value) {
+    const safeUrl = getSafeExternalUrl(value);
+    if (!safeUrl) return '';
+    try {
+        const url = new URL(safeUrl);
+        if (url.hostname === 'docs.google.com' && url.pathname.includes('/forms/')) {
+            url.searchParams.set('embedded', 'true');
+        }
+        return url.href;
+    } catch (e) {
+        return safeUrl;
+    }
+}
+
+function renderDailyForms() {
+    const list = document.getElementById('daily-forms-list');
+    const count = document.getElementById('daily-forms-count');
+    if (!list) return;
+
+    const combined = DEFAULT_DAILY_FORMS.concat(Array.isArray(rawData.forms) ? rawData.forms : []);
+    const seen = new Set();
+    const forms = combined.map((item, index) => ({
+        name: String(item && (item.name || item.label || item.title) || `Form ${index + 1}`).trim(),
+        url: getSafeExternalUrl(item && (item.url || item.link))
+    })).filter(item => {
+        if (!item.url) return false;
+        const key = item.url.toLowerCase().replace(/\/$/, '');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    if (count) count.textContent = `${forms.length} ${forms.length === 1 ? 'form' : 'forms'}`;
+    const signature = forms.map(form => `${form.name}|${form.url}`).join('||');
+    if (list.dataset.formsSignature === signature) return;
+    list.dataset.formsSignature = signature;
+    if (!forms.length) {
+        list.innerHTML = `
+            <div class="daily-tools-empty">
+                <strong>No forms found</strong>
+                <span>Add linked form names directly in column K, or use columns K and L as name and URL, in the “Important links” subsheet.</span>
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = forms.map((form, index) => {
+        const embedUrl = getEmbeddableFormUrl(form.url);
+        const hostname = new URL(form.url).hostname.replace(/^www\./, '');
+        return `
+            <section class="daily-form-panel" aria-labelledby="daily-form-title-${index}">
+                <header class="daily-form-panel__header">
+                    <div class="daily-form-panel__title">
+                        <h4 id="daily-form-title-${index}">${escapeHtml(form.name)}</h4>
+                        <p>${escapeHtml(hostname)}</p>
+                    </div>
+                    <a class="daily-form-panel__open" href="${escapeHtml(form.url)}" target="_blank" rel="noopener noreferrer">
+                        Open separately <span aria-hidden="true">↗</span>
+                    </a>
+                </header>
+                <iframe
+                    class="daily-form-panel__frame"
+                    src="${escapeHtml(embedUrl)}"
+                    title="${escapeHtml(form.name)}"
+                    loading="lazy"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    allow="clipboard-write"
+                ></iframe>
+            </section>`;
+    }).join('');
+}
+
 function renderNamedLinks(targetId, items, kind) {
     const grid = document.getElementById(targetId);
     if (!grid) return;
@@ -12584,7 +12664,7 @@ window.filterClickupByMember = function(memberName) {
 };
 
 function renderClickupDashboard() {
-    if (clickupTasks.length === 0) {
+    if (clickupTasks.length === 0 && !clickupFetchAttempted && !clickupFetchInFlight) {
         fetchClickupTasksLive();
         return;
     }
@@ -12734,6 +12814,9 @@ function renderClickupDashboard() {
 }
 
 function fetchClickupTasksLive() {
+    if (clickupFetchInFlight) return;
+    clickupFetchInFlight = true;
+    clickupFetchAttempted = true;
     const statusEl = document.getElementById('clickup-sync-status');
     if (statusEl) {
         statusEl.innerHTML = `<span style="color: var(--accent-primary); animation: pulse-blue 1.5s infinite;">Syncing...</span>`;
@@ -12741,9 +12824,10 @@ function fetchClickupTasksLive() {
 
     const liveUrl = localStorage.getItem('live_google_sheet_url') || (typeof GOOGLE_SCRIPT_API_URL === "string" ? GOOGLE_SCRIPT_API_URL : "");
     if (!liveUrl || liveUrl.includes("YOUR_DEPLOYED_SCRIPT_WEB_APP_URL")) {
-        console.warn("No active Google Script API URL found for ClickUp sync proxy. Using simulated task data.");
-        if (statusEl) statusEl.innerText = "Fallback Active";
-        generateMockClickupTasks();
+        console.warn("No active Google Script API URL found for ClickUp sync proxy.");
+        clickupFetchInFlight = false;
+        clickupTasks = [];
+        if (statusEl) statusEl.innerText = "Sync URL missing";
         renderClickupDashboard();
         return;
     }
@@ -12759,16 +12843,18 @@ function fetchClickupTasksLive() {
                 throw new Error(data.error);
             }
             clickupTasks = data || [];
+            clickupFetchInFlight = false;
             console.log("Successfully loaded " + clickupTasks.length + " ClickUp tasks.");
-            if (statusEl) statusEl.innerText = "Synced Just Now";
+            if (statusEl) statusEl.innerText = `${clickupTasks.length} tasks synced just now`;
             renderClickupDashboard();
         })
         .catch(err => {
             console.error("ClickUp Fetch Proxy failed: ", err);
+            clickupFetchInFlight = false;
+            clickupTasks = [];
             if (statusEl) {
-                statusEl.innerHTML = `<span style="color: var(--accent-red); font-size: 12px;">Sync Failed</span>`;
+                statusEl.innerHTML = `<span style="color: var(--accent-red); font-size: 12px;" title="${escapeHtml(err.message || String(err))}">Sync failed — retry</span>`;
             }
-            generateMockClickupTasks();
             renderClickupDashboard();
         });
 }

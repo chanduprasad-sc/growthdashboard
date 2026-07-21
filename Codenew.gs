@@ -85,7 +85,7 @@ function doGet(e) {
     }
   } else if (action === 'fetchClickupTasks') {
     try {
-      var tasks = fetchClickupTasksProxy();
+      var tasks = fetchClickupTasksFromConfiguredLocations();
       return ContentService.createTextOutput(JSON.stringify(tasks))
         .setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
@@ -1889,6 +1889,7 @@ pocBranches: readPocBranchSheet(),
 redashQueries: readRedashQueries(),
 importantLinks: readNamedUrlPairs(IMPORTANT_LINKS_SHEET_NAME, 1, 2),
 importantSheets: readNamedUrlPairs(IMPORTANT_LINKS_SHEET_NAME, 7, 8),
+forms: readFormLinks(IMPORTANT_LINKS_SHEET_NAME, 11, 12),
 builtAt: Utilities.formatDate(new Date(), "Asia/Kolkata", "dd MMM yyyy, hh:mm a") + " IST",
 rowCounts: {}
 };
@@ -1901,6 +1902,7 @@ payload.rowCounts.pocBranches = payload.pocBranches.length;
 payload.rowCounts.redashQueries = payload.redashQueries.length;
 payload.rowCounts.importantLinks = payload.importantLinks.length;
 payload.rowCounts.importantSheets = payload.importantSheets.length;
+payload.rowCounts.forms = payload.forms.length;
 
 getCacheFile().setContent(JSON.stringify(payload));
 
@@ -1918,7 +1920,7 @@ var file = getCacheFile();
 var content = file.getBlob().getDataAsString();
 if (!content || content === "{}") { Logger.log("Cache empty — reading sheets directly"); return buildAndReturn(); }
 var data = JSON.parse(content);
-if (!data.calls || !data.callTkts || !data.redashQueries || !data.importantLinks || !data.importantSheets) { Logger.log("Cache malformed or outdated — rebuilding"); return buildAndReturn(); }
+if (!data.calls || !data.callTkts || !data.redashQueries || !data.importantLinks || !data.importantSheets || !data.forms) { Logger.log("Cache malformed or outdated — rebuilding"); return buildAndReturn(); }
 Logger.log("Serving from cache (built: " + (data.builtAt || "unknown") + ")");
 return data;
 } catch(e) {
@@ -2289,6 +2291,50 @@ function readNamedUrlPairs(sheetName, labelColumn, urlColumn) {
   }
 }
 
+// Forms can be maintained as a rich-text hyperlink directly in column K, a
+// plain URL in column K, or a conventional K:L name/URL pair.
+function readFormLinks(sheetName, formColumn, optionalUrlColumn) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() < 1) return [];
+
+    var lastRow = sheet.getLastRow();
+    var formRange = sheet.getRange(1, formColumn, lastRow, 1);
+    var formValues = formRange.getDisplayValues();
+    var formRichValues = formRange.getRichTextValues();
+    var urlRange = sheet.getRange(1, optionalUrlColumn, lastRow, 1);
+    var urlValues = urlRange.getDisplayValues();
+    var urlRichValues = urlRange.getRichTextValues();
+    var forms = [];
+    var seen = {};
+
+    for (var r = 0; r < lastRow; r++) {
+      var columnKText = String(formValues[r][0] || "").trim();
+      var columnKRich = formRichValues[r][0];
+      var columnLText = String(urlValues[r][0] || "").trim();
+      var columnLRich = urlRichValues[r][0];
+      var columnKUrl = columnKRich ? String(columnKRich.getLinkUrl() || "").trim() : "";
+      var columnLUrl = columnLRich ? String(columnLRich.getLinkUrl() || "").trim() : "";
+      var url = columnLUrl || columnLText || columnKUrl;
+      var name = columnKText;
+
+      if (!url && /^https?:\/\//i.test(columnKText)) url = columnKText;
+      if (!/^https?:\/\//i.test(url)) continue;
+      if (!name || /^https?:\/\//i.test(name)) name = "Form " + (forms.length + 1);
+
+      var key = url.toLowerCase().replace(/\/$/, "");
+      if (seen[key]) continue;
+      seen[key] = true;
+      forms.push({ name: name, url: url });
+    }
+    return forms;
+  } catch (e) {
+    Logger.log("Error reading forms from " + sheetName + " column " + formColumn + ": " + e.message);
+    return [];
+  }
+}
+
 function getUiSafe() {
   try {
     return SpreadsheetApp.getUi();
@@ -2607,4 +2653,129 @@ function fetchClickupTasksProxy() {
   }
   
   return allTasks;
+}
+
+// Pull exactly the two ClickUp locations used by the B2B team:
+// 1) https://app.clickup.com/603234/v/l/jd32-9304 (saved View)
+// 2) https://app.clickup.com/603234/v/o/f/37290871?pr=613347 (Folder)
+// The previous proxy queried the whole Space and then discarded tasks whose
+// creators were not in a hard-coded allow-list, which made totals incomplete.
+function fetchClickupTasksFromConfiguredLocations() {
+  var apiKey = "pk_3430072_ZDJJ8449NADRU27T8AP3E52RFK3HPS8H";
+  var options = {
+    method: "get",
+    headers: { "Authorization": apiKey, "Accept": "application/json" },
+    muteHttpExceptions: true
+  };
+  var taskMap = {};
+  var errors = [];
+
+  fetchClickupTaskPages(
+    "https://api.clickup.com/api/v2/view/" + encodeURIComponent("jd32-9304") + "/task",
+    options,
+    taskMap,
+    "View jd32-9304",
+    errors,
+    false
+  );
+
+  var folderId = "37290871";
+  var folderResponse = UrlFetchApp.fetch("https://api.clickup.com/api/v2/folder/" + folderId, options);
+  if (folderResponse.getResponseCode() === 200) {
+    var folder = JSON.parse(folderResponse.getContentText());
+    var lists = folder.lists || [];
+    lists.forEach(function(list) {
+      fetchClickupTaskPages(
+        "https://api.clickup.com/api/v2/list/" + encodeURIComponent(String(list.id)) + "/task",
+        options,
+        taskMap,
+        "Folder 37290871 / " + (list.name || list.id),
+        errors,
+        true
+      );
+    });
+  } else {
+    errors.push("Folder 37290871 returned HTTP " + folderResponse.getResponseCode());
+    // Be resilient if ClickUp exposes this shared location as a View or List
+    // rather than a Folder for the current token.
+    fetchClickupTaskPages(
+      "https://api.clickup.com/api/v2/view/" + folderId + "/task",
+      options,
+      taskMap,
+      "View 37290871",
+      errors,
+      false
+    );
+    fetchClickupTaskPages(
+      "https://api.clickup.com/api/v2/list/" + folderId + "/task",
+      options,
+      taskMap,
+      "List 37290871",
+      errors,
+      true
+    );
+  }
+
+  var tasks = Object.keys(taskMap).map(function(id) { return taskMap[id]; });
+  tasks.sort(function(a, b) {
+    return Number(b.date_updated || b.date_created || 0) - Number(a.date_updated || a.date_created || 0);
+  });
+  if (!tasks.length && errors.length) {
+    throw new Error("No ClickUp tasks could be loaded. " + errors.join("; "));
+  }
+  Logger.log("Loaded " + tasks.length + " unique ClickUp tasks from configured locations" + (errors.length ? " (warnings: " + errors.join("; ") + ")" : ""));
+  return tasks;
+}
+
+function fetchClickupTaskPages(baseUrl, options, taskMap, sourceLabel, errors, includeClosed) {
+  for (var page = 0; page < 100; page++) {
+    var separator = baseUrl.indexOf("?") === -1 ? "?" : "&";
+    var url = baseUrl + separator + "page=" + page + "&subtasks=true";
+    if (includeClosed) url += "&include_closed=true&include_timl=true";
+    var response = UrlFetchApp.fetch(url, options);
+    if (response.getResponseCode() !== 200) {
+      errors.push(sourceLabel + " returned HTTP " + response.getResponseCode());
+      return;
+    }
+
+    var payload = JSON.parse(response.getContentText());
+    var tasks = payload.tasks || [];
+    tasks.forEach(function(task) {
+      if (!task || !task.id) return;
+      taskMap[String(task.id)] = normalizeConfiguredClickupTask(task, sourceLabel);
+    });
+
+    if (!tasks.length || tasks.length < 100 || payload.last_page === true) return;
+  }
+  errors.push(sourceLabel + " reached the 10,000-task safety limit");
+}
+
+function normalizeConfiguredClickupTask(task, sourceLabel) {
+  return {
+    id: task.id,
+    custom_id: task.custom_id || null,
+    name: task.name || "Untitled task",
+    description: task.description || task.text_content || "",
+    status: task.status ? { status: task.status.status, color: task.status.color } : null,
+    creator: task.creator ? {
+      id: task.creator.id,
+      username: task.creator.username || task.creator.email || "Unknown",
+      email: task.creator.email || "",
+      profilePicture: task.creator.profilePicture || null
+    } : { id: 0, username: "Unknown", email: "", profilePicture: null },
+    assignees: (task.assignees || []).map(function(assignee) {
+      return {
+        id: assignee.id,
+        username: assignee.username || assignee.email || "Unknown",
+        email: assignee.email || "",
+        profilePicture: assignee.profilePicture || null
+      };
+    }),
+    date_created: task.date_created,
+    date_updated: task.date_updated,
+    url: task.url || ("https://app.clickup.com/t/" + task.id),
+    source: sourceLabel,
+    list: task.list ? { id: task.list.id, name: task.list.name || "" } : null,
+    folder: task.folder ? { id: task.folder.id, name: task.folder.name || "" } : null
+  };
 }

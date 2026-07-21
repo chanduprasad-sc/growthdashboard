@@ -1239,6 +1239,36 @@ def read_named_url_pairs(sheet_name, label_index, url_index):
 important_links = read_named_url_pairs("Important links", 0, 1)
 important_sheets = read_named_url_pairs("Important links", 6, 7)
 
+def read_form_links(sheet_name="Important links", form_index=10, optional_url_index=11):
+    try:
+        df = pd.read_excel(excel_path, sheet_name=sheet_name, header=None)
+    except Exception as exc:
+        print(f"Warning: unable to read forms from {sheet_name}: {exc}")
+        return []
+
+    forms = []
+    seen = set()
+    for row in df.itertuples(index=False, name=None):
+        if len(row) <= form_index:
+            continue
+        column_k = clean_str(row[form_index])
+        column_l = clean_str(row[optional_url_index]) if len(row) > optional_url_index else ""
+        if re.match(r'^https?://', column_l, re.IGNORECASE):
+            name, url = column_k, column_l
+        elif re.match(r'^https?://', column_k, re.IGNORECASE):
+            name = column_l if column_l and not re.match(r'^https?://', column_l, re.IGNORECASE) else f"Form {len(forms) + 1}"
+            url = column_k
+        else:
+            continue
+        key = url.lower().rstrip('/')
+        if key in seen:
+            continue
+        seen.add(key)
+        forms.append({"name": name or f"Form {len(forms) + 1}", "url": url})
+    return forms
+
+forms = read_form_links()
+
 redash_queries = []
 try:
     redash_df = pd.read_excel(excel_path, sheet_name="Redash")
@@ -1278,7 +1308,8 @@ dashboard_data = {
     "agent_scorecards": agent_scorecards,
     "redashQueries": redash_queries,
     "importantLinks": important_links,
-    "importantSheets": important_sheets
+    "importantSheets": important_sheets,
+    "forms": forms
 }
 
 with open(output_json_path, 'w', encoding='utf-8') as f:

@@ -1274,14 +1274,29 @@
             <section id="tab-daily-tools" class="tab-content">
                 <!-- Sub-tab pills for inner navigation -->
                 <div class="sub-tab-pills" id="daily-tools-sub-tabs">
-                    <button class="sub-tab-pill active" data-subtab="dt-redash">📊 Redash Queries</button>
-                    <button class="sub-tab-pill" data-subtab="dt-clickup">✅ ClickUp Tasks & Forms</button>
+                    <button class="sub-tab-pill active" data-subtab="dt-forms">📝 Forms</button>
+                    <button class="sub-tab-pill" data-subtab="dt-redash">📊 Redash Queries</button>
+                    <button class="sub-tab-pill" data-subtab="dt-clickup">✅ ClickUp Tasks</button>
                     <button class="sub-tab-pill" data-subtab="dt-links">🔗 Important Links</button>
                     <button class="sub-tab-pill" data-subtab="dt-sheets">📝 Important Sheets</button>
                 </div>
 
-                <!-- DT Sub-Tab 1: Redash -->
-                <div class="sub-tab-content active" id="dt-redash">
+                <!-- DT Sub-Tab 1: Forms -->
+                <div class="sub-tab-content active" id="dt-forms">
+                    <div class="daily-forms-header">
+                        <div>
+                            <h3>Submission Forms</h3>
+                            <p>Full-size forms synced from column K of the “Important links” subsheet.</p>
+                        </div>
+                        <span id="daily-forms-count" class="daily-forms-count">Loading forms…</span>
+                    </div>
+                    <div id="daily-forms-list" class="daily-forms-list" aria-live="polite">
+                        <!-- Sheet-backed and default ClickUp forms are rendered here. -->
+                    </div>
+                </div>
+
+                <!-- DT Sub-Tab 2: Redash -->
+                <div class="sub-tab-content" id="dt-redash">
                     <div class="intel-header-card card" style="padding: 20px; border-radius: 12px; margin-bottom: 25px; background: var(--bg-card); border: 1px solid var(--border-color);">
                         <h3 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary);">Redash Favorite Queries</h3>
                         <p style="color: var(--text-secondary); margin-top: 5px; font-size: 0.9rem;">Browse, filter, and copy your team's favorite Redash queries. Queries are synced from the spreadsheet database.</p>
@@ -1295,11 +1310,11 @@
                     </div>
                 </div>
 
-                <!-- DT Sub-Tab 2: ClickUp -->
+                <!-- DT Sub-Tab 3: ClickUp -->
                 <div class="sub-tab-content" id="dt-clickup">
                     <div class="clickup-kpi-row" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px;">
                         <div class="metric-card card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
-                            <span class="metric-label" style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Total Workspace Tasks</span>
+                            <span class="metric-label" style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Total Location Tasks</span>
                             <span class="metric-value" id="clickup-total-tasks" style="font-size: 1.8rem; font-weight: 700; color: var(--accent-primary); margin-top: 8px;">-</span>
                         </div>
                         <div class="metric-card card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
@@ -1323,7 +1338,7 @@
                         <!-- ClickUp Task Board -->
                         <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; height: 500px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Workspace Tasks</h3>
+                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">Configured ClickUp Tasks</h3>
                                 <div style="display: flex; gap: 10px; align-items: center;">
                                     <div class="clickup-tab-container" style="display: flex; background: rgba(0,0,0,0.25); padding: 3px; border-radius: 8px; border: 1px solid var(--border-color);">
                                         <button class="clickup-tab-btn active" id="btn-clickup-active-tab" style="padding: 6px 12px; border-radius: 6px; border: none; background: var(--accent-primary); color: white; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">Active</button>
@@ -1359,23 +1374,9 @@
                         </div>
                     </div>
 
-                    <!-- Embed Forms Container -->
-                    <div style="margin-top: 30px;">
-                        <h3 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary); margin-bottom: 15px;">ClickUp Quick Submission Forms</h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                            <div class="card" style="padding: 15px; height: 950px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
-                                <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; color: var(--accent-primary);">CX ROTA Form</h4>
-                                <iframe src="https://forms.clickup.com/603234/f/jd32-9404/UM47JAM7C8QS7RT2B2" width="100%" height="100%" style="border: none; border-radius: 8px; background: white; flex-grow: 1;"></iframe>
-                            </div>
-                            <div class="card" style="padding: 15px; height: 950px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column;">
-                                <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; color: var(--orange);">Publisher ROTA request form</h4>
-                                <iframe src="https://forms.clickup.com/603234/f/jd32-25844/2HV47GR6UHDI4L0IX9" width="100%" height="100%" style="border: none; border-radius: 8px; background: white; flex-grow: 1;"></iframe>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
-                <!-- DT Sub-Tab 3: Important Links -->
+                <!-- DT Sub-Tab 4: Important Links -->
                 <div class="sub-tab-content" id="dt-links">
                     <div class="intel-header-card card" style="padding: 20px; border-radius: 12px; margin-bottom: 25px; background: var(--bg-card); border: 1px solid var(--border-color);">
                         <h3 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary);">Important Tools & Links</h3>
@@ -1433,7 +1434,7 @@
                     </div>
                 </div>
 
-                <!-- DT Sub-Tab 4: Important Sheets -->
+                <!-- DT Sub-Tab 5: Important Sheets -->
                 <div class="sub-tab-content" id="dt-sheets">
                     <div class="intel-header-card card" style="padding: 20px; border-radius: 12px; margin-bottom: 25px; background: var(--bg-card); border: 1px solid var(--border-color);">
                         <h3 style="font-size: 1.2rem; font-weight: 600; color: var(--text-primary);">Important Spreadsheets</h3>
