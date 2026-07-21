@@ -2120,9 +2120,9 @@ function getDashboardMetricsContext() {
 Dashboard Current State Context:
 - Active Filters: ${filterState}
 - Date Preset: ${activeFilters.datePreset} (From: ${activeFilters.dateFrom || 'N/A'}, To: ${activeFilters.dateTo || 'N/A'})
-- Total Calls: ${totalCalls} (Answered: ${answeredCalls}, Missed: ${missedCalls}, AOH: ${aohCalls})
-- WhatsApp Interactions: ${totalWhatsapp}
-- Care Emails: ${totalEmails}
+- Ozonetel Entries: ${totalCalls} (Answered: ${answeredCalls}, Missed: ${missedCalls}, AOH: ${aohCalls})
+- WhatsApp Queries: ${totalWhatsapp}
+- Care Email Tickets: ${totalEmails}
 - Top 3 Active Brokers: ${topBrokers || 'None'}
 - Top 3 Active RMs: ${topRMs || 'None'}
 - Top 3 Active Issues: ${topIssues || 'None'}
@@ -2391,6 +2391,15 @@ function updateDashboardConnectionStatus(status, label, detail) {
     if (syncBtn) syncBtn.style.display = 'inline-flex';
 }
 
+function setDashboardLoadingState(isLoading, message) {
+    const loader = document.getElementById('dashboard-data-loader');
+    const messageEl = document.getElementById('dashboard-data-loader-message');
+    if (!loader) return;
+    if (messageEl && message) messageEl.textContent = message;
+    loader.classList.toggle('is-hidden', !isLoading);
+    loader.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+}
+
 function updateSourceFreshnessIndicators(data) {
     const interactions = Array.isArray(data?.support_interactions) ? data.support_interactions : [];
     const sourceRows = {
@@ -2445,6 +2454,7 @@ function applyDashboardPayload(data) {
         if (elTo) elTo.value = activeFilters.dateTo;
     }
     buildViewModel();
+    setDashboardLoadingState(false);
     return validation;
 }
 
@@ -2487,6 +2497,7 @@ function scheduleDashboardRetry() {
 }
 
 async function initializeDashboardData() {
+    setDashboardLoadingState(true, 'Opening the latest saved snapshot…');
     updateDashboardConnectionStatus('syncing', 'Loading saved data', 'Opening local snapshot…');
     let cachedRecord = null;
     try {
@@ -2505,7 +2516,10 @@ async function initializeDashboardData() {
             cachedRecord = null;
         }
     }
-    if (!cachedRecord) updateDashboardConnectionStatus('syncing', 'Connecting', 'Fetching the first snapshot…');
+    if (!cachedRecord) {
+        setDashboardLoadingState(true, 'Fetching DevRev tickets, Ozonetel entries and WhatsApp queries…');
+        updateDashboardConnectionStatus('syncing', 'Connecting', 'Fetching the first snapshot…');
+    }
     await loadDashboardData({ reason: 'startup' });
     setTimeout(() => fetchClickupTasksLive(), 300);
 }
@@ -2530,12 +2544,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function loadDashboardData(options = {}) {
     if (dashboardSyncPromise) return dashboardSyncPromise;
-    dashboardSyncPromise = performDashboardSync(options).finally(() => { dashboardSyncPromise = null; });
+    const syncButton = document.getElementById('sidebar-sync-btn');
+    if (syncButton) {
+        syncButton.classList.add('is-loading');
+        syncButton.setAttribute('aria-busy', 'true');
+    }
+    dashboardSyncPromise = performDashboardSync(options).finally(() => {
+        dashboardSyncPromise = null;
+        if (syncButton) {
+            syncButton.classList.remove('is-loading');
+            syncButton.removeAttribute('aria-busy');
+        }
+    });
     return dashboardSyncPromise;
 }
 
 async function performDashboardSync(options = {}) {
     const hasSavedData = Boolean(rawData);
+    if (!hasSavedData) setDashboardLoadingState(true, 'Fetching DevRev tickets, Ozonetel entries and WhatsApp queries…');
     updateDashboardConnectionStatus('syncing', hasSavedData ? 'Refreshing quietly' : 'Connecting', hasSavedData && dashboardLastCacheRecord ? dashboardCacheAge(dashboardLastCacheRecord.savedAt) : 'Contacting Google Sheets…');
     try {
         if (navigator.onLine === false) throw new Error('Browser is offline');
@@ -2573,6 +2599,7 @@ async function performDashboardSync(options = {}) {
         if (rawData) {
             updateDashboardConnectionStatus('offline', 'Saved data · retrying', dashboardLastCacheRecord ? dashboardCacheAge(dashboardLastCacheRecord.savedAt) : 'Refresh will retry automatically');
         } else {
+            setDashboardLoadingState(true, 'The data source is taking longer than expected. Retrying…');
             updateDashboardConnectionStatus('error', 'Unable to load data', 'Retrying automatically…');
         }
         scheduleDashboardRetry();
@@ -2713,10 +2740,10 @@ function setupEventListeners() {
                     testResultDiv.style.backgroundColor = 'rgba(34, 197, 94, 0.15)';
                     testResultDiv.style.color = '#22c55e';
                     testResultDiv.innerHTML = `<strong>✓ Connection Successful!</strong><br>Successfully fetched sheet data:<br>` +
-                        `• Calls: ${callCount} rows<br>` +
-                        `• Call Tickets: ${ticketCount} rows<br>` +
-                        `• WhatsApp Chats: ${waCount} rows<br>` +
-                        `• Care Emails: ${emailCount} rows<br>` +
+                        `• Ozonetel Entries: ${callCount} rows<br>` +
+                        `• DevRev Tickets: ${ticketCount} rows<br>` +
+                        `• WhatsApp Queries: ${waCount} rows<br>` +
+                        `• Care Email Tickets: ${emailCount} rows<br>` +
                         `• Last Built: ${data.builtAt || 'N/A'}`;
                 } else {
                     throw new Error("Invalid response format. Missing 'calls', 'callTkts', or 'whatsapp' keys.");
@@ -3108,8 +3135,8 @@ function setupEventListeners() {
     // Register click handlers for all 8 KPI cards in Weekly Pulse
     const kpiCards = [
         { id: 'card-interactions', type: 'interactions', title: 'Total Interactions' },
-        { id: 'card-tickets', type: 'tickets', title: 'Call Tickets' },
-        { id: 'card-whatsapp', type: 'whatsapp', title: 'WhatsApp Chats' },
+        { id: 'card-tickets', type: 'tickets', title: 'DevRev Tickets' },
+        { id: 'card-whatsapp', type: 'whatsapp', title: 'WhatsApp Queries' },
         { id: 'card-answered', type: 'answered', title: 'Answered Calls' },
         { id: 'card-missed', type: 'missed', title: 'Missed Calls' },
         { id: 'card-aoh', type: 'aoh', title: 'AOH Calls' },
@@ -3577,6 +3604,13 @@ function setDateRangeFromPreset(preset) {
         fromDate.setDate(baseDate.getDate() + distanceToMonday);
         toDate = new Date(fromDate.getTime());
         toDate.setDate(fromDate.getDate() + 6);
+    } else if (preset === 'last-week') {
+        // Previous calendar week: Monday through Sunday.
+        const currentDay = baseDate.getDay();
+        const distanceToThisMonday = currentDay === 0 ? -6 : 1 - currentDay;
+        fromDate.setDate(baseDate.getDate() + distanceToThisMonday - 7);
+        toDate = new Date(fromDate.getTime());
+        toDate.setDate(fromDate.getDate() + 6);
     } else if (preset === 'today') {
         fromDate = new Date(baseDate.getTime());
         toDate = new Date(baseDate.getTime());
@@ -3584,9 +3618,9 @@ function setDateRangeFromPreset(preset) {
         fromDate.setDate(baseDate.getDate() - 1);
         toDate.setDate(baseDate.getDate() - 1);
     } else if (preset === '7d') {
-        fromDate.setDate(baseDate.getDate() - 7);
+        fromDate.setDate(baseDate.getDate() - 6);
     } else if (preset === '30d') {
-        fromDate.setDate(baseDate.getDate() - 30);
+        fromDate.setDate(baseDate.getDate() - 29);
     } else if (preset === 'month') {
         fromDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
         toDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0); // End of month
@@ -3659,12 +3693,33 @@ function getPreviousPeriodDates(fromStr, toStr) {
     };
 }
 
+function formatDashboardDate(dateStr) {
+    const parts = String(dateStr || '').split('-').map(Number);
+    if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) return dateStr || '—';
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    return new Intl.DateTimeFormat('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    }).format(date);
+}
+
+function updateDateComparisonNote() {
+    const note = document.getElementById('date-comparison-note');
+    if (!note || !activeFilters.dateFrom || !activeFilters.dateTo) return;
+    const previous = getPreviousPeriodDates(activeFilters.dateFrom, activeFilters.dateTo);
+    const selectedRange = `${formatDashboardDate(activeFilters.dateFrom)} – ${formatDashboardDate(activeFilters.dateTo)}`;
+    const comparisonRange = `${formatDashboardDate(previous.from)} – ${formatDashboardDate(previous.to)}`;
+    note.innerHTML = `<span aria-hidden="true">⇄</span><span>Comparing <strong>${selectedRange}</strong> with <strong>${comparisonRange}</strong> (previous equivalent period).</span>`;
+}
+
 // -------------------------------------------------------------
 // 3. VIEWMODEL RE-COMPILER (REACTIVE FILTERS)
 // -------------------------------------------------------------
 
 function buildViewModel() {
     if (!rawData) return;
+    updateDateComparisonNote();
     // Guide tab has no dynamic data
     if (currentTab === 'tab-guide') return;
 
@@ -4538,7 +4593,7 @@ function renderWeeklyComparisonChart() {
     charts.weeklyComparison = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['Call Tickets', 'Answered Calls', 'Missed Calls', 'AOH Calls', 'WhatsApp Chats'],
+            labels: ['DevRev Tickets', 'Answered Calls', 'Missed Calls', 'AOH Calls', 'WhatsApp Queries'],
             datasets: [
                 {
                     label: 'Present Period',
@@ -4733,7 +4788,7 @@ function renderPulseTrendChart(data) {
             labels: sortedDates,
             datasets: [
                 {
-                    label: 'Call Tickets',
+                    label: 'DevRev Tickets',
                     data: sortedDates.map(d => dateCounts[d].tkt),
                     borderColor: THEME_COLORS.blue,
                     backgroundColor: blueGrad,
@@ -4746,7 +4801,7 @@ function renderPulseTrendChart(data) {
                     pointBorderColor: 'transparent'
                 },
                 {
-                    label: 'WhatsApp',
+                    label: 'WhatsApp Queries',
                     data: sortedDates.map(d => dateCounts[d].wa),
                     borderColor: THEME_COLORS.green,
                     backgroundColor: greenGrad,
@@ -4787,7 +4842,7 @@ function renderPulseTrendChart(data) {
                 const ctx = chart.ctx;
                 ctx.save();
                 const dataset = chart.data.datasets[args.index];
-                if (dataset.label === 'Call Tickets') {
+                if (dataset.label === 'DevRev Tickets') {
                     ctx.shadowColor = hexToRgba(THEME_COLORS.blue, 0.45);
                     ctx.shadowBlur = 12;
                 } else if (dataset.label === 'WhatsApp') {
@@ -4876,7 +4931,7 @@ function renderChannelDonutChart(data) {
         else counts['Care Email']++;
     });
 
-    const labels = ['Call Tickets', 'WhatsApp Chats', 'Care Emails'];
+    const labels = ['DevRev Tickets', 'WhatsApp Queries', 'Care Email Tickets'];
     const values = [counts['Call Ticket'], counts['WhatsApp Chat'], counts['Care Email']];
     const total = values.reduce((a, b) => a + b, 0);
 
@@ -5773,7 +5828,7 @@ function renderAISummaryTab() {
             <div class="ai-report-stat-card"><span class="stat-icon">🧑</span><div class="stat-label">Top RM</div><div class="stat-val" style="font-size:1rem;line-height:1.3">${topRM ? topRM[0] : '—'}</div><div class="stat-sub">${topRM ? topRM[1] + ' contacts' : ''}</div></div>
             <div class="ai-report-stat-card"><span class="stat-icon">⚠️</span><div class="stat-label">Repeat Loops</div><div class="stat-val" style="color:#ef4444">${repeatLoops}</div><div class="stat-sub">7-day repeat incidents</div></div>
             <div class="ai-report-stat-card"><span class="stat-icon">⏱️</span><div class="stat-label">Avg Handling Time</div><div class="stat-val">${ahtVal}</div><div class="stat-sub">Inbound answered calls</div></div>
-            <div class="ai-report-stat-card"><span class="stat-icon">📞</span><div class="stat-label">Total Calls</div><div class="stat-val">${calls.length.toLocaleString()}</div><div class="stat-sub">Ozonetel call records</div></div>
+            <div class="ai-report-stat-card"><span class="stat-icon">📞</span><div class="stat-label">Ozonetel Entries</div><div class="stat-val">${calls.length.toLocaleString()}</div><div class="stat-sub">Raw call records</div></div>
         `;
     }
 
@@ -5859,7 +5914,7 @@ function renderAISummaryTab() {
         data.forEach(item => { if (cc[item.type] !== undefined) cc[item.type]++; });
         aiChartInstances['channels'] = new Chart(chCanvas.getContext('2d'), {
             type: 'pie',
-            data: { labels: ['Call Tickets', 'WhatsApp', 'Care Emails'], datasets: [{ data: [cc['Call Ticket'], cc['WhatsApp Chat'], cc['Care Email']], backgroundColor: ['rgba(14,165,233,0.8)', 'rgba(34,197,94,0.8)', 'rgba(249,115,22,0.8)'], borderColor: THEME_COLORS.cardBg, borderWidth: 3 }] },
+            data: { labels: ['DevRev Tickets', 'WhatsApp Queries', 'Care Email Tickets'], datasets: [{ data: [cc['Call Ticket'], cc['WhatsApp Chat'], cc['Care Email']], backgroundColor: ['rgba(14,165,233,0.8)', 'rgba(34,197,94,0.8)', 'rgba(249,115,22,0.8)'], borderColor: THEME_COLORS.cardBg, borderWidth: 3 }] },
             options: Object.assign(getStandardChartOptions('pie', true), { plugins: { legend: { position: 'bottom', labels: { color: THEME_COLORS.textSecondary || '#cbd5e1', font: { size: 10 }, padding: 10 } } } })
         });
     }
@@ -6676,7 +6731,7 @@ function renderVisualControlDashboard() {
             labels: formattedDateLabels,
             datasets: [
                 {
-                    label: 'Call Tickets',
+                    label: 'DevRev Tickets',
                     data: callTotalPoints,
                     borderColor: THEME_COLORS.purple,
                     backgroundColor: hexToRgba(THEME_COLORS.purple, 0.05),
@@ -6720,7 +6775,7 @@ function renderVisualControlDashboard() {
         data: {
             labels: formattedDateLabels,
             datasets: [{
-                label: 'WhatsApp',
+                label: 'WhatsApp Queries',
                 data: waPoints,
                 borderColor: THEME_COLORS.green,
                 backgroundColor: hexToRgba(THEME_COLORS.green, 0.08),
@@ -6739,7 +6794,7 @@ function renderVisualControlDashboard() {
         data: {
             labels: formattedDateLabels,
             datasets: [{
-                label: 'Care Emails',
+                label: 'Care Email Tickets',
                 data: emailPoints,
                 borderColor: THEME_COLORS.yellow,
                 backgroundColor: hexToRgba(THEME_COLORS.yellow, 0.08),
@@ -6756,7 +6811,7 @@ function renderVisualControlDashboard() {
     vcCharts.channelMix = new Chart(ctx4, {
         type: 'doughnut',
         data: {
-            labels: [`Call Tickets (${tkt})`, `WhatsApp (${wa})`, `Care Emails (${mail})`],
+            labels: [`DevRev Tickets (${tkt})`, `WhatsApp Queries (${wa})`, `Care Email Tickets (${mail})`],
             datasets: [{
                 data: [tkt, wa, mail],
                 backgroundColor: [THEME_COLORS.purple, THEME_COLORS.green, THEME_COLORS.yellow],
@@ -6906,7 +6961,7 @@ function renderVisualControlDashboard() {
             const titleEl = emailChartCard.querySelector('.card-title');
             const subtitleEl = emailChartCard.querySelector('.card-subtitle-right');
             if (titleEl) {
-                titleEl.textContent = (careEmailToggle === 'broker') ? 'Top Brokers - Care Emails' : 'Top RMs - Care Emails';
+                titleEl.textContent = (careEmailToggle === 'broker') ? 'Top Brokers - Care Email Tickets' : 'Top RMs - Care Email Tickets';
             }
             if (subtitleEl) {
                 subtitleEl.textContent = (careEmailToggle === 'broker') ? 'BROKER FAMILIES IN CARE EMAIL FLOW' : 'RMS/REPORTERS IN CARE EMAIL FLOW';
@@ -6943,7 +6998,7 @@ function renderVisualControlDashboard() {
             labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
             datasets: [
                 {
-                    label: 'Call Tickets',
+                    label: 'DevRev Tickets',
                     data: dowCounts.tkt,
                     borderColor: THEME_COLORS.purple,
                     backgroundColor: 'transparent',
@@ -6951,7 +7006,7 @@ function renderVisualControlDashboard() {
                     borderWidth: 2
                 },
                 {
-                    label: 'WhatsApp',
+                    label: 'WhatsApp Queries',
                     data: dowCounts.wa,
                     borderColor: THEME_COLORS.green,
                     backgroundColor: 'transparent',
@@ -6959,7 +7014,7 @@ function renderVisualControlDashboard() {
                     borderWidth: 2
                 },
                 {
-                    label: 'Care Emails',
+                    label: 'Care Email Tickets',
                     data: dowCounts.mail,
                     borderColor: THEME_COLORS.yellow,
                     backgroundColor: 'transparent',
@@ -7000,7 +7055,7 @@ function renderVisualControlDashboard() {
             labels: monthLabels.length > 0 ? monthLabels : ['No Data'],
             datasets: [
                 {
-                    label: 'Call Tickets',
+                    label: 'DevRev Tickets',
                     data: mCallPoints.length > 0 ? mCallPoints : [0],
                     borderColor: THEME_COLORS.purple,
                     backgroundColor: 'transparent',
@@ -7008,7 +7063,7 @@ function renderVisualControlDashboard() {
                     borderWidth: 2
                 },
                 {
-                    label: 'WhatsApp',
+                    label: 'WhatsApp Queries',
                     data: mWaPoints.length > 0 ? mWaPoints : [0],
                     borderColor: THEME_COLORS.green,
                     backgroundColor: 'transparent',
@@ -7016,7 +7071,7 @@ function renderVisualControlDashboard() {
                     borderWidth: 2
                 },
                 {
-                    label: 'Care Emails',
+                    label: 'Care Email Tickets',
                     data: mMailPoints.length > 0 ? mMailPoints : [0],
                     borderColor: THEME_COLORS.yellow,
                     backgroundColor: 'transparent',
@@ -7410,21 +7465,21 @@ function renderSLAAndQAMatrix(data) {
     if (slaTbody) {
         slaTbody.innerHTML = `
             <tr>
-                <td><strong>Call Tickets</strong></td>
+                <td><strong>DevRev Tickets</strong></td>
                 <td class="text-right"><strong>${formatSeconds(slaStats['Call Ticket'].frtCount ? slaStats['Call Ticket'].frtSum / slaStats['Call Ticket'].frtCount : null)}</strong></td>
                 <td class="text-right">${formatPct(slaStats['Call Ticket'].frtMet, slaStats['Call Ticket'].frtCount)}</td>
                 <td class="text-right"><strong>${formatSeconds(slaStats['Call Ticket'].rtCount ? slaStats['Call Ticket'].rtSum / slaStats['Call Ticket'].rtCount : null)}</strong></td>
                 <td class="text-right">${formatPct(slaStats['Call Ticket'].rtMet, slaStats['Call Ticket'].rtCount)}</td>
             </tr>
             <tr>
-                <td><strong>WhatsApp Chats</strong></td>
+                <td><strong>WhatsApp Queries</strong></td>
                 <td class="text-right">-</td>
                 <td class="text-right">-</td>
                 <td class="text-right"><strong>${formatSeconds(slaStats['WhatsApp Chat'].rtCount ? slaStats['WhatsApp Chat'].rtSum / slaStats['WhatsApp Chat'].rtCount : null)}</strong></td>
                 <td class="text-right">${formatPct(slaStats['WhatsApp Chat'].rtMet, slaStats['WhatsApp Chat'].rtCount)}</td>
             </tr>
             <tr>
-                <td><strong>Care Emails</strong></td>
+                <td><strong>Care Email Tickets</strong></td>
                 <td class="text-right"><strong>${formatSeconds(slaStats['Care Email'].frtCount ? slaStats['Care Email'].frtSum / slaStats['Care Email'].frtCount : null)}</strong></td>
                 <td class="text-right">${formatPct(slaStats['Care Email'].frtMet, slaStats['Care Email'].frtCount)}</td>
                 <td class="text-right"><strong>${formatSeconds(slaStats['Care Email'].rtCount ? slaStats['Care Email'].rtSum / slaStats['Care Email'].rtCount : null)}</strong></td>
@@ -7818,7 +7873,7 @@ const CHART_VIZ_METRICS = {
     unique_branches: { label: 'Active branches', calculate: rows => chartVizUniqueCount(rows, item => item.branch) },
     unique_pocs: { label: 'Active POCs', calculate: rows => chartVizUniqueCount(rows, item => item.poc) },
     call_tickets: { label: 'Call tickets', calculate: rows => rows.filter(item => item.type === 'Call Ticket').length },
-    whatsapp: { label: 'WhatsApp conversations', calculate: rows => rows.filter(item => item.type === 'WhatsApp Chat').length },
+    whatsapp: { label: 'WhatsApp Queries', calculate: rows => rows.filter(item => item.type === 'WhatsApp Chat').length },
     care_emails: { label: 'Care emails', calculate: rows => rows.filter(item => item.type === 'Care Email').length },
     answered: { label: 'Answered calls', calculate: rows => rows.filter(item => ['answered', 'connected'].includes(getDeepDiveCallStatus(item))).length },
     missed: { label: 'Missed / abandoned calls', calculate: rows => rows.filter(item => ['missed', 'abandoned', 'aoh'].includes(getDeepDiveCallStatus(item))).length },
@@ -7858,7 +7913,7 @@ function chartVizDateKey(value) {
 function chartVizChannelLabel(type) {
     if (type === 'WhatsApp Chat') return 'WhatsApp';
     if (type === 'Care Email') return 'Care';
-    if (type === 'Call Ticket') return 'Call Tickets';
+    if (type === 'Call Ticket') return 'DevRev Tickets';
     return chartVizValue(type, 'Other');
 }
 
@@ -8261,9 +8316,9 @@ function renderMainOverview(data, calls) {
 
     const grid = document.getElementById('md-channel-summary-grid');
     const channels = [
-        { name: 'Call Tickets', icon: '📞', cls: 'calls', items: callTickets, frt: getAvgFRT(callTickets), sla: getSLACompliance(callTickets, 'sla_frt_status'), topIssue: getTopIssue(callTickets), topBroker: getTopBroker(callTickets), oc: getOpenClosed(callTickets) },
-        { name: 'WhatsApp Chats', icon: '💬', cls: 'whatsapp', items: whatsapp, frt: getAvgFRT(whatsapp), sla: getSLACompliance(whatsapp, 'sla_frt_status'), topIssue: getTopIssue(whatsapp), topBroker: getTopBroker(whatsapp), oc: getOpenClosed(whatsapp) },
-        { name: 'Care Emails', icon: '📧', cls: 'emails', items: emails, frt: getAvgFRT(emails), sla: getSLACompliance(emails, 'sla_frt_status'), topIssue: getTopIssue(emails), topBroker: getTopBroker(emails), oc: getOpenClosed(emails) }
+        { name: 'DevRev Tickets', icon: '📞', cls: 'calls', items: callTickets, frt: getAvgFRT(callTickets), sla: getSLACompliance(callTickets, 'sla_frt_status'), topIssue: getTopIssue(callTickets), topBroker: getTopBroker(callTickets), oc: getOpenClosed(callTickets) },
+        { name: 'WhatsApp Queries', icon: '💬', cls: 'whatsapp', items: whatsapp, frt: getAvgFRT(whatsapp), sla: getSLACompliance(whatsapp, 'sla_frt_status'), topIssue: getTopIssue(whatsapp), topBroker: getTopBroker(whatsapp), oc: getOpenClosed(whatsapp) },
+        { name: 'Care Email Tickets', icon: '📧', cls: 'emails', items: emails, frt: getAvgFRT(emails), sla: getSLACompliance(emails, 'sla_frt_status'), topIssue: getTopIssue(emails), topBroker: getTopBroker(emails), oc: getOpenClosed(emails) }
     ];
     grid.innerHTML = channels.map(ch => `
         <div class="channel-summary-card">
@@ -8531,9 +8586,9 @@ function renderMainOverview(data, calls) {
             data: {
                 labels: sortedDates,
                 datasets: [
-                    { label: 'Call Tickets', data: sortedDates.map(d => dateMap[d].calls), borderColor: THEME_COLORS.blue, backgroundColor: blueGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 },
-                    { label: 'WhatsApp', data: sortedDates.map(d => dateMap[d].wa), borderColor: THEME_COLORS.green, backgroundColor: greenGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 },
-                    { label: 'Care Emails', data: sortedDates.map(d => dateMap[d].emails), borderColor: THEME_COLORS.orange, backgroundColor: orangeGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 }
+                    { label: 'DevRev Tickets', data: sortedDates.map(d => dateMap[d].calls), borderColor: THEME_COLORS.blue, backgroundColor: blueGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 },
+                    { label: 'WhatsApp Queries', data: sortedDates.map(d => dateMap[d].wa), borderColor: THEME_COLORS.green, backgroundColor: greenGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 },
+                    { label: 'Care Email Tickets', data: sortedDates.map(d => dateMap[d].emails), borderColor: THEME_COLORS.orange, backgroundColor: orangeGrad, tension: 0.35, fill: true, borderWidth: 2, pointRadius: 2 }
                 ]
             },
             options: Object.assign(getStandardChartOptions('line', true), { scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15, font: { size: 9 } }, grid: { color: THEME_COLORS.border } }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), font: { size: 9 } }, grid: { color: THEME_COLORS.border }, beginAtZero: true } } })
@@ -8546,7 +8601,7 @@ function renderMainOverview(data, calls) {
         mdCharts.channelMix = new Chart(ctx2.getContext('2d'), {
             type: 'doughnut',
             data: {
-                labels: ['Call Tickets', 'WhatsApp', 'Care Emails'],
+                labels: ['DevRev Tickets', 'WhatsApp Queries', 'Care Email Tickets'],
                 datasets: [{ data: [callTickets.length, whatsapp.length, emails.length], backgroundColor: [THEME_COLORS.blue, THEME_COLORS.green, THEME_COLORS.orange], borderWidth: 0 }]
             },
             options: Object.assign(getStandardChartOptions('doughnut', true), { cutout: '70%' })
@@ -8563,7 +8618,7 @@ function renderMainOverview(data, calls) {
         mdCharts.responseTime = new Chart(ctx3.getContext('2d'), {
             type: 'bar',
             data: {
-                labels: ['Call Tickets', 'WhatsApp', 'Care Emails'],
+                labels: ['DevRev Tickets', 'WhatsApp Queries', 'Care Email Tickets'],
                 datasets: [
                     { label: 'Avg FRT (sec)', data: [getAvgFRT(callTickets), getAvgFRT(whatsapp), getAvgFRT(emails)], backgroundColor: [THEME_COLORS.blue + '80', THEME_COLORS.green + '80', THEME_COLORS.orange + '80'], borderRadius: 6 },
                     { label: 'Avg RT (sec)', data: [avgRT(callTickets), avgRT(whatsapp), avgRT(emails)], backgroundColor: [THEME_COLORS.blue, THEME_COLORS.green, THEME_COLORS.orange], borderRadius: 6 }
@@ -8621,7 +8676,7 @@ function renderCallsDeepDive(data, calls) {
 
     const kpiGrid = document.getElementById('md-calls-kpi-grid');
     kpiGrid.innerHTML = [
-        { title: 'Total Call Tickets', value: callTickets.length, cls: '' },
+        { title: 'Total DevRev Tickets', value: callTickets.length, cls: '' },
         { title: 'Answered', value: answered.length, cls: 'text-green' },
         { title: 'Missed', value: missed.length, cls: 'text-red' },
         { title: 'AOH', value: aoh.length, cls: 'text-orange' },
@@ -8677,7 +8732,7 @@ function renderCallsDeepDive(data, calls) {
     const ctx3 = document.getElementById('md-agent-calls-chart');
     if (ctx3) {
         mdCharts.agentCalls = new Chart(ctx3.getContext('2d'), {
-            type: 'bar', data: { labels: sortedAgents.map(a=>a[0]), datasets: [{ label: 'Call Tickets Handled', data: sortedAgents.map(a=>a[1]), backgroundColor: THEME_COLORS.purple + '80', borderRadius: 6 }] },
+            type: 'bar', data: { labels: sortedAgents.map(a=>a[0]), datasets: [{ label: 'DevRev Tickets Handled', data: sortedAgents.map(a=>a[1]), backgroundColor: THEME_COLORS.purple + '80', borderRadius: 6 }] },
             options: Object.assign(getStandardChartOptions('bar', false), { indexAxis: 'y', scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') }, beginAtZero: true }, y: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-primary') } } } })
         });
     }
@@ -8778,7 +8833,7 @@ function renderWhatsAppDeepDive(data) {
     const ctx1 = document.getElementById('md-wa-volume-chart');
     if (ctx1) {
         mdCharts.waVolume = new Chart(ctx1.getContext('2d'), {
-            type: 'line', data: { labels: dates, datasets: [{ label: 'WhatsApp Chats', data: dates.map(d => dateMap[d]), borderColor: THEME_COLORS.green, backgroundColor: THEME_COLORS.green + '20', tension: 0.4, fill: true }] },
+            type: 'line', data: { labels: dates, datasets: [{ label: 'WhatsApp Queries', data: dates.map(d => dateMap[d]), borderColor: THEME_COLORS.green, backgroundColor: THEME_COLORS.green + '20', tension: 0.4, fill: true }] },
             options: Object.assign(getStandardChartOptions('line', true), { scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } })
         });
     }
@@ -8849,7 +8904,7 @@ function renderEmailsDeepDive(data) {
     const ctx1 = document.getElementById('md-email-volume-chart');
     if (ctx1) {
         mdCharts.emailVolume = new Chart(ctx1.getContext('2d'), {
-            type: 'line', data: { labels: dates, datasets: [{ label: 'Care Emails', data: dates.map(d => dateMap[d]), borderColor: THEME_COLORS.orange, backgroundColor: THEME_COLORS.orange + '20', tension: 0.4, fill: true }] },
+            type: 'line', data: { labels: dates, datasets: [{ label: 'Care Email Tickets', data: dates.map(d => dateMap[d]), borderColor: THEME_COLORS.orange, backgroundColor: THEME_COLORS.orange + '20', tension: 0.4, fill: true }] },
             options: Object.assign(getStandardChartOptions('line', true), { scales: { x: { ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted'), maxTicksLimit: 15 } }, y: { beginAtZero: true, ticks: { color: getComputedStyle(document.body).getPropertyValue('--text-muted') } } } })
         });
     }
@@ -10184,9 +10239,9 @@ function renderAgentPerformance() {
     } else {
         const m = agentMetrics[selectedAgent] || {};
         kpisDiv.innerHTML = [
-            { label: 'Call Tickets', value: m.calls || 0 },
-            { label: 'WhatsApp Chats', value: m.wa || 0 },
-            { label: 'Care Emails', value: m.emails || 0 },
+            { label: 'DevRev Tickets', value: m.calls || 0 },
+            { label: 'WhatsApp Queries', value: m.wa || 0 },
+            { label: 'Care Email Tickets', value: m.emails || 0 },
             { label: 'Total', value: m.total || 0 },
             { label: 'Avg Talk Time', value: formatSecondsCompact(m.avgTalkTime) },
             { label: 'QA Score', value: m.avgQA !== '-' ? m.avgQA + '%' : '-' },
@@ -10772,11 +10827,11 @@ function renderPredictiveCapacityPlanner() {
                     <strong style="color: var(--purple);">${forecasted.calls} calls</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 500;">
-                    <span>💬 WhatsApp Chats:</span>
+                    <span>💬 WhatsApp Queries:</span>
                     <strong style="color: var(--green);">${forecasted.wa} chats</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 500;">
-                    <span>✉️ Care Emails:</span>
+                    <span>✉️ Care Email Tickets:</span>
                     <strong style="color: var(--orange);">${forecasted.emails} emails</strong>
                 </div>
             </div>
@@ -11635,7 +11690,7 @@ function renderAgentTelemetryTables(selectedAgent, data, calls) {
                 <td><strong>${total}</strong></td>
             </tr>`;
         });
-        agentDialStatusBody.innerHTML = html || '<tr><td colspan="6" class="text-center text-muted">No Ozonetel calls found for active filters</td></tr>';
+        agentDialStatusBody.innerHTML = html || '<tr><td colspan="6" class="text-center text-muted">No Ozonetel call entries found for active filters</td></tr>';
     }
 
     // 2. Ignored Ozonetel Dial Status Table

@@ -56,6 +56,19 @@
     </style>
 </head>
 <body class="light-mode">
+    <div id="dashboard-data-loader" class="dashboard-data-loader" role="status" aria-live="polite" aria-label="Loading dashboard data">
+        <div class="dashboard-data-loader__content">
+            <div class="dashboard-data-loader__mark" aria-hidden="true">
+                <span></span><span></span><span></span>
+            </div>
+            <strong>Loading support data</strong>
+            <p id="dashboard-data-loader-message">Preparing the latest dashboard snapshot…</p>
+            <div class="dashboard-data-loader__sources" aria-hidden="true">
+                <i></i><i></i><i></i><i></i>
+            </div>
+        </div>
+    </div>
+
     <!-- Apple-inspired Liquid Glass Background Mesh and Noise Overlay -->
     <div class="bg-mesh">
         <div class="blob blob-1"></div>
@@ -189,9 +202,9 @@
                     </div>
                     <strong id="data-gen-time" class="data-time-badge">Loading...</strong>
                     <div class="source-freshness-list" aria-label="Data source freshness">
-                        <span class="source-freshness" data-freshness-source="devrev"><i></i><b>DevRev</b><small>Checking…</small></span>
-                        <span class="source-freshness" data-freshness-source="ozonetel"><i></i><b>Ozonetel</b><small>Checking…</small></span>
-                        <span class="source-freshness" data-freshness-source="whatsapp"><i></i><b>WhatsApp</b><small>Checking…</small></span>
+                        <span class="source-freshness" data-freshness-source="devrev"><i></i><b>DevRev Tickets</b><small>Checking…</small></span>
+                        <span class="source-freshness" data-freshness-source="ozonetel"><i></i><b>Ozonetel Entries</b><small>Checking…</small></span>
+                        <span class="source-freshness" data-freshness-source="whatsapp"><i></i><b>WhatsApp Queries</b><small>Checking…</small></span>
                     </div>
                 </div>
             </div>
@@ -264,10 +277,11 @@
                         <div class="preset-buttons">
                             <button class="preset-btn" data-preset="today">Today</button>
                             <button class="preset-btn" data-preset="yesterday">Yesterday</button>
-                            <button class="preset-btn" data-preset="7d">Last 7d</button>
-                            <button class="preset-btn" data-preset="30d">Last 30d</button>
+                            <button class="preset-btn" data-preset="7d">Last 7 Days</button>
+                            <button class="preset-btn" data-preset="30d">Last 30 Days</button>
                             <button class="preset-btn" data-preset="month">This Month</button>
                             <button class="preset-btn" data-preset="year">This Year</button>
+                            <button class="preset-btn" data-preset="last-week">Last Week</button>
                             <button class="preset-btn active" id="current-week-preset-btn" data-preset="week">Current Week</button>
                             <button class="preset-btn" data-preset="custom">Custom</button>
                         </div>
@@ -285,6 +299,11 @@
                     </div>
                 </div>
 
+                <div id="date-comparison-note" class="date-comparison-note" aria-live="polite">
+                    <span aria-hidden="true">⇄</span>
+                    <span>Comparison period will appear after the dates load.</span>
+                </div>
+
                 <!-- Row 2: Channel, Select Dropdowns, Reset -->
                 <div class="filter-row-sub" style="border-top: 1px solid var(--border-color); padding-top: 16px;">
                     <!-- Channel filter pills -->
@@ -292,9 +311,9 @@
                         <label class="filter-label">Quick Channel Filters</label>
                         <div class="channel-pills">
                             <button class="pill-btn active" data-channel="all" id="pill-combined">Combined</button>
-                            <button class="pill-btn" data-channel="Call Ticket">Call Tickets</button>
-                            <button class="pill-btn" data-channel="WhatsApp Chat">WhatsApp</button>
-                            <button class="pill-btn hidden" data-channel="Care Email" id="pill-care-emails" style="display: none;">Care Emails</button>
+                            <button class="pill-btn" data-channel="Call Ticket">DevRev Tickets</button>
+                            <button class="pill-btn" data-channel="WhatsApp Chat">WhatsApp Queries</button>
+                            <button class="pill-btn hidden" data-channel="Care Email" id="pill-care-emails" style="display: none;">Care Email Tickets</button>
                         </div>
                     </div>
 
@@ -302,7 +321,7 @@
                     <div class="filter-group" style="display: flex; align-items: center; margin-top: auto; padding-bottom: 4px; margin-left: 12px;">
                         <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">
                             <input type="checkbox" id="filter-include-emails" style="width: 16px; height: 16px; cursor: pointer; border-radius: 4px; accent-color: var(--purple);">
-                            Include Care Emails
+                            Include Care Email Tickets
                         </label>
                     </div>
 
@@ -364,15 +383,15 @@
                             <div class="kpi-card" id="card-interactions">
                                 <div class="interaction-hero-layout">
                                     <div class="interaction-hero-primary">
-                                        <span class="kpi-title">Total Interactions <small>DevRev tickets, chats and emails</small></span>
+                                        <span class="kpi-title">Total Interactions <small>DevRev call tickets, WhatsApp queries and care email tickets</small></span>
                                         <div class="kpi-value" id="pulse-total-interactions">0</div>
                                         <div class="kpi-desc">The interaction total is not inflated with duplicate raw call events.</div>
                                         <div class="kpi-sub-info" id="pulse-total-sub"></div>
                                     </div>
                                     <div class="interaction-hero-ozonetel">
                                         <div class="interaction-hero-ozonetel-heading">
-                                            <strong>Ozonetel call operations</strong>
-                                            <span>Raw operational layer</span>
+                                            <strong>Ozonetel Entries</strong>
+                                            <span>Raw call operations</span>
                                         </div>
                                         <div class="ozonetel-inline-groups">
                                             <div class="ozonetel-inline-group">
@@ -383,15 +402,7 @@
                                                 <div><span>Connected</span><strong id="hero-oz-connected">0</strong></div>
                                                 <div><span>Abandoned</span><strong><b id="hero-oz-abandoned">0</b> · <b id="hero-oz-abandoned-rate">0%</b></strong></div>
                                             </div>
-                                            <div class="ozonetel-inline-group">
-                                                <h4>Timing</h4>
-                                                <div><span>Average AHT</span><strong><b id="hero-oz-aht">00:00:00</b><small class="metric-sample" id="hero-oz-aht-n">n=0</small></strong></div>
-                                                <div><span>Median AHT</span><strong><b id="hero-oz-median">00:00:00</b><small class="metric-sample" id="hero-oz-median-n">n=0</small></strong></div>
-                                                <div><span>90th % AHT</span><strong><b id="hero-oz-p90">00:00:00</b><small class="metric-sample" id="hero-oz-p90-n">n=0</small></strong></div>
-                                                <div><span>Talk / Hold</span><strong><b id="hero-oz-talk">00:00:00</b> · <b id="hero-oz-hold">00:00:00</b></strong></div>
-                                                <div><span>Queue Ans / Unans</span><strong><b id="hero-oz-queue-ans">00:00:00</b> · <b id="hero-oz-queue-unans">00:00:00</b></strong></div>
-                                            </div>
-                                            <div class="ozonetel-inline-group">
+                                            <div class="ozonetel-inline-group ozonetel-inline-group--progressive">
                                                 <h4>Progressive</h4>
                                                 <div><span>Attempted</span><strong id="hero-oz-prog-attempted">0</strong></div>
                                                 <div><span>Answered</span><strong id="hero-oz-prog-answered">0</strong></div>
@@ -399,21 +410,29 @@
                                                 <div><span>User / Other</span><strong><b id="hero-oz-prog-user">0</b> · <b id="hero-oz-prog-other">0</b></strong></div>
                                                 <div><span>Progressive AHT</span><strong id="hero-oz-prog-aht">00:00:00</strong></div>
                                             </div>
+                                            <div class="ozonetel-inline-group ozonetel-inline-group--timing">
+                                                <h4>Timing</h4>
+                                                <div><span>Average AHT</span><strong><b id="hero-oz-aht">00:00:00</b><small class="metric-sample" id="hero-oz-aht-n">n=0</small></strong></div>
+                                                <div><span>Median AHT</span><strong><b id="hero-oz-median">00:00:00</b><small class="metric-sample" id="hero-oz-median-n">n=0</small></strong></div>
+                                                <div><span>90th % AHT</span><strong><b id="hero-oz-p90">00:00:00</b><small class="metric-sample" id="hero-oz-p90-n">n=0</small></strong></div>
+                                                <div><span>Talk / Hold</span><strong><b id="hero-oz-talk">00:00:00</b> · <b id="hero-oz-hold">00:00:00</b></strong></div>
+                                                <div><span>Queue Ans / Unans</span><strong><b id="hero-oz-queue-ans">00:00:00</b> · <b id="hero-oz-queue-unans">00:00:00</b></strong></div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="kpi-card" id="card-tickets">
-                                <span class="kpi-title">Call Tickets <small>DevRev record + Ozonetel call volume</small></span>
+                                <span class="kpi-title">Call Activity <small>DevRev tickets + Ozonetel entries</small></span>
                                 <div class="kpi-dual-source-grid">
                                     <div class="kpi-source-column">
-                                        <span class="kpi-source-label">DevRev</span>
+                                        <span class="kpi-source-label">DevRev Tickets</span>
                                         <div class="kpi-value" id="pulse-call-tickets">0</div>
                                         <div class="kpi-desc">Tickets created</div>
                                         <div class="kpi-sub-info" id="pulse-tickets-sub"></div>
                                     </div>
                                     <div class="kpi-source-column kpi-source-column--ozonetel">
-                                        <span class="kpi-source-label">Ozonetel</span>
+                                        <span class="kpi-source-label">Ozonetel Entries</span>
                                         <div class="kpi-value text-blue" id="pulse-oz-total">0</div>
                                         <div class="kpi-desc">Inbound + progressive calls</div>
                                         <div class="kpi-source-detail"><strong id="pulse-oz-inbound">0</strong> inbound <span>·</span> <strong id="pulse-oz-progressive">0</strong> progressive</div>
@@ -421,22 +440,22 @@
                                 </div>
                             </div>
                             <div class="kpi-card" id="card-whatsapp">
-                                <span class="kpi-title">WhatsApp Chats <small>DevRev conversations</small></span>
+                                <span class="kpi-title">WhatsApp Queries <small>WhatsApp conversations on DevRev</small></span>
                                 <div class="kpi-value" id="pulse-whatsapp-chats">0</div>
-                                <div class="kpi-desc">WhatsApp conversations</div>
+                                <div class="kpi-desc">WhatsApp chat queries</div>
                                 <div class="kpi-sub-info" id="pulse-whatsapp-sub"></div>
                             </div>
                             <div class="kpi-card" id="card-answered">
-                                <span class="kpi-title">Answered Calls <small>DevRev outcome + Ozonetel connected</small></span>
+                                <span class="kpi-title">Answered Calls <small>DevRev call tickets + Ozonetel call entries</small></span>
                                 <div class="kpi-dual-source-grid">
                                     <div class="kpi-source-column">
-                                        <span class="kpi-source-label">DevRev</span>
+                                        <span class="kpi-source-label">DevRev Tickets</span>
                                         <div class="kpi-value text-green" id="pulse-answered-calls">0</div>
                                         <div class="kpi-desc">Answered call tickets</div>
                                         <div class="kpi-sub-info" id="pulse-answered-sub"></div>
                                     </div>
                                     <div class="kpi-source-column kpi-source-column--ozonetel">
-                                        <span class="kpi-source-label">Ozonetel</span>
+                                        <span class="kpi-source-label">Ozonetel Entries</span>
                                         <div class="kpi-value text-green" id="pulse-oz-connected">0</div>
                                         <div class="kpi-desc">Connected calls</div>
                                         <div class="kpi-source-detail">Operational connected volume</div>
@@ -444,16 +463,16 @@
                                 </div>
                             </div>
                             <div class="kpi-card" id="card-missed">
-                                <span class="kpi-title">Missed / Abandoned Calls <small>DevRev missed + Ozonetel abandoned</small></span>
+                                <span class="kpi-title">Missed / Abandoned Calls <small>DevRev missed tickets + Ozonetel abandoned entries</small></span>
                                 <div class="kpi-dual-source-grid">
                                     <div class="kpi-source-column">
-                                        <span class="kpi-source-label">DevRev</span>
+                                        <span class="kpi-source-label">DevRev Tickets</span>
                                         <div class="kpi-value text-red" id="pulse-missed-calls">0</div>
                                         <div class="kpi-desc">Missed call tickets</div>
                                         <div class="kpi-sub-info" id="pulse-missed-sub"></div>
                                     </div>
                                     <div class="kpi-source-column kpi-source-column--ozonetel">
-                                        <span class="kpi-source-label">Ozonetel</span>
+                                        <span class="kpi-source-label">Ozonetel Entries</span>
                                         <div class="kpi-value text-red" id="pulse-oz-abandoned">0</div>
                                         <div class="kpi-desc">Abandoned calls</div>
                                         <div class="kpi-source-detail kpi-source-detail--risk"><strong id="pulse-oz-abandoned-rate">0%</strong> of inbound calls</div>
@@ -461,16 +480,16 @@
                                 </div>
                             </div>
                             <div class="kpi-card" id="card-aoh">
-                                <span class="kpi-title">AOH / Progressive Calls <small>DevRev AOH + Ozonetel progressive outcome</small></span>
+                                <span class="kpi-title">AOH / Progressive Calls <small>DevRev AOH tickets + Ozonetel progressive entries</small></span>
                                 <div class="kpi-dual-source-grid">
                                     <div class="kpi-source-column">
-                                        <span class="kpi-source-label">DevRev</span>
+                                        <span class="kpi-source-label">DevRev Tickets</span>
                                         <div class="kpi-value text-blue" id="pulse-aoh-calls">0</div>
                                         <div class="kpi-desc">After-office-hours outcomes</div>
                                         <div class="kpi-sub-info" id="pulse-aoh-sub"></div>
                                     </div>
                                     <div class="kpi-source-column kpi-source-column--ozonetel">
-                                        <span class="kpi-source-label">Ozonetel</span>
+                                        <span class="kpi-source-label">Ozonetel Entries</span>
                                         <div class="kpi-value text-blue" id="pulse-oz-prog-attempted">0</div>
                                         <div class="kpi-desc">Progressive calls attempted</div>
                                         <div class="kpi-source-detail"><strong id="pulse-oz-prog-answered">0</strong> answered <span>·</span> <strong id="pulse-oz-prog-unanswered">0</strong> unanswered</div>
@@ -478,18 +497,18 @@
                                 </div>
                             </div>
                             <div class="kpi-card" id="card-aht">
-                                <span class="kpi-title">Avg Handling Time <small>Ozonetel inbound call timing</small></span>
+                                <span class="kpi-title">Avg Handling Time <small>Ozonetel call-entry timing</small></span>
                                 <div class="kpi-value" id="pulse-aht">00:00</div>
                                 <div class="kpi-desc">Avg duration per answered inbound call <small class="metric-sample" id="pulse-aht-primary-sample">n=0</small></div>
                                 <div class="kpi-sub-info" id="pulse-aht-sub"></div>
                                 <div class="kpi-source-bridge"><span>Median / 90th % <small class="metric-sample" id="pulse-aht-sample">n=0</small></span><strong><b id="pulse-oz-median-aht">00:00:00</b> · <b id="pulse-oz-p90-aht">00:00:00</b></strong></div>
                             </div>
                             <div class="kpi-card" id="card-aqt">
-                                <span class="kpi-title">Avg Queue Time <small>Ozonetel queue and conversation timing</small></span>
+                                <span class="kpi-title">Avg Queue Time <small>Ozonetel call-entry queue timing</small></span>
                                 <div class="kpi-value" id="pulse-aqt">00:00</div>
                                 <div class="kpi-desc">Avg time to answer calls</div>
                                 <div class="kpi-sub-info" id="pulse-aqt-sub"></div>
-                                <div class="kpi-source-bridge kpi-source-bridge--stacked"><span>Ozonetel timing</span><strong>Unanswered queue <b id="pulse-oz-queue-unanswered">00:00:00</b></strong><strong>Talk / Hold <b id="pulse-oz-talk">00:00:00</b> · <b id="pulse-oz-hold">00:00:00</b></strong></div>
+                                <div class="kpi-source-bridge kpi-source-bridge--stacked"><span>Ozonetel entry timing</span><strong>Unanswered queue <b id="pulse-oz-queue-unanswered">00:00:00</b></strong><strong>Talk / Hold <b id="pulse-oz-talk">00:00:00</b> · <b id="pulse-oz-hold">00:00:00</b></strong></div>
                             </div>
                         </div>
                     </div>
@@ -542,7 +561,7 @@
                     <div class="chart-row-2">
                         <div class="visual-card">
                             <h3 class="card-title">Support Channels Trend</h3>
-                            <p class="card-subtitle">Daily volumes of call tickets, WhatsApp chats, and emails</p>
+                            <p class="card-subtitle">Daily volumes of DevRev tickets, WhatsApp queries and care email tickets</p>
                             <div class="chart-container">
                                 <canvas id="chart-pulse-trend"></canvas>
                             </div>
@@ -793,8 +812,8 @@
                 <div class="sub-tab-pills" id="main-dash-sub-tabs">
                     <button class="sub-tab-pill active" data-subtab="md-overview">📊 Overview</button>
                     <button class="sub-tab-pill" data-subtab="md-calls">📞 Calls Deep-Dive</button>
-                    <button class="sub-tab-pill" data-subtab="md-whatsapp">💬 WhatsApp Deep-Dive</button>
-                    <button class="sub-tab-pill" data-subtab="md-emails">📧 Emails Deep-Dive</button>
+                    <button class="sub-tab-pill" data-subtab="md-whatsapp">💬 WhatsApp Queries</button>
+                    <button class="sub-tab-pill" data-subtab="md-emails">📧 Care Email Tickets</button>
                     <button class="sub-tab-pill" data-subtab="md-productivity">🛡️ Productivity Control Room</button>
                 </div>
 
@@ -1052,7 +1071,7 @@
                 <!-- MD Sub-Tab 3: WhatsApp Deep-Dive -->
                 <div class="sub-tab-content" id="md-whatsapp">
                     <div class="dashboard-section-wrapper">
-                        <h2 class="section-heading">WhatsApp Chat Analytics</h2>
+                        <h2 class="section-heading">WhatsApp Query Analytics</h2>
                         <div class="kpi-grid" id="md-wa-kpi-grid">
                             <!-- WA KPIs rendered dynamically -->
                         </div>
@@ -1073,12 +1092,12 @@
                             <canvas id="md-wa-issues-chart" height="280"></canvas>
                         </div>
                         <div class="deepdive-chart-card">
-                            <div class="chart-title">🏢 Top Brokers by WhatsApp</div>
+                            <div class="chart-title">🏢 Top Brokers by WhatsApp Queries</div>
                             <canvas id="md-wa-brokers-chart" height="280"></canvas>
                         </div>
                     </div>
                     <div class="dashboard-section-wrapper">
-                        <h2 class="section-heading">SLA Compliance — WhatsApp</h2>
+                        <h2 class="section-heading">SLA Compliance — WhatsApp Queries</h2>
                         <div id="md-wa-sla-table"></div>
                     </div>
                 </div>
@@ -1086,7 +1105,7 @@
                 <!-- MD Sub-Tab 4: Emails Deep-Dive -->
                 <div class="sub-tab-content" id="md-emails">
                     <div class="dashboard-section-wrapper">
-                        <h2 class="section-heading">Care Email Analytics</h2>
+                        <h2 class="section-heading">Care Email Ticket Analytics</h2>
                         <div class="kpi-grid" id="md-email-kpi-grid">
                             <!-- Email KPIs rendered dynamically -->
                         </div>
@@ -1112,7 +1131,7 @@
                         </div>
                     </div>
                     <div class="dashboard-section-wrapper">
-                        <h2 class="section-heading">SLA Compliance — Care Emails</h2>
+                        <h2 class="section-heading">SLA Compliance — Care Email Tickets</h2>
                         <div id="md-email-sla-table"></div>
                     </div>
                 </div>
@@ -1400,8 +1419,8 @@
                         <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
                             <div>
                                 <div style="font-size: 1.8rem; margin-bottom: 10px;">💬</div>
-                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">Devrev Whatsapp</h4>
-                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Monitor and manage live WhatsApp chats Vista board.</p>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">WhatsApp Queries</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Monitor WhatsApp chat queries on DevRev.</p>
                             </div>
                             <a href="https://app.devrev.ai/smallcasebp/vistas/vista-530" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 Open DevRev Vista ↗
@@ -1412,8 +1431,8 @@
                         <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
                             <div>
                                 <div style="font-size: 1.8rem; margin-bottom: 10px;">📞</div>
-                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">B2B Calls</h4>
-                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Access call records and logs Vista board on DevRev.</p>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">DevRev Tickets</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Access DevRev call-ticket records and logs.</p>
                             </div>
                             <a href="https://app.devrev.ai/smallcasebp/vistas/vista-712" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 Open DevRev Vista ↗
@@ -1424,8 +1443,8 @@
                         <div class="card" style="padding: 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; min-height: 160px; transition: var(--transition-smooth);">
                             <div>
                                 <div style="font-size: 1.8rem; margin-bottom: 10px;">✉️</div>
-                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">Care Emails</h4>
-                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Monitor and support customer care emails Vista board.</p>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">Care Email Tickets</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">Monitor customer-care email tickets on DevRev.</p>
                             </div>
                             <a href="https://app.devrev.ai/smallcasebp/vistas/vista-216" target="_blank" class="action-btn" style="padding: 10px; font-size: 0.85rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 Open DevRev Vista ↗
@@ -1488,20 +1507,20 @@
                     <div class="kpi-card vc-kpi-card accent-purple">
                         <span class="vc-kpi-label">TOTAL INTERACTIONS</span>
                         <strong class="vc-kpi-value" id="vc-kpi-total">0</strong>
-                        <span class="vc-kpi-desc">Call tickets + WhatsApp + Emails</span>
+                        <span class="vc-kpi-desc">DevRev tickets + WhatsApp queries + email tickets</span>
                     </div>
                     <div class="kpi-card vc-kpi-card accent-blue">
-                        <span class="vc-kpi-label">CALL TICKETS</span>
+                        <span class="vc-kpi-label">DEVREV TICKETS</span>
                         <strong class="vc-kpi-value" id="vc-kpi-calls">0</strong>
                         <span class="vc-kpi-desc">Answered, missed and AOH calls from DevRev title</span>
                     </div>
                     <div class="kpi-card vc-kpi-card accent-green">
-                        <span class="vc-kpi-label">WHATSAPP</span>
+                        <span class="vc-kpi-label">WHATSAPP QUERIES</span>
                         <strong class="vc-kpi-value" id="vc-kpi-whatsapp">0</strong>
-                        <span class="vc-kpi-desc">WhatsApp chats in filtered slice</span>
+                        <span class="vc-kpi-desc">WhatsApp queries in filtered slice</span>
                     </div>
                     <div class="kpi-card vc-kpi-card accent-orange">
-                        <span class="vc-kpi-label">CARE EMAILS</span>
+                        <span class="vc-kpi-label">CARE EMAIL TICKETS</span>
                         <strong class="vc-kpi-value" id="vc-kpi-emails">0</strong>
                         <span class="vc-kpi-desc">Care email tickets in filtered slice</span>
                     </div>
@@ -1541,7 +1560,7 @@
                 <div class="vc-charts-row-2">
                     <div class="visual-card">
                         <div class="card-header-row">
-                            <h3 class="card-title">Call Tickets Over Time</h3>
+                            <h3 class="card-title">DevRev Tickets Over Time</h3>
                             <span class="card-subtitle-right">ANSWERED / MISSED / AOH TREND FROM DEVREV TITLES</span>
                         </div>
                         <div class="chart-container">
@@ -1550,8 +1569,8 @@
                     </div>
                     <div class="visual-card">
                         <div class="card-header-row">
-                            <h3 class="card-title">WhatsApp Over Time</h3>
-                            <span class="card-subtitle-right">WHATSAPP CHAT VOLUME TREND</span>
+                            <h3 class="card-title">WhatsApp Queries Over Time</h3>
+                            <span class="card-subtitle-right">WHATSAPP QUERY VOLUME TREND</span>
                         </div>
                         <div class="chart-container">
                             <canvas id="vc-chart-whatsapp-over-time"></canvas>
@@ -1563,7 +1582,7 @@
                 <div class="vc-charts-row-2">
                     <div class="visual-card">
                         <div class="card-header-row">
-                            <h3 class="card-title">Care Emails Over Time</h3>
+                            <h3 class="card-title">Care Email Tickets Over Time</h3>
                             <span class="card-subtitle-right">CARE EMAIL TICKET TREND</span>
                         </div>
                         <div class="chart-container">
@@ -1573,7 +1592,7 @@
                     <div class="visual-card">
                         <div class="card-header-row">
                             <h3 class="card-title">Channel Mix</h3>
-                            <span class="card-subtitle-right">CALL TICKETS VS WHATSAPP VS CARE EMAILS</span>
+                            <span class="card-subtitle-right">DEVREV TICKETS VS WHATSAPP QUERIES VS CARE EMAIL TICKETS</span>
                         </div>
                         <div class="chart-container">
                             <canvas id="vc-chart-channel-mix"></canvas>
@@ -1585,7 +1604,7 @@
                 <div class="vc-charts-row-4">
                     <div class="visual-card">
                         <div class="card-header-row">
-                            <h3 class="card-title">Top RMs - Call Tickets</h3>
+                            <h3 class="card-title">Top RMs - DevRev Tickets</h3>
                             <span class="card-subtitle-right">RMS CONTACTING THROUGH CALLS</span>
                         </div>
                         <div class="chart-container">
@@ -1594,7 +1613,7 @@
                     </div>
                     <div class="visual-card">
                         <div class="card-header-row">
-                            <h3 class="card-title">Top RMs - WhatsApp</h3>
+                            <h3 class="card-title">Top RMs - WhatsApp Queries</h3>
                             <span class="card-subtitle-right">RMS CONTACTING THROUGH WHATSAPP</span>
                         </div>
                         <div class="chart-container">
@@ -1603,7 +1622,7 @@
                     </div>
                     <div class="visual-card">
                         <div class="card-header-row" style="flex-wrap: wrap; gap: 8px;">
-                            <h3 class="card-title">Top RMs - Care Emails</h3>
+                            <h3 class="card-title">Top RMs - Care Email Tickets</h3>
                             <div style="display: flex; gap: 12px; align-items: center; font-size: 0.72rem; margin-left: auto;">
                                 <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); font-weight: 600;">
                                     <input type="radio" name="vc-email-rm-toggle" value="broker" checked style="accent-color: var(--purple); cursor: pointer; margin: 0;"> Broker Name
@@ -1633,7 +1652,7 @@
                 <div class="vc-charts-row-4">
                     <div class="visual-card">
                         <div class="card-header-row">
-                            <h3 class="card-title">Top Issues - Call Tickets</h3>
+                            <h3 class="card-title">Top Issues - DevRev Tickets</h3>
                             <span class="card-subtitle-right">CALL-TICKET ISSUE CONCENTRATION</span>
                         </div>
                         <div class="chart-container">
@@ -1642,7 +1661,7 @@
                     </div>
                     <div class="visual-card">
                         <div class="card-header-row">
-                            <h3 class="card-title">Top Issues - WhatsApp</h3>
+                            <h3 class="card-title">Top Issues - WhatsApp Queries</h3>
                             <span class="card-subtitle-right">WHATSAPP ISSUE CONCENTRATION</span>
                         </div>
                         <div class="chart-container">
@@ -1651,7 +1670,7 @@
                     </div>
                     <div class="visual-card">
                         <div class="card-header-row">
-                            <h3 class="card-title">Top Issues - Care Emails</h3>
+                            <h3 class="card-title">Top Issues - Care Email Tickets</h3>
                             <span class="card-subtitle-right">CARE EMAIL ISSUE CONCENTRATION</span>
                         </div>
                         <div class="chart-container">
@@ -1913,7 +1932,7 @@
                                 <tr>
                                     <th>Agent</th>
                                     <th>Calls</th>
-                                    <th>WhatsApp</th>
+                                    <th>WhatsApp Queries</th>
                                     <th>Emails</th>
                                     <th>Total</th>
                                     <th>Avg Talk Time</th>
@@ -1991,7 +2010,7 @@
                         
                         <!-- NEW: Dial Status Categorization Table -->
                         <div class="dashboard-section-wrapper" style="margin-top: 30px;">
-                            <h2 class="section-heading">📞 Ozonetel Dial Status Categorization</h2>
+                            <h2 class="section-heading">📞 Ozonetel Entry Status</h2>
                             <div class="agent-comparison-table-wrapper">
                                 <div class="monthly-table-scroll scrollbar-themed" style="max-height: 45vh; overflow-y: auto;">
                                     <table class="agent-comparison-table" id="agent-dial-status-table">
@@ -2015,7 +2034,7 @@
 
                         <!-- NEW: Ignored Ozonetel Dial Status by Agent Table -->
                         <div class="dashboard-section-wrapper" style="margin-top: 30px;">
-                            <h2 class="section-heading">⚠️ Ignored Ozonetel Dial Status by Agent</h2>
+                            <h2 class="section-heading">⚠️ Ignored Ozonetel Entries by Agent</h2>
                             <div class="agent-comparison-table-wrapper">
                                 <div class="monthly-table-scroll scrollbar-themed" style="max-height: 45vh; overflow-y: auto;">
                                     <table class="agent-comparison-table" id="ignored-dial-status-table">
@@ -2097,7 +2116,7 @@
                     <section class="activity-insight-panel" aria-labelledby="activity-leaders-title">
                         <div class="activity-insight-heading">
                             <h3 id="activity-leaders-title">Most active</h3>
-                            <span>WhatsApp + calls</span>
+                            <span>WhatsApp queries + Ozonetel entries</span>
                         </div>
                         <div class="activity-insight-list" id="activity-leaders-list"></div>
                     </section>
@@ -2113,7 +2132,7 @@
                     <div class="activity-table-toolbar">
                         <div>
                             <h3 id="activity-table-title">Branch activity by smallcase POC</h3>
-                            <p id="activity-table-caption">Activity combines WhatsApp conversations and Ozonetel calls. Click a numeric heading to sort.</p>
+                            <p id="activity-table-caption">Activity combines WhatsApp queries and Ozonetel entries. Click a numeric heading to sort.</p>
                         </div>
                         <div class="activity-table-controls">
                             <select id="activity-poc-filter" aria-label="Filter activity by POC"><option value="all">All POCs</option></select>
@@ -2153,7 +2172,7 @@
                         <button type="button" id="chart-viz-reset" class="chart-viz-reset-btn">Reset chart filters</button>
                     </div>
                     <div class="chart-viz-filter-grid">
-                        <label><span>Channel</span><select id="chart-viz-channel"><option value="all">Combined</option><option value="Call Ticket">Call Tickets</option><option value="WhatsApp Chat">WhatsApp</option><option value="Care Email">Care</option></select></label>
+                        <label><span>Channel</span><select id="chart-viz-channel"><option value="all">Combined</option><option value="Call Ticket">DevRev Tickets</option><option value="WhatsApp Chat">WhatsApp Queries</option><option value="Care Email">Care Email Tickets</option></select></label>
                         <label><span>Broker</span><select id="chart-viz-broker"><option value="all">All brokers</option></select></label>
                         <label><span>POC</span><select id="chart-viz-poc"><option value="all">All POCs</option></select></label>
                         <label><span>Issue type</span><select id="chart-viz-issue"><option value="all">All issue types</option></select></label>
@@ -2322,7 +2341,7 @@
                             <br><br>
                             <strong>Date Range:</strong> Use the preset timeline buttons (Today, Last 7d, Last 30d, etc.) or set a custom date range. All tabs react to the selected date range.
                             <br><br>
-                            <strong>Filters:</strong> Filter by Broker Family, Assigned POC, Support Agent, and Channel type. Use the "Include Care Emails" checkbox to optionally include email data in the Weekly Pulse view.
+                            <strong>Filters:</strong> Filter by Broker Family, Assigned POC, Support Agent, and Channel type. Use the "Include Care Email Tickets" checkbox to optionally include email data in the Weekly Pulse view.
                         </div>
                     </div>
 
@@ -2364,10 +2383,10 @@
                         <div class="guide-title">📊 Data Sources</div>
                         <div class="guide-card">
                             <strong>6 Data Sheets:</strong><br>
-                            • <strong>Ozonetel Calls</strong> — Raw voice call records (UCID, duration, agent, status, recording URL)<br>
-                            • <strong>Ozonetel DevRev Tickets</strong> — Support tickets created from calls (matched via 20-second time window)<br>
-                            • <strong>WhatsApp Chats</strong> — RM conversations via WhatsApp (DevRev conversations)<br>
-                            • <strong>Care Emails</strong> — Email tickets from care@smallcase.com<br>
+                            • <strong>Ozonetel Entries</strong> — Raw voice call records (UCID, duration, agent, status, recording URL)<br>
+                            • <strong>DevRev Tickets</strong> — Call tickets created in DevRev and matched to calls<br>
+                            • <strong>WhatsApp Queries</strong> — RM WhatsApp conversations stored in DevRev<br>
+                            • <strong>Care Email Tickets</strong> — Email tickets from care@smallcase.com stored in DevRev<br>
                             • <strong>Ozonetel Agent Breaks</strong> — Agent break logs for occupancy calculation<br>
                             • <strong>POC-Branch Mapping</strong> — Master mapping of internal POCs to partner branches
                         </div>
@@ -2376,8 +2395,8 @@
                     <div class="guide-section">
                         <div class="guide-title">❓ FAQ</div>
                         <div class="guide-card">
-                            <strong>Q: Why are Care Emails excluded from Weekly Pulse by default?</strong><br>
-                            A: Care Emails don't have branch or POC mapping, so they're optionally included via the checkbox to keep weekly reports focused on mapped partners.<br><br>
+                            <strong>Q: Why are Care Email Tickets excluded from Weekly Pulse by default?</strong><br>
+                            A: Care Email Tickets don't have branch or POC mapping, so they're optionally included via the checkbox to keep weekly reports focused on mapped partners.<br><br>
                             <strong>Q: How is AHT calculated?</strong><br>
                             A: Average Handling Time is calculated from the Ozonetel Calls sheet "Duration" column for answered/connected voice calls, converted to seconds.<br><br>
                             <strong>Q: How is occupancy calculated?</strong><br>
@@ -2418,7 +2437,7 @@
                     <strong class="modal-kpi-val" id="poc-modal-kpi-wa">0%</strong>
                 </div>
                 <div class="modal-kpi-card">
-                    <span class="modal-kpi-lbl">Call Tickets</span>
+                    <span class="modal-kpi-lbl">DevRev Tickets</span>
                     <strong class="modal-kpi-val" id="poc-modal-kpi-call">0</strong>
                 </div>
                 <div class="modal-kpi-card">
